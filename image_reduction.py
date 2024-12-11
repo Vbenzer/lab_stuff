@@ -35,7 +35,7 @@ def create_master_dark(dark_folder, plot=False):
 
     return master_dark
 
-def reduce_image_with_dark(science_data, dark_data, output_file, science_header=None, plot=False):
+def reduce_image_with_dark(science_data, dark_data, output_file, save=False, plot=False):
     """
     Reduces a science image by subtracting a dark frame.
 
@@ -43,7 +43,7 @@ def reduce_image_with_dark(science_data, dark_data, output_file, science_header=
         science_data (np.ndarray): Science image data.
         dark_data (np.ndarray): Dark image data.
         output_file (str): Path to save the reduced FITS file.
-        science_header (astropy.io.fits.Header): Science image header.
+        save (bool): Save reduce image to file?
         plot (bool, optional): If True, plot the reduced image.
 
     Returns:
@@ -60,10 +60,11 @@ def reduce_image_with_dark(science_data, dark_data, output_file, science_header=
     # Clip negative values to zero (or other minimum threshold, if applicable)
     reduced_data = np.clip(reduced_data, 0, None)
 
-    if science_header is not None:
+    if save:
         # Save the reduced image to a new FITS file
-        hdu = fits.PrimaryHDU(data=reduced_data, header=science_header)
+        hdu = fits.PrimaryHDU(data=reduced_data)
         hdu.writeto(output_file, overwrite=True)
+        print(f"Reduced image saved to: {output_file}")
 
     if plot:
         # Plotting
@@ -86,7 +87,7 @@ def reduce_image_with_dark(science_data, dark_data, output_file, science_header=
         plt.tight_layout()
         plt.show()
 
-    print(f"Reduced image saved to: {output_file}")
+
 
     return reduced_data
 

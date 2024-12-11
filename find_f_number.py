@@ -3,7 +3,7 @@ from scipy.stats import linregress
 import matplotlib.pyplot as plt
 
 
-def calculate_f_number(data, plot_regression=False):
+def calculate_f_number(radii, pos_values, plot_regression=False):
     """
     Calculate the F-number (f/#) from the spot radii and CCD positions.
 
@@ -15,8 +15,9 @@ def calculate_f_number(data, plot_regression=False):
         float: The calculated F-number with error.
     """
     # Separate CCD positions and spot radii
-    ccd_positions, spot_radii = zip(*data)
-    ccd_positions = np.array(ccd_positions)
+    #ccd_positions, spot_radii = zip(*data) #Todo: weird number stuff when getting data from main directly
+    spot_radii = np.array(radii)*3.76e-3
+    ccd_positions = np.array(pos_values)
     spot_radii = np.array(spot_radii)
 
     # Perform linear regression
@@ -42,12 +43,15 @@ def calculate_f_number(data, plot_regression=False):
 
 if __name__ == "__main__":
     # Example usage
+    """data = [
+        (0, 11.46/3.76e-3),
+        (4.33, 12.19/3.76e-3),
+        (8.65, 12.91/3.76e-3),
+    ]  # Replace with your measured data"""
     data = [
-        (0, 11.4),
-        (2, 12.0),
-        (4, 12.6),
-        (6, 12.8),
-        (8, 13.0)
+        (0, 706),
+        (5, 814),
+        (9.9, 920),
     ]  # Replace with your measured data
 
     f_number,f_number_err = calculate_f_number(data, plot_regression=True)
