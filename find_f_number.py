@@ -11,7 +11,8 @@ def calculate_f_number(radii, pos_values, plot_regression=False, save_plot:bool=
     Calculate the F-number (f/#) from the spot radii and CCD positions.
 
     Parameters:
-        data (list of tuples): List of (CCD position, spot radius) pairs [(position, radius)].
+        radii (ndarray): Array of spot radii
+        pos_values (ndarray): Array of CCD positions
         plot_regression (bool): If True, plot the linear regression of the data.
 
     Returns:
@@ -20,7 +21,7 @@ def calculate_f_number(radii, pos_values, plot_regression=False, save_plot:bool=
 
     #Todo: weird number stuff when getting data from main directly
 
-    spot_radii = radii*3.76e-3
+    spot_radii = radii*7.52e-3
     ccd_positions = pos_values
 
     # Perform linear regression
@@ -43,11 +44,12 @@ def calculate_f_number(radii, pos_values, plot_regression=False, save_plot:bool=
         if save_plot:
             if save_path is None:
                 raise ValueError("'save_path' must be provided")
-            plt.savefig(save_path)
+            plt.savefig(save_path+"regression_plot.png")
 
         if plot_regression:
             plt.show()
-    with open("f_number.json","w") as f:
+        plt.close()
+    with open(save_path+"f_number.json","w") as f:
         json.dump({"f_number":f_number,"f_number_err":f_number_err}, f)
 
     return f_number,f_number_err
@@ -55,7 +57,7 @@ def calculate_f_number(radii, pos_values, plot_regression=False, save_plot:bool=
 
 if __name__ == "__main__":
     # Example usage
-    radii = np.array([706,814,920])
+    radii = np.array([435,488,548])
     pos_values = np.array([0,5,9.9])
 
 

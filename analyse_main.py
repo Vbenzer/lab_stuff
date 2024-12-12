@@ -5,12 +5,14 @@ from astropy.io import fits
 import os
 import numpy as np
 
-project_folder = "D:/stepper_motor/test_images/sequence_stepper_filter_fstop_analysis/Filter2/"
+project_folder = "D:/stepper_motor/test_images/sequence_stepper_filter_fstop_analysis/Filter5/"
 run_description = "Test"
 dark_folder = project_folder+"DARK"
 light_folder = project_folder+"LIGHT"
 reduce_images_folder = project_folder+"REDUCED/"
 measurements_folder = project_folder+"Measurements/"
+os.makedirs(measurements_folder, exist_ok=True)
+
 pos_values=[0,5,9.9]
 
 m_dark = image_reduction.create_master_dark(dark_folder, plot=False)
@@ -43,13 +45,18 @@ for n,red in enumerate(reduced_data):
     com = image_analysation.LocateFocus(trimmed_data)
 
     # Find aperture with 95% (or other) encircled energy
-    radius = image_analysation.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=True, save_file=measurements_folder+f"Radius_{n}")
+    os.makedirs(measurements_folder+f"/Radius", exist_ok=True)
+    radius = image_analysation.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=False, save_file=measurements_folder+f"/Radius/datapoint{n}")
     radii.append(radius)
 
 radii.sort()
 pos_values.sort()
 
+radii = np.array(radii)
+pos_values = np.array(pos_values)
+
+
 print('radii:',radii,'pos:',pos_values)
 
-f_number,f_number_err = find_f_number.calculate_f_number(radii,pos_values, plot_regression=True)
-print(f"Calculated F-number (f/#): {f_number:.2f} ± {f_number_err:.2f}")
+f_number,f_number_err = find_f_number.calculate_f_number(radii, pos_values, plot_regression=True, save_path=measurements_folder)
+print(f"Calculated F-number (f/#): {f_number:.3f} ± {f_number_err:.3f}")

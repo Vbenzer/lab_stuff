@@ -180,10 +180,11 @@ def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float
 
         if plot:
             plt.show()
-
+    plt.show()
+    plt.close()
 
     if save_data:
-        with open("radius.json", "w") as f:
+        with open(save_file+"radius.json", "w") as f:
             json.dump({"radius": radius, "center of mass": com}, f)
 
     return radius

@@ -17,6 +17,7 @@ def create_hdf5_group(folder_path:str, group_name:str):
 def add_data_to_hdf(path:str, data, dataset_name:str):
     with h5py.File(path, "w") as f:
         f.create_dataset(dataset_name, data)
+    # Attributes potentially
     print("Wrote data to:", dataset_name)
 
 def add_plot_to_hdf(file_path:str, plot_path:str, plot_name:str):

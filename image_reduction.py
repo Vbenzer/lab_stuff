@@ -98,7 +98,7 @@ def reduce_image_with_dark(science_data, dark_data, output_file, save=False, plo
             if img_path is None:
                 raise ValueError("'img_path' must be provided if 'save' is True")
             plt.savefig(img_path)
-
+        plt.close()
 
     return reduced_data
 
