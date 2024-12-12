@@ -9,8 +9,8 @@ project_folder = "D:/stepper_motor/test_images/sequence_stepper_filter_fstop_ana
 run_description = "Test"
 dark_folder = project_folder+"DARK"
 light_folder = project_folder+"LIGHT"
-reduce_images_folder = project_folder+"REDUCED"
-measurements_folder = project_folder+"Measurements"
+reduce_images_folder = project_folder+"REDUCED/"
+measurements_folder = project_folder+"Measurements/"
 pos_values=[0,5,9.9]
 
 m_dark = image_reduction.create_master_dark(dark_folder, plot=False)
@@ -35,7 +35,7 @@ for file_name in os.listdir(light_folder):
 radii = []
 
 
-for red in reduced_data:
+for n,red in enumerate(reduced_data):
     # Trim data to area of interest (perhaps not necessary with better background reduction)
     trimmed_data = image_analysation.CutImage(red, margin=500)  # Margin at 500 good for now
 
@@ -43,7 +43,7 @@ for red in reduced_data:
     com = image_analysation.LocateFocus(trimmed_data)
 
     # Find aperture with 95% (or other) encircled energy
-    radius = image_analysation.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=True)
+    radius = image_analysation.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=True, save_file=measurements_folder+f"Radius_{n}")
     radii.append(radius)
 
 radii.sort()
