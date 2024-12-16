@@ -44,7 +44,7 @@ def main(project_folder:str):
 
     for n,red in enumerate(reduced_data):
         # Trim data to area of interest (perhaps not necessary with better background reduction)
-        trimmed_data = image_analysation.CutImage(red, margin=500)  # Margin at 500 good for now
+        trimmed_data = image_analysation.cut_image(red, margin=500)  # Margin at 500 good for now
 
         # Locate center of mass within trimmed image (array)
         com = image_analysation.LocateFocus(trimmed_data)

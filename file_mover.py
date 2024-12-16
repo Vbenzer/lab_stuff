@@ -3,7 +3,11 @@ import shutil
 
 def move_files_and_folders(source_folder:str, destination_folder:str):
     """
-    Move all files and folders from the source folder to the destination folder.
+    Move all files and subfolders from the source folder to the destination folder.
+    Args:
+        source_folder: Path of the source folder.
+        destination_folder: Path of the destination folder.
+
     """
     for item in os.listdir(source_folder):
         source_path = os.path.join(source_folder, item)
@@ -20,7 +24,10 @@ def move_files_and_folders(source_folder:str, destination_folder:str):
 
 def clear_folder(folder_path):
     """
-    Remove all files and subfolders in the specified folder.
+    Clear all files and subfolders from the specified folder.
+    Args:
+        folder_path: Path of the folder to clear.
+
     """
     for item in os.listdir(folder_path):
         item_path = os.path.join(folder_path, item)

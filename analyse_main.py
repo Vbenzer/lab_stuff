@@ -8,9 +8,11 @@ import numpy as np
 import subprocess
 import time
 
-def run_batch_file(batch_file_path):
+def run_batch_file(batch_file_path:str):
     """
-    Run a batch file using subprocess.
+    Runs a batch file using subprocess
+    Args:
+        batch_file_path: Path of the file.
     """
     try:
         # Use subprocess to run the batch file
@@ -18,21 +20,31 @@ def run_batch_file(batch_file_path):
         print(f"Batch file executed successfully with return code {result.returncode}")
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while running the batch file: {e}")
-def main(project_folder:str):
 
+
+def main(project_folder:str):
+    """
+    Main function to run the analysis pipeline
+    Args:
+        project_folder: Path of the project folder.
+
+    """
+    # Start N.I.N.A. with F-stop analysis sequence
     run_batch_file("D:\stepper_motor\start_nina_with_fstop.bat")
 
-    # Wait for the flag file to appear
-    flag_file = "D:/stepper_motor/nina_flag.txt"
+    # Waiting for N.I.N.A. to complete
+    flag_file = "D:/stepper_motor/nina_flag.txt" # Flag file created by N.I.N.A. when sequence is complete
     print("Waiting for N.I.N.A. to complete...")
+
     while not os.path.exists(flag_file):
         time.sleep(10)  # Check every 5 seconds
-
     print("N.I.N.A. completed!")
+
     # Clean up the flag file
     os.remove(flag_file)
 
-    #Move files to project folder
+
+    # Move files to project folder, files are initially saved to the default Nina output folder
     file_mover.move_files_and_folders("D:/Vincent/nina_output", project_folder)
 
     time.sleep(1)
@@ -41,16 +53,20 @@ def main(project_folder:str):
     #Close Nina
     run_batch_file("D:\stepper_motor\close_nina.bat")
 
-    dark_folder = project_folder+"/DARK"
-    light_folder = project_folder+"/LIGHT"
-    reduce_images_folder = project_folder+"/REDUCED/"
-    measurements_folder = project_folder+"/Measurements/"
+    # Define folders
+    dark_folder = project_folder + "/DARK" # DARK is the standard Nina output folder name for darks
+    light_folder = project_folder + "/LIGHT" # LIGHT is the standard Nina output folder name for lights
+    reduce_images_folder = project_folder + "/REDUCED/" # Folder for reduced images
+    os.makedirs(reduce_images_folder, exist_ok=True)
+    measurements_folder = project_folder + "/Measurements/" # Folder for measurements
     os.makedirs(measurements_folder, exist_ok=True)
 
-    pos_values=[0,5,9.9]
+    pos_values=[0,5,9.9] # Values of the stepper motor positions (temporary(hopefully))
 
+    # Create master dark frame
     m_dark = image_reduction.create_master_dark(dark_folder, plot=False)
 
+    # Light frame reduction loop
     reduced_data = []
     for file_name in os.listdir(light_folder):
         if file_name.endswith(".fits"):  # Only process FITS files
@@ -58,39 +74,20 @@ def main(project_folder:str):
             with fits.open(file_path) as hdul:
                 light_frame = hdul[0].data.astype(np.float32)  # Convert to float for precision
 
-            os.makedirs(reduce_images_folder, exist_ok=True)
-            output_file = os.path.join(reduce_images_folder, file_name+"_reduced.fits")
+            output_file = os.path.join(reduce_images_folder, os.path.splitext(file_name)[0] + "_reduced.fits")
             red_file = image_reduction.reduce_image_with_dark(light_frame, m_dark, output_file, save=True)
             reduced_data.append(red_file)
 
 
+    # Radius calculation loop
+    radii = image_analysation.calculate_multiple_radii(reduced_data, measurements_folder)
 
-
-
-
-    radii = []
-
-
-    for n,red in enumerate(reduced_data):
-        # Trim data to area of interest (perhaps not necessary with better background reduction)
-        trimmed_data = image_analysation.CutImage(red, margin=500)  # Margin at 500 good for now
-
-        # Locate center of mass within trimmed image (array)
-        com = image_analysation.LocateFocus(trimmed_data)
-
-        # Find aperture with 95% (or other) encircled energy
-        os.makedirs(measurements_folder+f"/Radius", exist_ok=True)
-        radius = image_analysation.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=False, save_file=measurements_folder+f"/Radius/datapoint{n}")
-        radii.append(radius)
-
-    radii.sort()
-    pos_values.sort()
-
+    # Convert to numpy arrays
     radii = np.array(radii)
     pos_values = np.array(pos_values)
 
-
     print('radii:',radii,'pos:',pos_values)
 
+    # Calculate F-number
     f_number,f_number_err = find_f_number.calculate_f_number(radii, pos_values, plot_regression=True, save_path=measurements_folder)
     print(f"Calculated F-number (f/#): {f_number:.3f} ± {f_number_err:.3f}")

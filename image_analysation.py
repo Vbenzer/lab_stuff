@@ -1,15 +1,14 @@
 import numpy as np
 from astropy.io import fits
-from scipy.ndimage import center_of_mass
-from skimage.measure import regionprops, label
+import os
 import matplotlib.pyplot as plt
 import json
 
-def fits_to_arr(filename):
+def fits_to_arr(filename: str) -> np.ndarray:
     """
-
+    Convert fits file to numpy array
     Args:
-        filename: Path of fits file
+        filename: Path of the fits file
 
     Returns:
         Data of fits file as numpy array
@@ -123,15 +122,16 @@ def Area_of_Interest(array, **kwargs):
 
     return aoi
 
-def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float=0.95, plot:bool=False, save_data:bool=True,save_file:str=None):
+def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float=0.95, plot:bool=False, save_data:bool=True, save_file:str=None):
     """
     Finding the radius of circle around the center of mass of input image data
     Args:
-        image_data (array): Numpy array of the input image
+        image_data: Numpy array of the input image
         com: center of mass of input image
-        ee_value (float): encircled energy value to fit circle to. Int from 0 to 1.
-        **kwargs:
-            plot (bool): plots the circle around the center of mass of input image
+        ee_value: encircled energy value to fit circle to. Float between 0 and 1.
+        plot: If True, plot the circle on the image
+        save_data: If True, save the radius data to a json file
+        save_file: Path to save the radius data
 
     Returns:
         Radius of encircled energy of input image array
@@ -180,7 +180,6 @@ def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float
 
         if plot:
             plt.show()
-
     plt.close()
 
     if save_data:
@@ -190,7 +189,7 @@ def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float
     return radius
 
 
-def Trimming(array, yrange, xrange, margin=0, square=False):
+def trimming(array, yrange, xrange, margin=0, square=False):
     """
     Finding the index range of the interested area to narrow down the image.
 
@@ -232,7 +231,7 @@ def Trimming(array, yrange, xrange, margin=0, square=False):
     return out_array
 
 
-def CutImage(array, margin=20, **kwargs):
+def cut_image(array, margin=20, **kwargs):
     """
     Finding the index range of the area of interest to narrow down the image.
 
@@ -248,14 +247,14 @@ def CutImage(array, margin=20, **kwargs):
     """
     aoi = kwargs.get("aoi", None)
     if aoi is None: aoi = Area_of_Interest(array)
-    y_range, x_range = NarrowIndex(aoi)
-    out_array = Trimming(array, y_range, x_range, margin)
+    y_range, x_range = narrow_index(aoi)
+    out_array = trimming(array, y_range, x_range, margin)
 
     return out_array
 
 
-def NarrowIndex(binary):
-    '''
+def narrow_index(binary: np.ndarray[bool]) -> tuple[list[int], list[int]]:
+    """
     Finding the index range of the interested area to narrow down the image.
 
     Parameters:
@@ -264,7 +263,7 @@ def NarrowIndex(binary):
     Returns:
     [y_range]    y coordinate range
     [x_range]    x coordinate range
-    '''
+    """
     from skimage.feature import canny
 
     edges = canny(binary)
@@ -273,6 +272,34 @@ def NarrowIndex(binary):
     x_range = [min(perimeter[1]), max(perimeter[1])]
 
     return y_range, x_range
+
+
+def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder: str) -> list[int]:
+    """
+    Calculate the radii of multiple reduced data files.
+    Args:
+        reduced_data: List of reduced data files
+        measurements_folder: Path to measurements folder
+
+    Returns:
+        List of radii
+
+    """
+    radii = []
+    for n, red in enumerate(reduced_data):
+        # Trim data to area of interest (perhaps not necessary with better background reduction)
+        trimmed_data = cut_image(red, margin=500)  # Margin at 500 good for now
+
+        # Locate center of mass within trimmed image (array)
+        com = LocateFocus(trimmed_data)
+
+        # Find aperture with encircled energy
+        os.makedirs(measurements_folder + f"/Radius", exist_ok=True)
+        radius = find_circle_radius(trimmed_data, com, ee_value=0.98, plot=False,
+                                                      save_file=measurements_folder + f"/Radius/datapoint{n}")
+        radii.append(radius)
+    return radii
+
 
 # Usage
 if __name__ == "__main__":
@@ -283,7 +310,7 @@ if __name__ == "__main__":
     data = fits_to_arr(fits_file)
 
     #Trim data to area of interest (perhaps not necessary with better background reduction)
-    trimmed_data = CutImage(data,margin=500) #Margin at 500 good for now
+    trimmed_data = cut_image(data, margin=500) #Margin at 500 good for now
 
     #Locate center of mass within trimmed image (array)
     com = LocateFocus(trimmed_data)

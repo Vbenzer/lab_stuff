@@ -4,13 +4,15 @@ import matplotlib.pyplot as plt
 import os
 
 
-def create_master_dark(dark_folder, img_path:str=None, plot=False, save:bool=False,):
+def create_master_dark(dark_folder:str, img_path:str=None, plot:bool=False, save:bool=False) -> np.ndarray:
     """
     Create a master dark frame by averaging all dark frames in the folder.
 
     Parameters:
         dark_folder (str): Path to the folder containing dark frames.
+        img_path (str): Path to save the plot.
         plot (bool, optional): If True, plot the master dark frame.
+        save (bool, optional): If True, save the master dark frame as a FITS file.
 
     Returns:
         np.ndarray: The master dark frame.
@@ -40,7 +42,8 @@ def create_master_dark(dark_folder, img_path:str=None, plot=False, save:bool=Fal
 
     return master_dark
 
-def reduce_image_with_dark(science_data, dark_data, output_file, save=False, plot:bool=False, save_plot:bool=False, img_path:str=None):
+def reduce_image_with_dark(science_data:np.ndarray, dark_data:np.ndarray, output_file:str, save:bool=False,
+                           plot:bool=False, save_plot:bool=False, img_path:str=None) -> np.ndarray:
     """
     Reduces a science image by subtracting a dark frame.
 

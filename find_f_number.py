@@ -1,4 +1,5 @@
 import numpy as np
+from numpy import array
 from scipy.stats import linregress
 import matplotlib.pyplot as plt
 import json
@@ -6,23 +7,23 @@ import json
 
 
 
-def calculate_f_number(radii, pos_values, plot_regression=False, save_plot:bool=True, save_path:str=None):
+def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regression:bool=False, save_plot:bool=True, save_path:str=None):
     """
     Calculate the F-number (f/#) from the spot radii and CCD positions.
 
     Parameters:
-        radii (ndarray): Array of spot radii
-        pos_values (ndarray): Array of CCD positions
-        plot_regression (bool): If True, plot the linear regression of the data.
+        radii : Array of spot radii
+        ccd_positions : Array of CCD positions
+        plot_regression : If True, plot the linear regression of the data.
+        save_plot : If True, save the plot to a file.
+        save_path : Path to save the plot file.
 
     Returns:
         float: The calculated F-number with error.
     """
 
-    #Todo: weird number stuff when getting data from main directly
-
-    spot_radii = radii*7.52e-3
-    ccd_positions = pos_values
+    # Convert spot radii to millimeters
+    spot_radii = radii*7.52e-3 #Todo: Get this value from image header
 
     # Perform linear regression
     slope, intercept, r_value, p_value, std_err = linregress(ccd_positions, spot_radii)
@@ -53,6 +54,7 @@ def calculate_f_number(radii, pos_values, plot_regression=False, save_plot:bool=
         json.dump({"f_number":f_number,"f_number_err":f_number_err}, f)
 
     return f_number,f_number_err
+
 
 
 if __name__ == "__main__":
