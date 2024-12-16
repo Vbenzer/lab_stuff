@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 
 
-def create_master_dark(dark_folder, plot=False):
+def create_master_dark(dark_folder, img_path:str=None, plot=False, save:bool=False,):
     """
     Create a master dark frame by averaging all dark frames in the folder.
 
@@ -27,15 +27,20 @@ def create_master_dark(dark_folder, plot=False):
 
     # Calculate the master dark frame as the mean of all dark frames
     master_dark = np.mean(dark_data, axis=0)
-
-    if plot:
+    if save or plot:
         plt.figure()
         plt.imshow(master_dark, cmap='gray', origin='lower')
-        plt.show()
+        if save:
+            if img_path is None:
+                raise ValueError("'img_path' must be provided if 'save' is True")
+            plt.savefig(img_path)
+        if plot:
+            plt.show()
+
 
     return master_dark
 
-def reduce_image_with_dark(science_data, dark_data, output_file, science_header=None, plot=False):
+def reduce_image_with_dark(science_data, dark_data, output_file, save=False, plot:bool=False, save_plot:bool=False, img_path:str=None):
     """
     Reduces a science image by subtracting a dark frame.
 
@@ -43,8 +48,10 @@ def reduce_image_with_dark(science_data, dark_data, output_file, science_header=
         science_data (np.ndarray): Science image data.
         dark_data (np.ndarray): Dark image data.
         output_file (str): Path to save the reduced FITS file.
-        science_header (astropy.io.fits.Header): Science image header.
+        save (bool): Save reduce image to file?
         plot (bool, optional): If True, plot the reduced image.
+        save_plot: Save plot as image if True.
+        img_path: Required if save_plot is set to True. Path to save plot to.
 
     Returns:
           np.ndarray: The reduced image data.
@@ -60,12 +67,13 @@ def reduce_image_with_dark(science_data, dark_data, output_file, science_header=
     # Clip negative values to zero (or other minimum threshold, if applicable)
     reduced_data = np.clip(reduced_data, 0, None)
 
-    if science_header is not None:
+    if save:
         # Save the reduced image to a new FITS file
-        hdu = fits.PrimaryHDU(data=reduced_data, header=science_header)
+        hdu = fits.PrimaryHDU(data=reduced_data)
         hdu.writeto(output_file, overwrite=True)
+        print(f"Reduced image saved to: {output_file}")
 
-    if plot:
+    if plot or save_plot:
         # Plotting
         plt.figure(figsize=(12, 4))
         plt.subplot(1, 3, 1)
@@ -84,9 +92,13 @@ def reduce_image_with_dark(science_data, dark_data, output_file, science_header=
         plt.colorbar()
 
         plt.tight_layout()
-        plt.show()
-
-    print(f"Reduced image saved to: {output_file}")
+        if plot:
+            plt.show()
+        if save_plot:
+            if img_path is None:
+                raise ValueError("'img_path' must be provided if 'save' is True")
+            plt.savefig(img_path)
+        plt.close()
 
     return reduced_data
 

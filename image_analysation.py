@@ -3,6 +3,7 @@ from astropy.io import fits
 from scipy.ndimage import center_of_mass
 from skimage.measure import regionprops, label
 import matplotlib.pyplot as plt
+import json
 
 def fits_to_arr(filename):
     """
@@ -122,13 +123,13 @@ def Area_of_Interest(array, **kwargs):
 
     return aoi
 
-def find_circle_radius(image_data, com, ee_value=0.95, **kwargs):
+def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float=0.95, plot:bool=False, save_data:bool=True,save_file:str=None):
     """
     Finding the radius of circle around the center of mass of input image data
     Args:
         image_data (array): Numpy array of the input image
         com: center of mass of input image
-        ee_value (int): encircled energy value to fit circle to. Int from 0 to 1.
+        ee_value (float): encircled energy value to fit circle to. Int from 0 to 1.
         **kwargs:
             plot (bool): plots the circle around the center of mass of input image
 
@@ -139,7 +140,10 @@ def find_circle_radius(image_data, com, ee_value=0.95, **kwargs):
     #image_data = np.nan_to_num(image_data)
 
     # Read the center of mass
-    center_y, center_x = int(com[0]), int(com[1])
+    if com:
+        center_x, center_y = com
+    else:
+        center_y, center_x = int(com[0]), int(com[1]) #Todo: potentially change to float, pixel grid to center of pixel
 
     # Create a radial profile centered on the center of mass
     y, x = np.indices(image_data.shape)
@@ -159,7 +163,7 @@ def find_circle_radius(image_data, com, ee_value=0.95, **kwargs):
     # Find the radius where 95% (or other if changed) of the encircled energy is reached
     radius = int(np.argmax(encircled_energy_fraction >= ee_value))
 
-    if kwargs.get("plot", False):
+    if plot or save_data:
         # Plot for visualization
         plt.figure(figsize=(8, 6))
         plt.imshow(image_data, cmap='gray', origin='lower')
@@ -168,7 +172,20 @@ def find_circle_radius(image_data, com, ee_value=0.95, **kwargs):
         plt.gca().add_artist(circle)
         plt.legend()
         plt.title(f"Circle Detection with {ee_value*100}% Encircled Energy")
-        plt.show()
+
+        if save_data:
+            if save_file is None:
+                raise ValueError("'save_file' must be given")
+            plt.savefig(save_file+"plot.png")
+
+        if plot:
+            plt.show()
+
+    plt.close()
+
+    if save_data:
+        with open(save_file+"radius.json", "w") as f:
+            json.dump({"radius": radius, "center of mass": com}, f)
 
     return radius
 
@@ -260,7 +277,7 @@ def NarrowIndex(binary):
 # Usage
 if __name__ == "__main__":
     #Path of fits file to analyse
-    fits_file = 'reduced_image_close.fits'
+    fits_file = 'D:/stepper_motor/test_images/sequence_stepper_filter_fstop_analysis/Filter2/REDUCED/LIGHT_0000_0.00s.fits_reduced.fits'
 
     #Turn data to numpy array
     data = fits_to_arr(fits_file)
