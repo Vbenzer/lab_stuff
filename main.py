@@ -37,33 +37,34 @@ def run_experiment():
         if not response:
             message_label.config(text="Please enter a new measurement name!")
             return
+
     else:
         os.makedirs(folder_path)
         show_info_message("Success!", f"Folder '{measurement_name}' created successfully!")
 
     # Perform actions based on checkbox selections
     if var1.get():
-        run_code_1(folder_path)
+        run_code_1(folder_path,measurement_name)
+        print("Running code 1")
     if var2.get():
         run_code_2(folder_path)
     if var3.get():
         run_code_3(folder_path)
+    else:
+        message_label.config(text="Please select an experiment to run!")
 
-    # Close the window
     root.destroy()
 
-def run_code_1(folder_path):
+def run_code_1(folder_path,measurement_name):
+    print(f"Running code 1 with folder: {folder_path}")
     # Code to run the first experiment
     import analyse_main
-    analyse_main.main(folder_path)
-    print(f"Running code 1 with folder: {folder_path}")
-    # Add your code here
+    analyse_main.main(folder_path,measurement_name)
 
 def run_code_2(folder_path):
+    print(f"Running code 2 with folder: {folder_path}")
     import collimation_test
     collimation_test.main(folder_path)
-    print(f"Running code 2 with folder: {folder_path}")
-    # Add your code here
 
 def run_code_3(folder_path):
     # Code to run the third experiment

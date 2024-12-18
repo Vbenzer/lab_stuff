@@ -11,15 +11,14 @@ def create_new_hdf5(file_path:str):
 
 def create_hdf5_group(folder_path:str, group_name:str):
     with h5py.File(folder_path,"w") as f:
-        grp = f.create_group(group_name)
+        f.create_group(group_name)
     print("Created new group:", group_name, "at:", folder_path)
-    return grp
 
 def add_data_to_hdf(path:str, data, dataset_name:str):
-    with h5py.File(path, "w") as f:
-        f.create_dataset(dataset_name, data)
-    # Attributes potentially
+    with h5py.File(path, "a") as f:
+        dset = f.create_dataset(dataset_name, data)
     print("Wrote data to:", dataset_name)
+    return dset
 
 def add_plot_to_hdf(file_path:str, plot_path:str, plot_name:str):
     with h5py.File(file_path, "w") as f:
@@ -29,18 +28,12 @@ def add_plot_to_hdf(file_path:str, plot_path:str, plot_name:str):
 
 
 if __name__ == "__main__":
-    #hdf_file="test"
-    #create_new_hdf5(hdf_file)
-    #grp = create_hdf5_group(hdf_file, "test_group")
-    #print(grp.name)
-    #test_data=np.array([1,2,3,4,5])
-    #add_data_to_hdf(hdf_file, test_data, "test_data")
+    hdf_file="test.hdf5"
+    create_new_hdf5(hdf_file)
+    create_hdf5_group(hdf_file, "test_group")
+    test_data=np.array([1,2,3,4,5])
+    add_data_to_hdf(hdf_file, test_data, "test_data")
 
-    with h5py.File("mytestfile.hdf5", "a") as f:
-        grp = f.create_group("subgroup2")
-        print(list(f.keys()))
-        #dset = f.create_dataset("mydataset", (100,), dtype='i')
-        f.flush()
-    #print(dset.name)
+
 
 

@@ -7,6 +7,7 @@ import os
 import numpy as np
 import subprocess
 import time
+import h5py
 
 def run_batch_file(batch_file_path:str):
     """
@@ -22,7 +23,7 @@ def run_batch_file(batch_file_path:str):
         print(f"Error occurred while running the batch file: {e}")
 
 
-def main(project_folder:str):
+def main(project_folder:str, measurement_name:str):
     """
     Main function to run the analysis pipeline
     Args:
@@ -49,13 +50,13 @@ def main(project_folder:str):
     time.sleep(1)
     file_mover.clear_folder("D:/Vincent/nina_output")
 
-    #Close Nina
+    # Close Nina
     run_batch_file("D:\stepper_motor\close_nina.bat")
 
     # Run analysis pipeline
-    run_from_existing_files(project_folder)
+    run_from_existing_files(project_folder, measurement_name)
 
-def run_from_existing_files(project_folder:str):
+def run_from_existing_files(project_folder:str, measurement_name:str):
     """
     Run the analysis pipeline using existing files in the project folder.
     Args:
@@ -66,6 +67,8 @@ def run_from_existing_files(project_folder:str):
     light_folder = project_folder + "/LIGHT"  # LIGHT is the standard Nina output folder name for lights
     reduce_images_folder = project_folder + "/REDUCED/"  # Folder for reduced images
     os.makedirs(reduce_images_folder, exist_ok=True)
+    #with h5py.File("D:/Vincent/" + "measurements.h5", "a") as f:
+    #    f.create_group(measurement_name)
     measurements_folder = project_folder + "/Measurements/"  # Folder for measurements
     os.makedirs(measurements_folder, exist_ok=True)
 
@@ -99,6 +102,23 @@ def run_from_existing_files(project_folder:str):
     f_number, f_number_err = find_f_number.calculate_f_number(radii, pos_values, plot_regression=True,
                                                               save_path=measurements_folder)
     print(f"Calculated F-number (f/#): {f_number:.3f} ± {f_number_err:.3f}")
+    """
+    # Save everything to HDF5 file
+    with h5py.File("D:/Vincent/" + "measurements.h5", "a") as f:
+        group = f[measurement_name]
+        group.create_dataset("radii", data=radii)
+        group.create_dataset("pos_values", data=pos_values)
+        group.create_dataset("f_number", data=f_number)
+        group.create_dataset("f_number_err", data=f_number_err)
+
+        # Save plots to HDF5 file
+        with open(measurements_folder + "regression_plot.png", "rb") as plot_file:
+            group.create_dataset("regression_plot", data=plot_file.read())
+        for file_name in os.listdir(measurements_folder + "Radius/"):
+            if file_name.endswith(".png"):
+                with open(measurements_folder + f"Radius/{file_name}", "rb") as plot_file:
+                    group.create_dataset(f"radius_plot_{file_name}", data=plot_file.read())
+    """
 
 if __name__ == "__main__":
     project_folder = r"D:\Vincent\filter2_newcoll"
