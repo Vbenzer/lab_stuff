@@ -24,6 +24,7 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
 
     # Convert spot radii to millimeters
     spot_radii = radii*7.52e-3 #Todo: Get this value from image header
+    spot_radii = np.sort(spot_radii)[::-1]  #Sort in descending order because motor is reversed when measuring fiber frd
 
     # Perform linear regression
     slope, intercept, r_value, p_value, std_err = linregress(ccd_positions, spot_radii)
@@ -59,7 +60,7 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
 
 if __name__ == "__main__":
     # Example usage
-    radii = np.array([908,664,396])
+    radii = np.array([885,757,631])
     pos_values = np.array([9.9,5,0])
 
 

@@ -27,6 +27,15 @@ def add_plot_to_hdf(file_path:str, plot_path:str, plot_name:str):
     print("Plot:", plot_name, "saved to:", file_path)
 
 
+def save_measurement_hdf5(filename, measurement_name, f_number, f_number_err):
+    with h5py.File(filename, 'a') as file:
+        # Create a group for each measurement ID
+        measurement_group = file.create_group(measurement_name)
+
+        # Save the two arrays under the measurement group
+        measurement_group.create_dataset('f_number', data=f_number)
+        measurement_group.create_dataset('f_number_err', data=f_number_err)
+
 if __name__ == "__main__":
     hdf_file="test.hdf5"
     create_new_hdf5(hdf_file)

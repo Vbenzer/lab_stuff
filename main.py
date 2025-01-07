@@ -48,14 +48,16 @@ def run_experiment():
         print("Running code 1")
     if var2.get():
         run_code_2(folder_path)
+        print("Running code 2")
     if var3.get():
-        run_code_3(folder_path)
+        run_code_3(folder_path, measurement_name)
+        print("Running code 3")
     else:
         message_label.config(text="Please select an experiment to run!")
 
     root.destroy()
 
-def run_code_1(folder_path,measurement_name):
+def run_code_1(folder_path, measurement_name):
     print(f"Running code 1 with folder: {folder_path}")
     # Code to run the first experiment
     import analyse_main
@@ -66,10 +68,10 @@ def run_code_2(folder_path):
     import collimation_test
     collimation_test.main(folder_path)
 
-def run_code_3(folder_path):
-    # Code to run the third experiment
+def run_code_3(folder_path, measurement_name):
     print(f"Running code 3 with folder: {folder_path}")
-    # Add your code here
+    import fiber_frd_measurements
+    fiber_frd_measurements.main(folder_path, measurement_name)
 
 # Base directory where folders will be created
 base_directory = r"D:\Vincent"
@@ -94,7 +96,7 @@ var3 = tk.BooleanVar()
 
 tk.Checkbutton(root, text="Measure F/# from filter", variable=var1).grid(row=2, column=0, sticky=tk.W, padx=10)
 tk.Checkbutton(root, text="Compute Aperture Radius", variable=var2).grid(row=2, column=1, sticky=tk.W, padx=10)
-tk.Checkbutton(root, text="Option 3", variable=var3).grid(row=2, column=2, sticky=tk.W, padx=10)
+tk.Checkbutton(root, text="Fiber FRD Measurement", variable=var3).grid(row=2, column=2, sticky=tk.W, padx=10)
 
 tk.Button(root, text="Run Experiment", command=run_experiment).grid(row=3, column=0, columnspan=3, pady=20)
 

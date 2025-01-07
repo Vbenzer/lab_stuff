@@ -22,16 +22,17 @@ def run_batch_file(batch_file_path:str):
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while running the batch file: {e}")
 
-
-def main(project_folder:str, measurement_name:str):
+def main(project_folder:str, measurement_name:str, batch_file_path:str="D:\stepper_motor\start_nina_with_fstop.bat"):
     """
     Main function to run the analysis pipeline
     Args:
         project_folder: Path of the project folder.
+        measurement_name: Name of the measurement folder.
+        batch_file_path: Path of the batch file to start N.I.N.A.
 
     """
     # Start N.I.N.A. with F-stop analysis sequence
-    run_batch_file("D:\stepper_motor\start_nina_with_fstop.bat")
+    run_batch_file(batch_file_path)
 
     # Waiting for N.I.N.A. to complete
     flag_file = "D:/stepper_motor/nina_flag.txt" # Flag file created by N.I.N.A. when sequence is complete
@@ -99,7 +100,7 @@ def run_from_existing_files(project_folder:str, measurement_name:str):
     print('radii:', radii, 'pos:', pos_values)
 
     # Calculate F-number
-    f_number, f_number_err = find_f_number.calculate_f_number(radii, pos_values, plot_regression=True,
+    f_number, f_number_err = find_f_number.calculate_f_number(radii, pos_values, plot_regression=False,
                                                               save_path=measurements_folder)
     print(f"Calculated F-number (f/#): {f_number:.3f} ± {f_number_err:.3f}")
     """
