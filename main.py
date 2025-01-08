@@ -2,9 +2,12 @@ import os
 import threading
 import tkinter as tk
 import time
-from tkinter import messagebox, simpledialog
 
-def check_folder_exists(*args):
+
+def check_folder_exists():
+    """
+    Check if the folder already exists in the base directory.
+    """
     folder_name = folder_name_var.get()
     folder_path = os.path.join(base_directory, folder_name)
     if os.path.exists(folder_path):
@@ -12,12 +15,18 @@ def check_folder_exists(*args):
     else:
         message_label.config(text="Valid Name", fg="green")
     selected_folder_label.config(text=f"Selected Folder: {folder_path}")
-    update_experiment_status()
+    update_experiment_status() # Update the experiment status when the folder name changes
 
 def clear_message():
+    """
+    Clear the message label after a delay.
+    """
     message_label.config(text="")
 
 def create_folder():
+    """
+    Create a new folder in the base directory.
+    """
     global folder_selected
     folder_name = folder_name_var.get()
     folder_path = os.path.join(base_directory, folder_name)
@@ -33,6 +42,9 @@ def create_folder():
     run_experiment_button.config(state=tk.NORMAL)
 
 def update_experiment_status():
+    """
+    Update the experiment status based on the selected experiments.
+    """
     selected_experiments = []
     if var1.get():
         selected_experiments.append("Measure F/# from filter")
@@ -49,6 +61,9 @@ def update_experiment_status():
         experiment_status_label.config(text=f"Selected: {', '.join(selected_experiments)}", fg="blue")
 
 def run_experiment():
+    """
+    Run the selected experiments in separate threads.
+    """
     def experiment_thread():
         folder_name = folder_name_var.get()
         folder_path = os.path.join(base_directory, folder_name)
@@ -81,6 +96,9 @@ def run_experiment():
     threading.Thread(target=read_progress).start()
 
 def read_progress():
+    """
+    Read the progress file and update the progress text widget.
+    """
     progress_file = "progress.txt"
 
     with open(progress_file, "a") as f:
@@ -94,6 +112,11 @@ def read_progress():
         time.sleep(1)
 
 def update_progress_text(lines):
+    """
+    Update the progress text widget with the given lines
+    Args:
+        lines: Description of the current step.
+    """
     progress_text.config(state=tk.NORMAL)
     progress_text.delete(1.0, tk.END)
     for line in lines:
@@ -182,3 +205,4 @@ progress_text.grid(row=8, column=0, columnspan=3, pady=10)
 stop_event = threading.Event()
 root.protocol("WM_DELETE_WINDOW", on_closing)
 root.mainloop()
+

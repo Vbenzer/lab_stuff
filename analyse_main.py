@@ -2,12 +2,13 @@ import image_analysation
 import image_reduction
 import find_f_number
 import file_mover
+import file_save_managment
 from astropy.io import fits
 import os
 import numpy as np
 import subprocess
 import time
-import h5py
+
 
 def run_batch_file(batch_file_path:str):
     """
@@ -34,6 +35,9 @@ def main(project_folder:str, measurement_name:str, batch_file_path:str="D:\stepp
     # Start N.I.N.A. with F-stop analysis sequence
     run_batch_file(batch_file_path)
 
+    # Write progress to file
+    file_save_managment.write_progress("Starting N.I.N.A. with F-stop analysis sequence")
+
     # Waiting for N.I.N.A. to complete
     flag_file = "D:/stepper_motor/nina_flag.txt" # Flag file created by N.I.N.A. when sequence is complete
     print("Waiting for N.I.N.A. to complete...")
@@ -41,6 +45,9 @@ def main(project_folder:str, measurement_name:str, batch_file_path:str="D:\stepp
     while not os.path.exists(flag_file):
         time.sleep(10)  # Check every 5 seconds
     print("N.I.N.A. completed!")
+
+    # Write progress to file
+    file_save_managment.write_progress("N.I.N.A. completed")
 
     # Clean up the flag file
     os.remove(flag_file)
@@ -54,6 +61,9 @@ def main(project_folder:str, measurement_name:str, batch_file_path:str="D:\stepp
     # Close Nina
     run_batch_file("D:\stepper_motor\close_nina.bat")
 
+    # Write progress to file
+    file_save_managment.write_progress("N.I.N.A. closed, starting analysis pipeline")
+
     # Run analysis pipeline
     run_from_existing_files(project_folder, measurement_name)
 
@@ -63,20 +73,28 @@ def run_from_existing_files(project_folder:str, measurement_name:str):
     Args:
         project_folder: Path of the project folder.
     """
+
+    # Write progress to file
+    file_save_managment.write_progress("Creating analysis folders")
+
     # Define folders
     dark_folder = project_folder + "/DARK"  # DARK is the standard Nina output folder name for darks
     light_folder = project_folder + "/LIGHT"  # LIGHT is the standard Nina output folder name for lights
     reduce_images_folder = project_folder + "/REDUCED/"  # Folder for reduced images
     os.makedirs(reduce_images_folder, exist_ok=True)
-    #with h5py.File("D:/Vincent/" + "measurements.h5", "a") as f:
-    #    f.create_group(measurement_name)
     measurements_folder = project_folder + "/Measurements/"  # Folder for measurements
     os.makedirs(measurements_folder, exist_ok=True)
 
     pos_values = [9.9, 5, 0]  # Values of the stepper motor positions (temporary(hopefully))
 
+    # Write progress to file
+    file_save_managment.write_progress("Creating master dark frame")
+
     # Create master dark frame
     m_dark = image_reduction.create_master_dark(dark_folder, plot=False)
+
+    # Write progress to file
+    file_save_managment.write_progress("Reducing light frames")
 
     # Light frame reduction loop
     reduced_data = []
@@ -90,6 +108,9 @@ def run_from_existing_files(project_folder:str, measurement_name:str):
             red_file = image_reduction.reduce_image_with_dark(light_frame, m_dark, output_file, save=True)
             reduced_data.append(red_file)
 
+    # Write progress to file
+    file_save_managment.write_progress("Calculating radii")
+
     # Radius calculation loop
     radii = image_analysation.calculate_multiple_radii(reduced_data, measurements_folder)
 
@@ -99,27 +120,13 @@ def run_from_existing_files(project_folder:str, measurement_name:str):
 
     print('radii:', radii, 'pos:', pos_values)
 
+    # Write progress to file
+    file_save_managment.write_progress("Calculating F-number")
+
     # Calculate F-number
     f_number, f_number_err = find_f_number.calculate_f_number(radii, pos_values, plot_regression=False,
                                                               save_path=measurements_folder)
     print(f"Calculated F-number (f/#): {f_number:.3f} ± {f_number_err:.3f}")
-    """
-    # Save everything to HDF5 file
-    with h5py.File("D:/Vincent/" + "measurements.h5", "a") as f:
-        group = f[measurement_name]
-        group.create_dataset("radii", data=radii)
-        group.create_dataset("pos_values", data=pos_values)
-        group.create_dataset("f_number", data=f_number)
-        group.create_dataset("f_number_err", data=f_number_err)
-
-        # Save plots to HDF5 file
-        with open(measurements_folder + "regression_plot.png", "rb") as plot_file:
-            group.create_dataset("regression_plot", data=plot_file.read())
-        for file_name in os.listdir(measurements_folder + "Radius/"):
-            if file_name.endswith(".png"):
-                with open(measurements_folder + f"Radius/{file_name}", "rb") as plot_file:
-                    group.create_dataset(f"radius_plot_{file_name}", data=plot_file.read())
-    """
 
 if __name__ == "__main__":
     project_folder = r"D:\Vincent\filter2_newcoll"
