@@ -3,6 +3,7 @@ import json
 import matplotlib.pyplot as plt
 import file_save_managment
 import analyse_main
+
 def main(project_folder:str, measurement_name:str):
     f_num = np.zeros(5)
     f_num_err = np.zeros(5)
@@ -11,8 +12,11 @@ def main(project_folder:str, measurement_name:str):
         # Create project subfolder for each filter
         project_folder += f"/filter_{i}"
 
+        # Write progress to file
+        file_save_managment.write_progress(f"Starting analysis for filter: {i}")
+
         # Run the main analysis pipeline for each filter
-        #analyse_main.main(project_folder, measurement_name, batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat")
+        analyse_main.main(project_folder, measurement_name, batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat")
 
         # Load the f-number and its error from the JSON file
         with open(project_folder+"/Measurements/f_number.json") as f:
@@ -22,6 +26,9 @@ def main(project_folder:str, measurement_name:str):
 
         print(f"Filter {i} complete!")
     print("All filters complete!")
+
+    # Write progress to file
+    file_save_managment.write_progress("All filters complete, forming final plot")
 
     # Input f-numbers
     input_f_num = np.array([6, 5, 4.5, 4, 3.5])
