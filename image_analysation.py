@@ -313,7 +313,7 @@ if __name__ == "__main__":
     trimmed_data = cut_image(data, margin=500) #Margin at 500 good for now
 
     #Locate center of mass within trimmed image (array)
-    com = LocateFocus(trimmed_data)
+    com = LocateFocus(trimmed_data) #Todo: Does com makes sense with trimmed data?
 
     #Find aperture with 95% (or other) encircled energy
     radius = find_circle_radius(trimmed_data, com, ee_value=0.9,plot=True)

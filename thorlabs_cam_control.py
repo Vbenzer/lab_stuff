@@ -1,7 +1,6 @@
 import instrumental
-import numpy as np
 import cv2
-from instrumental.drivers.cameras import uc480
+#from instrumental.drivers.cameras import uc480
 
 
 def take_image(cam_name:str):
