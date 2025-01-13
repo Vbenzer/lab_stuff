@@ -4,7 +4,7 @@ import tkinter as tk
 import time
 
 
-def check_folder_exists():
+def check_folder_exists(*args):
     """
     Check if the folder already exists in the base directory.
     """
@@ -67,6 +67,10 @@ def run_experiment():
     def experiment_thread():
         folder_name = folder_name_var.get()
         folder_path = os.path.join(base_directory, folder_name)
+        if fiber_diameter_var.get() == "":
+            fiber_diameter = 0
+        else:
+            fiber_diameter = int(fiber_diameter_var.get())
 
         if not os.path.exists(folder_path):
             root.after(0, lambda: message_label.config(text="Folder does not exist. Please create it first.", fg="red"))
@@ -79,12 +83,13 @@ def run_experiment():
         if var3.get():
             run_code_3(folder_path, folder_name)
         if var4.get():
-            run_code_4(folder_path)
+            run_code_4(folder_path, fiber_diameter)
 
         root.after(1000, clear_message)
         root.after(0, root.destroy)
 
     entry.config(state='disabled')
+    fiber_diameter_entry.config(state='disabled')
     create_folder_button.config(state='disabled')
     run_experiment_button.config(state='disabled')
     checkbuttons = [var1_checkbutton, var2_checkbutton, var3_checkbutton, var4_checkbutton]
@@ -138,8 +143,12 @@ def run_code_3(folder_path, folder_name):
     import fiber_frd_measurements
     fiber_frd_measurements.main(folder_path, folder_name)
 
-def run_code_4(folder_path):
+def run_code_4(folder_path, fiber_diameter):
+    if fiber_diameter == 0:
+        raise ValueError("F iber diameter cannot be empty")
+
     import experiment_running_test
+    print(f"Running code 4 with fiber diameter: {fiber_diameter}")
     experiment_running_test.main(folder_path)
 
 def on_closing():
@@ -164,6 +173,12 @@ folder_name_var.trace("w", check_folder_exists)
 entry = tk.Entry(root, textvariable=folder_name_var)
 entry.grid(row=0, column=1, padx=5, pady=5)
 
+# Add a label and entry for fiber diameter
+tk.Label(root, text="Fiber Diameter:").grid(row=1, column=0, padx=10, pady=10)
+fiber_diameter_var = tk.StringVar()
+fiber_diameter_entry = tk.Entry(root, textvariable=fiber_diameter_var)
+fiber_diameter_entry.grid(row=1, column=1, padx=5, pady=5)
+
 var1 = tk.BooleanVar()
 var2 = tk.BooleanVar()
 var3 = tk.BooleanVar()
@@ -174,33 +189,33 @@ var2_checkbutton = tk.Checkbutton(root, text="Compute Aperture Radius", variable
 var3_checkbutton = tk.Checkbutton(root, text="Fiber FRD Measurement", variable=var3, command=update_experiment_status)
 var4_checkbutton = tk.Checkbutton(root, text="Code 4", variable=var4, command=update_experiment_status)
 
-var1_checkbutton.grid(row=3, column=0, sticky=tk.W, padx=10, pady=5)
-var2_checkbutton.grid(row=3, column=1, sticky=tk.W, padx=10, pady=5)
-var3_checkbutton.grid(row=4, column=0, sticky=tk.W, padx=10, pady=5)
-var4_checkbutton.grid(row=4, column=1, sticky=tk.W, padx=10, pady=5)
+var1_checkbutton.grid(row=4, column=0, sticky=tk.W, padx=10, pady=5)
+var2_checkbutton.grid(row=4, column=1, sticky=tk.W, padx=10, pady=5)
+var3_checkbutton.grid(row=5, column=0, sticky=tk.W, padx=10, pady=5)
+var4_checkbutton.grid(row=5, column=1, sticky=tk.W, padx=10, pady=5)
 
 create_folder_button = tk.Button(root, text="Create/Use Folder", command=create_folder)
 create_folder_button.grid(row=0, column=2, columnspan=1, pady=10)
 run_experiment_button = tk.Button(root, text="Run Experiment", command=run_experiment, state=tk.DISABLED)
-run_experiment_button.grid(row=6, column=0, columnspan=3, pady=10)
+run_experiment_button.grid(row=7, column=0, columnspan=3, pady=10)
 
 message_label = tk.Label(root, text="", fg="red")
-message_label.grid(row=1, column=0, columnspan=3)
+message_label.grid(row=2, column=0, columnspan=3)
 
 selected_folder_label = tk.Label(root, text="Selected Folder: ", fg="black")
-selected_folder_label.grid(row=2, column=0, columnspan=3, pady=10)
+selected_folder_label.grid(row=3, column=0, columnspan=3, pady=10)
 
 checkmark_label = tk.Label(root, text="", fg="green")
-checkmark_label.grid(row=2, column=2, pady=10)
+checkmark_label.grid(row=3, column=2, pady=10)
 
 experiment_status_label = tk.Label(root, text="No experiment selected", fg="red")
-experiment_status_label.grid(row=5, column=0, columnspan=3)
+experiment_status_label.grid(row=6, column=0, columnspan=3)
 
 running_label = tk.Label(root, text="Currently Running", fg="blue")
-running_label.grid(row=7, column=0, columnspan=3, pady=10)
+running_label.grid(row=8, column=0, columnspan=3, pady=10)
 
 progress_text = tk.Text(root, height=10, state=tk.DISABLED)
-progress_text.grid(row=8, column=0, columnspan=3, pady=10)
+progress_text.grid(row=9, column=0, columnspan=3, pady=10)
 
 stop_event = threading.Event()
 root.protocol("WM_DELETE_WINDOW", on_closing)

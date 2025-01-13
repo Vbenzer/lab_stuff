@@ -3,7 +3,7 @@ import cv2
 #from instrumental.drivers.cameras import uc480
 
 
-def take_image(cam_name:str):
+def take_image(cam_name:str, save_file_name:str):
     cam = instrumental.instrument(cam_name)
     cam.open()
     frame = cam.grab_image(exposure_time="1s")
@@ -11,7 +11,7 @@ def take_image(cam_name:str):
         image = frame
         cv2.imshow("Captured Image", image)
         cv2.waitKey(0)
-        cv2.imwrite(f'{cam_name}_image2.png', image)
+        cv2.imwrite(save_file_name, image) #Todo: Save as fits file and define save folder
     else:
         print("Failed to capture image.")
     cam.close()

@@ -149,12 +149,6 @@ def plot_images(science_file, dark_file, reduced_file):
 
 if __name__ == "__main__":
 
-    """# Usage example
-    science_file = 'test_short.fits.fits'
-    dark_file = 'DARK_0.02s_2024-12-04_14-25-11.fits'
-    output_file = 'reduced_image_close.fits'
-    reduce_image_with_dark(science_file, dark_file, output_file)
 
-    plot_images(science_file, dark_file, output_file)"""
 
     create_master_dark("Darks", plot=True)
