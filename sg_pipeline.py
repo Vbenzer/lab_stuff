@@ -310,24 +310,30 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
 
     # Calculate distance between entrance COC and COM
     #entrance_distances = np.linalg.norm(entrance_coms - entrance_cocs, axis=1)
-    entrance_distances_x = np.abs(entrance_coms[:, 0] - entrance_cocs[:, 0])
-    entrance_distances_y = np.abs(entrance_coms[:, 1] - entrance_cocs[:, 1])
+    entrance_distances_x = entrance_coms[:, 0] - entrance_cocs[:, 0]
+    entrance_distances_y = entrance_coms[:, 1] - entrance_cocs[:, 1]
     print("entrance distances x,y:", entrance_distances_x, entrance_distances_y)
 
     # Calculate distance between exit COC and COM
     #exit_distances = np.linalg.norm(exit_coms - exit_cocs, axis=1)
-    exit_distances_x = np.abs(exit_coms[:, 0] - exit_cocs[:, 0])
-    exit_distances_y = np.abs(exit_coms[:, 1] - exit_cocs[:, 1])
+    exit_distances_x = exit_coms[:, 0] - exit_cocs[:, 0] #Todo: Exit shift better calculate relative to reference? Alternatively raise precision of coc
+    exit_distances_y = exit_coms[:, 1] - exit_cocs[:, 1]
 
     print("exit distances x,y:", exit_distances_x, exit_distances_y)
 
-    # Calculate total distances
+    # Calculate total distances with sign differences depending on the direction of the movement
     entrance_distances = np.sqrt(entrance_distances_x**2 + entrance_distances_y**2)
     exit_distances = np.sqrt(exit_distances_x**2 + exit_distances_y**2)
 
     # Choose the exit/entrance pair with the smallest entrance distance from coc as reference
     reference_index = np.argmin(entrance_distances)
     print("Reference index:", reference_index)
+
+    # Change sign of entrance distance depending on the direction of the movement
+    for i in range(len(entrance_distances)):
+        if entrance_distances_y[i] < 0:
+            entrance_distances[i] = -entrance_distances[i]
+
 
     # Calculate the scrambling gain for each pair
     scrambling_gain = []
@@ -348,7 +354,7 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
 
         # Plot COM x and y movement of the fiber output with different spot positions as colorbar
         scatter = plt.scatter(exit_distances_x, exit_distances_y, c=entrance_distances, cmap='viridis')
-        plt.colorbar(scatter, label='Entrance Spot Distance')
+        plt.colorbar(scatter, label='Relative Spot Displacement [px]')
         plt.xlabel('Exit COM x-distance [px]')
         plt.ylabel('Exit COM y-distance [px]')
         plt.title('COM Movement of Fiber Output')
@@ -358,44 +364,70 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
 
     return scrambling_gain
 
-def main(fiber_diameter:int):
+def main(fiber_diameter:int, number_of_positions:int=3):
     """
     Main function to run the scrambling gain calculation pipeline.
     """
     import image_reduction
     import thorlabs_cam_control as tcc
+    import file_mover
     import time
+    import move_to_filter
 
-    # Clear the image folders
+    # Define image folders
+    main_image_folder = ("D:/Vincent/thorlabs_cams_images_test")
+    entrance_image_folder = os.path.join(main_image_folder, "entrance")
+    exit_image_folder = os.path.join(main_image_folder, "exit")
+    entrance_dark_image_folder = os.path.join(entrance_image_folder, "dark")
+    exit_dark_image_folder = os.path.join(exit_image_folder, "dark")
+    reduced_entrance_image_folder = os.path.join(entrance_image_folder, "reduced")
+    reduced_exit_image_folder = os.path.join(exit_image_folder, "reduced")
 
-    # Todo: define clear save folders
+    # Clear folders before adding new images
+    file_mover.clear_folder(main_image_folder)
 
-    # Filter wheel to 0
+    # Create folders if they don't exist
+    os.makedirs(entrance_image_folder, exist_ok=True)
+    os.makedirs(exit_image_folder, exist_ok=True)
+    os.makedirs(entrance_dark_image_folder, exist_ok=True)
+    os.makedirs(exit_dark_image_folder, exist_ok=True)
+    os.makedirs(reduced_entrance_image_folder, exist_ok=True)
+    os.makedirs(reduced_exit_image_folder, exist_ok=True)
 
-    # Take darks #Todo background subtraction, use filter wheel for no dark
-    for i in range(4):
-        tcc.take_image("entrance_cam",f"entrance_images/darks/entrance_cam_dark{i}.png")
-        tcc.take_image("exit_cam",f"exit_images/darks/dark{i}.png")
+    move_to_filter.move("none")
+    print("Taking darks in 30s")
+    time.sleep(30)
 
-    master_dark = image_reduction.create_master_dark("entrance_images/darks", plot=False)
+    # Take darks
+    for i in range(5):
+        tcc.take_image("entrance_cam", entrance_dark_image_folder+f"/entrance_cam_dark{i}.png")
+        tcc.take_image("exit_cam", exit_dark_image_folder+f"/exit_cam_dark{i}.png")
+
+    entrance_master_dark = (image_reduction
+                            .create_master_dark(entrance_dark_image_folder, plot=False))
+    exit_master_dark = image_reduction.create_master_dark(exit_dark_image_folder, plot=False)
+
+    move_to_filter.move("0")
+    print("Taking images in 30s")
+    time.sleep(30)
 
     # Take images
-    number_of_images = 2
+    number_of_images = number_of_positions
     for i in range(number_of_images):
-        tcc.take_image("entrance_cam",f"entrance_images/entrance_cam_image{i}.png")
-        tcc.take_image("exit_cam",f"exit_images/exit_cam_image{i}.png")
-        print("Move spot to next position")
-        time.sleep(30) # Time to move spot manually Todo: Automate spot movement
+        tcc.take_image("entrance_cam", entrance_image_folder+f"/entrance_cam_image{i}.png")
+        tcc.take_image("exit_cam",exit_image_folder+f"/exit_cam_image{i}.png")
+        print(f"Image {i+1} out of {number_of_images} done! Move spot to next position")
+        time.sleep(10) # Time to move spot manually Todo: Automate spot movement
+    print("All images taken!")
 
     # Reduce images
     for i in range(number_of_images):
-        image = png_to_numpy(f"exit_images/entrance_cam_image{i}.png")
-        image_reduction.reduce_image_with_dark(image, master_dark, f"entrance_images/reduced/entrance_cam_image{i}_reduced.png", save=True)
-        image = png_to_numpy(f"entrance_images/exit_cam_image{i}.png")
-        image_reduction.reduce_image_with_dark(image, master_dark, f"exit_images/reduced/exit_cam_image{i}_reduced.png", save=True)
+        image = png_to_numpy(entrance_image_folder+f"/entrance_cam_image{i}.png")
+        image_reduction.reduce_image_with_dark(image, entrance_master_dark, reduced_entrance_image_folder+f"/entrance_cam_image{i}_reduced.png", save=True)
+        image = png_to_numpy(exit_image_folder+f"/exit_cam_image{i}.png")
+        image_reduction.reduce_image_with_dark(image, exit_master_dark, reduced_exit_image_folder+f"/exit_cam_image{i}_reduced.png", save=True)
 
-
-    sg = calculate_scrambling_gain("entrance_images/reduced", "exit_images/reduced", fiber_diameter) # Todo: get fiber diameter from input GUI
+    sg = calculate_scrambling_gain(reduced_entrance_image_folder, reduced_exit_image_folder, fiber_diameter, plot=True) # Todo: get fiber diameter from input GUI
     print("Scrambling gain:", sg)
 
 # Test functions
@@ -462,5 +494,10 @@ plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
 # Plot com movement for exit images
 plot_circle_movement(exit_folder, fiber_diameter, 'exit')"""
 
+entrance_folder = "D:/Vincent/thorlabs_cams_images_oct/entrance/reduced"
+exit_folder = "D:/Vincent/thorlabs_cams_images_oct/exit/reduced"
+
 sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, plot=True)
 print(sg)
+
+#main(fiber_diameter)

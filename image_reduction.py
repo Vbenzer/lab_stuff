@@ -2,6 +2,7 @@ import numpy as np
 from astropy.io import fits
 import matplotlib.pyplot as plt
 import os
+import cv2
 
 
 def create_master_dark(dark_folder:str, img_path:str=None, plot:bool=False, save:bool=False) -> np.ndarray:
@@ -26,6 +27,10 @@ def create_master_dark(dark_folder:str, img_path:str=None, plot:bool=False, save
             with fits.open(file_path) as hdul:
                 dark_frame = hdul[0].data.astype(np.float32)  # Convert to float for precision
                 dark_data.append(dark_frame)  # Append to the list
+        if file_name.endswith(".png"):
+            file_path = os.path.join(dark_folder, file_name)
+            dark_frame = plt.imread(file_path)
+            dark_data.append(dark_frame)
 
     # Calculate the master dark frame as the mean of all dark frames
     master_dark = np.mean(dark_data, axis=0)
@@ -71,10 +76,20 @@ def reduce_image_with_dark(science_data:np.ndarray, dark_data:np.ndarray, output
     reduced_data = np.clip(reduced_data, 0, None)
 
     if save:
-        # Save the reduced image to a new FITS file
-        hdu = fits.PrimaryHDU(data=reduced_data)
-        hdu.writeto(output_file, overwrite=True)
-        print(f"Reduced image saved to: {output_file}")
+        # Check if the output file is .fits or .png
+        if output_file.endswith(".fits"):
+            # Save the reduced image to a new FITS file
+            hdu = fits.PrimaryHDU(data=reduced_data)
+            hdu.writeto(output_file, overwrite=True)
+            print(f"Reduced image saved to: {output_file}")
+
+        elif output_file.endswith(".png"):
+            # Save the reduced image to a new PNG file
+            cv2.imwrite(output_file, reduced_data)
+            print(f"Reduced image saved to: {output_file}")
+
+        else:
+            raise ValueError("Output file must be a .fits or .png file.")
 
     if plot or save_plot:
         # Plotting

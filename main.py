@@ -3,7 +3,8 @@ import threading
 import tkinter as tk
 import time
 
-
+# Todo: Change it so that folder or fiber diameter input are only required when a experiment is selected that
+#  actually needs it.
 def check_folder_exists(*args):
     """
     Check if the folder already exists in the base directory.
@@ -53,7 +54,9 @@ def update_experiment_status():
     if var3.get():
         selected_experiments.append("Fiber FRD Measurement")
     if var4.get():
-        selected_experiments.append("Code 4")
+        selected_experiments.append("Test")
+    if var5.get():
+        selected_experiments.append("Scrambling Gain Measurement")
 
     if not selected_experiments:
         experiment_status_label.config(text="No experiment selected", fg="red")
@@ -84,6 +87,8 @@ def run_experiment():
             run_code_3(folder_path, folder_name)
         if var4.get():
             run_code_4(folder_path, fiber_diameter)
+        if var5.get():
+            run_code_5(folder_path, fiber_diameter)
 
         root.after(1000, clear_message)
         root.after(0, root.destroy)
@@ -145,12 +150,19 @@ def run_code_3(folder_path, folder_name):
 
 def run_code_4(folder_path, fiber_diameter):
     if fiber_diameter == 0:
-        raise ValueError("F iber diameter cannot be empty")
+        raise ValueError("Fiber diameter cannot be empty")
 
     import experiment_running_test
     print(f"Running code 4 with fiber diameter: {fiber_diameter}")
     experiment_running_test.main(folder_path)
 
+def run_code_5(folder_path, fiber_diameter):
+    if fiber_diameter == 0:
+        raise ValueError("Fiber diameter cannot be empty")
+
+    import sg_pipeline
+    print(f"Running code 5 with fiber diameter: {fiber_diameter}")
+    sg_pipeline.main(folder_path, fiber_diameter)
 def on_closing():
     stop_event.set()
     root.destroy()
@@ -183,16 +195,19 @@ var1 = tk.BooleanVar()
 var2 = tk.BooleanVar()
 var3 = tk.BooleanVar()
 var4 = tk.BooleanVar()
+var5 = tk.BooleanVar()
 
 var1_checkbutton = tk.Checkbutton(root, text="Measure F/# from filter", variable=var1, command=update_experiment_status)
 var2_checkbutton = tk.Checkbutton(root, text="Compute Aperture Radius", variable=var2, command=update_experiment_status)
 var3_checkbutton = tk.Checkbutton(root, text="Fiber FRD Measurement", variable=var3, command=update_experiment_status)
-var4_checkbutton = tk.Checkbutton(root, text="Code 4", variable=var4, command=update_experiment_status)
+var4_checkbutton = tk.Checkbutton(root, text="Test", variable=var4, command=update_experiment_status)
+var5_checkbutton = tk.Checkbutton(root, text="Scrambling Gain Measurement", variable=var5, command=update_experiment_status)
 
 var1_checkbutton.grid(row=4, column=0, sticky=tk.W, padx=10, pady=5)
 var2_checkbutton.grid(row=4, column=1, sticky=tk.W, padx=10, pady=5)
 var3_checkbutton.grid(row=5, column=0, sticky=tk.W, padx=10, pady=5)
 var4_checkbutton.grid(row=5, column=1, sticky=tk.W, padx=10, pady=5)
+var5_checkbutton.grid(row=4, column=2, sticky=tk.W, padx=10, pady=5)
 
 create_folder_button = tk.Button(root, text="Create/Use Folder", command=create_folder)
 create_folder_button.grid(row=0, column=2, columnspan=1, pady=10)
