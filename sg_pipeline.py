@@ -5,7 +5,7 @@ import os
 
 from numpy import ndarray, dtype
 from numpy.f2py.symbolic import number_types
-from numpy.lib._function_base_impl import _SCT
+#from numpy.lib._function_base_impl import _SCT
 
 import image_analysation
 import matplotlib.pyplot as plt
@@ -242,8 +242,8 @@ def plot_circle_movement(image_folder:str, fibre_diameter:int, cam_type:str): # 
     plt.legend()
     plt.show()
 
-def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, fibre_diameter:int) -> ndarray[
-    tuple[int, ...], dtype[_SCT]]:
+def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, fibre_diameter:int, plot:bool=False) -> ndarray[
+    tuple[float, float]]:
     """
     Calculate the scrambling gain of the fiber using the given images.
     Args:
@@ -309,14 +309,23 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
     print("exit:", exit_cocs, exit_coms, exit_radii)
 
     # Calculate distance between entrance COC and COM
-    entrance_distances = np.linalg.norm(entrance_coms - entrance_cocs, axis=1)
-    print("entrance distances:", entrance_distances)
+    #entrance_distances = np.linalg.norm(entrance_coms - entrance_cocs, axis=1)
+    entrance_distances_x = np.abs(entrance_coms[:, 0] - entrance_cocs[:, 0])
+    entrance_distances_y = np.abs(entrance_coms[:, 1] - entrance_cocs[:, 1])
+    print("entrance distances x,y:", entrance_distances_x, entrance_distances_y)
 
     # Calculate distance between exit COC and COM
-    exit_distances = np.linalg.norm(exit_coms - exit_cocs, axis=1)
-    print("exit distances:", exit_distances)
+    #exit_distances = np.linalg.norm(exit_coms - exit_cocs, axis=1)
+    exit_distances_x = np.abs(exit_coms[:, 0] - exit_cocs[:, 0])
+    exit_distances_y = np.abs(exit_coms[:, 1] - exit_cocs[:, 1])
 
-    # Choose the exit/entrance pair with the smallest distance entrance distance from coc as reference
+    print("exit distances x,y:", exit_distances_x, exit_distances_y)
+
+    # Calculate total distances
+    entrance_distances = np.sqrt(entrance_distances_x**2 + entrance_distances_y**2)
+    exit_distances = np.sqrt(exit_distances_x**2 + exit_distances_y**2)
+
+    # Choose the exit/entrance pair with the smallest entrance distance from coc as reference
     reference_index = np.argmin(entrance_distances)
     print("Reference index:", reference_index)
 
@@ -330,6 +339,22 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
 
     # Delete the element which is zero
     scrambling_gain = np.delete(scrambling_gain, reference_index)
+
+
+    if plot:
+        entrance_distances = np.delete(entrance_distances, reference_index)
+        exit_distances_y = np.delete(exit_distances_y, reference_index)
+        exit_distances_x = np.delete(exit_distances_x, reference_index)
+
+        # Plot COM x and y movement of the fiber output with different spot positions as colorbar
+        scatter = plt.scatter(exit_distances_x, exit_distances_y, c=entrance_distances, cmap='viridis')
+        plt.colorbar(scatter, label='Entrance Spot Distance')
+        plt.xlabel('Exit COM x-distance [px]')
+        plt.ylabel('Exit COM y-distance [px]')
+        plt.title('COM Movement of Fiber Output')
+        plt.grid(True)
+        plt.show()
+
 
     return scrambling_gain
 
@@ -359,6 +384,7 @@ def main(fiber_diameter:int):
     for i in range(number_of_images):
         tcc.take_image("entrance_cam",f"entrance_images/entrance_cam_image{i}.png")
         tcc.take_image("exit_cam",f"exit_images/exit_cam_image{i}.png")
+        print("Move spot to next position")
         time.sleep(30) # Time to move spot manually Todo: Automate spot movement
 
     # Reduce images
@@ -423,6 +449,11 @@ print(com_of_spot(image, plot=True))
 """
 entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/entrance'
 exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/exit'
+
+entrance_folder = "entrance_images"
+exit_folder = "exit_images"
+
+
 fiber_diameter = 100
 """
 # Plot com movement for entrance images
@@ -431,5 +462,5 @@ plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
 # Plot com movement for exit images
 plot_circle_movement(exit_folder, fiber_diameter, 'exit')"""
 
-sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter)
+sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, plot=True)
 print(sg)
