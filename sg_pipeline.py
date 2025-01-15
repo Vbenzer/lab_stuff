@@ -9,8 +9,11 @@ from numpy.f2py.symbolic import number_types
 
 import image_analysation
 import matplotlib.pyplot as plt
-from skimage import io, color, feature, transform, filters
+from skimage import io, color, feature, transform, filters, morphology, measure
+from scipy.spatial.distance import directed_hausdorff
 from skimage.draw import disk, circle_perimeter
+from scipy import ndimage as ndi
+import cv2
 
 
 def png_to_numpy(image_path):
@@ -72,7 +75,7 @@ def detect_circle(image:np.ndarray, fibre_diameter:int, cam_type:str, threshold_
     else:
         raise ValueError("Invalid camera type. Must be either 'exit' or 'entrance'.")
 
-    print(px_radius)
+    #print(px_radius)
 
     # Perform Hough Circle Transform
     hough_radii = np.arange(px_radius - 5, px_radius + 5, 1)
@@ -82,6 +85,229 @@ def detect_circle(image:np.ndarray, fibre_diameter:int, cam_type:str, threshold_
     accums, cx, cy, radii = transform.hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1, normalize=False)
 
     return cy[0], cx[0], radii[0]
+
+def make_shape(shape:str, radius:int):
+    """
+    Create a shape for the fiber with the given diameter.
+    Args:
+        shape: Shape form. Must be either "circle", "square" or "octagon".
+        radius: Fiber radius in pixels.
+
+    Returns:
+        np.ndarray: The shape as a NumPy array.
+    """
+    if shape == "circle":
+        mask = np.zeros((2 * radius, 2 * radius), dtype=bool)
+        rr, cc = disk((radius, radius), radius)
+        mask[rr, cc] = True
+        plt.imshow(mask, cmap='gray')
+        plt.axis("off")
+        plt.show()
+        return mask
+    if shape == "square":
+        mask = np.zeros((2 * radius, 2 * radius), dtype=bool)
+        mask[0:radius, 0:radius] = True
+        plt.imshow(mask, cmap='gray')
+        plt.xlim(0, 2 * radius)
+        plt.ylim(0, 2 * radius)
+        plt.axis("off")
+        plt.show()
+        return mask
+    if shape == "octagon":
+        # Calculate side length from the radius
+        size = 2 * radius * (np.sqrt(2) - 1)
+
+        # Total size of the mask (to fit the octagon comfortably)
+        total_size = int(radius * 3)  # Diagonal length of the octagon
+        mask = np.zeros((total_size, total_size), dtype=np.uint8)
+
+        # Calculate center of the mask
+        center = total_size // 2
+
+        # Calculate vertices of the octagon
+        vertices = np.array([
+            (center - size / 2, center - radius),  # Top-left
+            (center + size / 2, center - radius),  # Top-right
+            (center + radius, center - size / 2),  # Right-top
+            (center + radius, center + size / 2),  # Right-bottom
+            (center + size / 2, center + radius),  # Bottom-right
+            (center - size / 2, center + radius),  # Bottom-left
+            (center - radius, center + size / 2),  # Left-bottom
+            (center - radius, center - size / 2),  # Left-top
+        ])
+
+        # Create the polygon (octagon) mask
+        from skimage.draw import polygon
+        rr, cc = polygon(vertices[:, 1], vertices[:, 0], mask.shape)
+        mask[rr, cc] = 255
+
+        plt.imshow(mask, cmap="gray")
+        #plt.scatter(vertices[:, 1], vertices[:, 0], color='red', s=5)
+        plt.title("Octagon Mask")
+        #plt.axis("off")
+        plt.show()
+
+        return mask, vertices
+
+def match_shape(image, radius):
+    num_rotations = 36
+    template, vertices = make_shape("octagon", radius)
+    best_match = None
+    best_score = -np.inf
+    best_angle = 0
+    best_location = None
+
+    if image.dtype != np.uint8:
+        image = (image * 255).astype(np.uint8)
+
+    for angle in np.linspace(0, 360, num_rotations, endpoint=False):
+        rotated_template = transform.rotate(template, angle, resize=True)
+        rotated_template = (rotated_template * 255).astype(np.uint8)
+
+        result = cv2.matchTemplate(image, rotated_template, cv2.TM_CCOEFF_NORMED)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+
+        if max_val > best_score:
+            best_score = max_val
+            best_match = rotated_template
+            best_angle = angle
+            best_location = max_loc
+
+    if best_match is not None:
+        # Convert best match position to grid of image
+
+
+
+        best_match = best_match > 0
+        # Change shape of best match to fit the image
+        best_match = np.pad(best_match, ((best_location[0], image.shape[0] - best_location[0] - best_match.shape[0]),
+                                         (best_location[1], image.shape[1] - best_location[1] - best_match.shape[1])),
+                            mode='constant', constant_values=0)
+        plt.imshow(best_match)
+        plt.show()
+        plt.imshow(image, cmap='gray')
+        plt.title(f'Best match with angle: {best_angle:.2f} degrees')
+        plt.show()
+    else:
+        print("No match found")
+
+def binary_filtering(image:np.ndarray, plot:bool=False):
+    """
+    Apply binary filtering to the given image.
+    Args:
+        image: Input image as a NumPy array.
+        plot: If True, plot the filtering steps.
+
+    Returns:
+
+    """
+    smooth = filters.gaussian(image, sigma=1.6)
+
+    thresh_value = filters.threshold_otsu(smooth)
+    thresh = smooth > thresh_value
+
+    fill = ndi.binary_fill_holes(thresh)
+
+    # Skip clear border step
+
+    dilate = morphology.binary_dilation(fill)
+    erode = morphology.binary_erosion(fill)
+
+    mask = np.logical_and(dilate, ~erode)
+
+    filled_mask = ndi.binary_fill_holes(mask)
+
+    image_without_spot = np.copy(image)
+    image_without_spot[filled_mask] = 0
+    smooth_without_spot = filters.gaussian(image_without_spot, sigma=1.6)
+    thresh_value_without_spot = filters.threshold_otsu(smooth_without_spot)
+    thresh_without_spot = smooth_without_spot > thresh_value_without_spot
+    fill_without_spot = ndi.binary_fill_holes(thresh_without_spot)
+    dilate_without_spot = morphology.binary_dilation(fill_without_spot)
+    erode_without_spot = morphology.binary_erosion(fill_without_spot)
+    mask_without_spot = np.logical_and(dilate_without_spot, ~erode_without_spot)
+
+    if plot:
+        fig, ax = plt.subplots(2, 4, figsize=(12, 6), sharey=True)
+
+        ax[0, 0].imshow(image, cmap="gray")
+        ax[0, 0].set_title('a) Raw')
+
+        ax[0, 1].imshow(smooth, cmap="gray")
+        ax[0, 1].set_title('b) Blur')
+
+        ax[0, 2].imshow(thresh, cmap="gray")
+        ax[0, 2].set_title('c) Threshold')
+
+        ax[0, 3].imshow(fill, cmap="gray")
+        ax[0, 3].set_title('c-1) Fill in')
+
+        ax[1, 1].imshow(dilate, cmap="gray")
+        ax[1, 1].set_title('d) Dilate')
+
+        ax[1, 2].imshow(erode, cmap="gray")
+        ax[1, 2].set_title('e) Erode')
+
+        ax[1, 3].imshow(mask, cmap="gray")
+        ax[1, 3].set_title('f) Nucleus Rim')
+
+        for a in ax.ravel():
+            a.set_axis_off()
+
+        fig.tight_layout()
+        plt.show()
+
+        # Plot images without spot
+        fig, ax = plt.subplots(2, 4, figsize=(12, 6), sharey=True)
+        ax[0, 0].imshow(image_without_spot, cmap="gray")
+        ax[0, 0].set_title('a) Raw')
+
+        ax[0, 1].imshow(smooth_without_spot, cmap="gray")
+        ax[0, 1].set_title('b) Blur')
+
+        ax[0, 2].imshow(thresh_without_spot, cmap="gray")
+        ax[0, 2].set_title('c) Threshold')
+
+        ax[0, 3].imshow(fill_without_spot, cmap="gray")
+        ax[0, 3].set_title('c-1) Fill in')
+
+        ax[1, 1].imshow(dilate_without_spot, cmap="gray")
+        ax[1, 1].set_title('d) Dilate')
+
+        ax[1, 2].imshow(erode_without_spot, cmap="gray")
+        ax[1, 2].set_title('e) Erode')
+
+        ax[1, 3].imshow(mask_without_spot, cmap="gray")
+        ax[1, 3].set_title('f) Nucleus Rim')
+
+        for a in ax.ravel():
+            a.set_axis_off()
+
+        fig.tight_layout()
+        plt.show()
+
+def detect_shape(image:np.ndarray, shape:str, radius:int, plot:bool=False):
+    import cv2
+    #image = cv2.imread('shapes.jpg', 0)  # Load grayscale image
+    #template = cv2.imread('octagon_template.jpg', 0)  # Load your shape template
+
+    template = make_shape(shape, radius)
+
+    # Perform template matching
+    result = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
+    threshold = 0.8  # Set a threshold for a good match
+    locations = np.where(result >= threshold)
+
+    # Draw rectangles around detected shapes
+    output = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    for loc in zip(*locations[::-1]):
+        h, w = template.shape
+        cv2.rectangle(output, loc, (loc[0] + w, loc[1] + h), (0, 255, 0), 2)
+
+    # Show result
+    cv2.imshow('Detected Shapes', output)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 def create_circular_mask(image:np.ndarray, center:tuple[int,int], radius:int, margin=0):
     """
@@ -353,7 +579,7 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
         exit_distances_x = np.delete(exit_distances_x, reference_index)
 
         # Plot COM x and y movement of the fiber output with different spot positions as colorbar
-        scatter = plt.scatter(exit_distances_x, exit_distances_y, c=entrance_distances, cmap='viridis')
+        scatter = plt.scatter(exit_distances_x, exit_distances_y, c=entrance_distances, cmap='plasma')
         plt.colorbar(scatter, label='Relative Spot Displacement [px]')
         plt.xlabel('Exit COM x-distance [px]')
         plt.ylabel('Exit COM y-distance [px]')
@@ -400,8 +626,8 @@ def main(fiber_diameter:int, number_of_positions:int=3):
 
     # Take darks
     for i in range(5):
-        tcc.take_image("entrance_cam", entrance_dark_image_folder+f"/entrance_cam_dark{i}.png")
-        tcc.take_image("exit_cam", exit_dark_image_folder+f"/exit_cam_dark{i}.png")
+        tcc.take_image("entrance_cam", entrance_dark_image_folder+f"/entrance_cam_dark{i:03d}.png")
+        tcc.take_image("exit_cam", exit_dark_image_folder+f"/exit_cam_dark{i:03d}.png")
 
     entrance_master_dark = (image_reduction
                             .create_master_dark(entrance_dark_image_folder, plot=False))
@@ -414,18 +640,18 @@ def main(fiber_diameter:int, number_of_positions:int=3):
     # Take images
     number_of_images = number_of_positions
     for i in range(number_of_images):
-        tcc.take_image("entrance_cam", entrance_image_folder+f"/entrance_cam_image{i}.png")
-        tcc.take_image("exit_cam",exit_image_folder+f"/exit_cam_image{i}.png")
+        tcc.take_image("entrance_cam", entrance_image_folder+f"/entrance_cam_image{i:03d}.png")
+        tcc.take_image("exit_cam",exit_image_folder+f"/exit_cam_image{i:03d}.png")
         print(f"Image {i+1} out of {number_of_images} done! Move spot to next position")
         time.sleep(10) # Time to move spot manually Todo: Automate spot movement
     print("All images taken!")
 
     # Reduce images
     for i in range(number_of_images):
-        image = png_to_numpy(entrance_image_folder+f"/entrance_cam_image{i}.png")
-        image_reduction.reduce_image_with_dark(image, entrance_master_dark, reduced_entrance_image_folder+f"/entrance_cam_image{i}_reduced.png", save=True)
-        image = png_to_numpy(exit_image_folder+f"/exit_cam_image{i}.png")
-        image_reduction.reduce_image_with_dark(image, exit_master_dark, reduced_exit_image_folder+f"/exit_cam_image{i}_reduced.png", save=True)
+        image = png_to_numpy(entrance_image_folder+f"/entrance_cam_image{i:03d}.png")
+        image_reduction.reduce_image_with_dark(image, entrance_master_dark, reduced_entrance_image_folder+f"/entrance_cam_image{i:03d}_reduced.png", save=True)
+        image = png_to_numpy(exit_image_folder+f"/exit_cam_image{i:03d}.png")
+        image_reduction.reduce_image_with_dark(image, exit_master_dark, reduced_exit_image_folder+f"/exit_cam_image{i:03d}_reduced.png", save=True)
 
     sg = calculate_scrambling_gain(reduced_entrance_image_folder, reduced_exit_image_folder, fiber_diameter, plot=True) # Todo: get fiber diameter from input GUI
     print("Scrambling gain:", sg)
@@ -479,11 +705,11 @@ image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/entr
 image = io.imread(image_path)
 print(com_of_spot(image, plot=True))
 """
-entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/entrance'
-exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/exit'
+entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct/entrance/reduced'
+exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images/exit/reduced'
 
-entrance_folder = "entrance_images"
-exit_folder = "exit_images"
+#entrance_folder = "entrance_images"
+#exit_folder = "exit_images"
 
 
 fiber_diameter = 100
@@ -494,10 +720,19 @@ plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
 # Plot com movement for exit images
 plot_circle_movement(exit_folder, fiber_diameter, 'exit')"""
 
-entrance_folder = "D:/Vincent/thorlabs_cams_images_oct/entrance/reduced"
-exit_folder = "D:/Vincent/thorlabs_cams_images_oct/exit/reduced"
+#entrance_folder = "D:/Vincent/thorlabs_cams_images_oct/entrance/reduced"
+#exit_folder = "D:/Vincent/thorlabs_cams_images_oct/exit/reduced"
 
-sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, plot=True)
-print(sg)
+#sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, plot=True)
+#print(sg)
 
 #main(fiber_diameter)
+
+image = entrance_folder + "/entrance_cam_image0_reduced.png"
+image = png_to_numpy(image)
+#binary_filtering(image, plot=True)
+
+#make_shape("octagon", 100)
+#detect_shape(image, "octagon", 100, plot=True)
+match_shape(image, 110)
+# Todo: use predefined shapes to fit on fiber and then create mask from that with erosion/dilation
