@@ -3,14 +3,9 @@ from PIL import Image
 from astropy.io import fits
 import os
 
-from numpy import ndarray, dtype
-from numpy.f2py.symbolic import number_types
-#from numpy.lib._function_base_impl import _SCT
-
 import image_analysation
 import matplotlib.pyplot as plt
 from skimage import io, color, feature, transform, filters, morphology, measure
-from scipy.spatial.distance import directed_hausdorff
 from skimage.draw import disk, circle_perimeter
 from scipy import ndimage as ndi
 import cv2
@@ -29,15 +24,14 @@ def png_to_numpy(image_path):
     with Image.open(image_path) as img:
         return np.array(img)
 
-def detect_circle(image:np.ndarray, fibre_diameter:int, cam_type:str, threshold_value=20):
+def detect_circle(image:np.ndarray, fiber_px_radius:int, plot_mask:bool=False):
     """
     Detects a circle in the given image using Hough Circle Transform.
 
     Parameters:
         image (np.ndarray): The input image as a NumPy array.
-        fibre_diameter (int): The diameter of the fibre in micrometers.
-        cam_type (str): The type of camera used. Must be either 'exit' or 'entrance'.
-        threshold_value (float): The threshold value to filter out the brighter spot.
+        fiber_px_radius (int): The radius of the fiber in pixels.
+        plot_mask (bool): If True, plot the detected circle.
 
     Returns:
         tuple: (center_y, center_x, radius) of the detected circle.
@@ -48,47 +42,28 @@ def detect_circle(image:np.ndarray, fibre_diameter:int, cam_type:str, threshold_
     else:
         image_gray = image
 
-    """
-    # Apply a threshold to filter out the brighter spot
-    image_gray = filters.threshold_local(image_gray, block_size=11, offset=0)
-
-    plt.imshow(image_gray, cmap='gray')
-    plt.show()
-    print(image_gray)
-    image_gray[image_gray > threshold_value] = 0
-    print(image_gray)
-
-    plt.imshow(image_gray, cmap='gray')
-    plt.show()
-    """
-
     # Detect edges using Canny edge detector
     edges = feature.canny(image_gray, sigma=1.6, low_threshold=0.1, high_threshold=2)
 
-    """plt.imshow(edges)
-    plt.show()"""
-
-    if cam_type == 'exit':
-        px_radius = int(fibre_diameter / 0.45 / 2) # 0.45 um/px #Todo: Are these values correct?
-    elif cam_type == 'entrance':
-        px_radius = int(fibre_diameter / 0.526 / 2) # 0.526 um/px
-    else:
-        raise ValueError("Invalid camera type. Must be either 'exit' or 'entrance'.")
-
-    #print(px_radius)
-
     # Perform Hough Circle Transform
-    hough_radii = np.arange(px_radius - 5, px_radius + 5, 1)
+    hough_radii = np.arange(fiber_px_radius - 5, fiber_px_radius + 5, 1)
     hough_res = transform.hough_circle(edges, hough_radii)
 
     # Select the most prominent circle
     accums, cx, cy, radii = transform.hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1, normalize=False)
 
+    if plot_mask:
+        # Plot the detected circle
+        plt.imshow(image, cmap='gray')
+        circle_outline = plt.Circle((cx[0], cy[0]), radii[0], color='r', fill=False)
+        plt.gca().add_artist(circle_outline)
+        plt.show()
+
     return cy[0], cx[0], radii[0]
 
 def make_shape(shape:str, radius:int):
     """
-    Create a shape for the fiber with the given diameter.
+    Create a shape for the fiber with the given radius.
     Args:
         shape: Shape form. Must be either "circle", "square" or "octagon".
         radius: Fiber radius in pixels.
@@ -100,19 +75,22 @@ def make_shape(shape:str, radius:int):
         mask = np.zeros((2 * radius, 2 * radius), dtype=bool)
         rr, cc = disk((radius, radius), radius)
         mask[rr, cc] = True
-        plt.imshow(mask, cmap='gray')
+        """plt.imshow(mask, cmap='gray')
         plt.axis("off")
-        plt.show()
+        plt.show()"""
         return mask
+
     if shape == "square":
         mask = np.zeros((2 * radius, 2 * radius), dtype=bool)
         mask[0:radius, 0:radius] = True
-        plt.imshow(mask, cmap='gray')
+
+        """plt.imshow(mask, cmap='gray')
         plt.xlim(0, 2 * radius)
         plt.ylim(0, 2 * radius)
         plt.axis("off")
-        plt.show()
+        plt.show()"""
         return mask
+
     if shape == "octagon":
         # Calculate side length from the radius
         size = 2 * radius * (np.sqrt(2) - 1)
@@ -141,57 +119,134 @@ def make_shape(shape:str, radius:int):
         rr, cc = polygon(vertices[:, 1], vertices[:, 0], mask.shape)
         mask[rr, cc] = 255
 
-        plt.imshow(mask, cmap="gray")
-        #plt.scatter(vertices[:, 1], vertices[:, 0], color='red', s=5)
-        plt.title("Octagon Mask")
-        #plt.axis("off")
-        plt.show()
+        """plt.imshow(mask, cmap="gray")
+        plt.title("Octagon Mask")"""
 
-        return mask, vertices
+        return mask
 
-def match_shape(image, radius):
-    num_rotations = 36
-    template, vertices = make_shape("octagon", radius)
+def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, radius_threshold:int=5, plot_all:bool=False,
+                plot_best:bool=False):
+    """
+    Match the given shape to the image using template matching.
+    Args:
+        image: Input image as a NumPy array.
+        radius: Expected radius of the shape in pixels.
+        shape: Form of the shape. Must be either "circle", "square" or "octagon".
+        num_rotations: Number of rotations to try. Currently locked to 45°.
+        radius_threshold: Threshold for the radius to try.
+        plot_all: If True, plot all the steps.
+        plot_best: If True, plot the best match.
+
+    Returns:
+        best_match (np.ndarray): Image of the best match.
+    """
     best_match = None
     best_score = -np.inf
     best_angle = 0
     best_location = None
+    best_radius = radius
 
-    if image.dtype != np.uint8:
-        image = (image * 255).astype(np.uint8)
+    # Detect edges using Canny edge detector
+    edges = feature.canny(image, sigma=2, low_threshold=1, high_threshold=7)
 
-    for angle in np.linspace(0, 360, num_rotations, endpoint=False):
-        rotated_template = transform.rotate(template, angle, resize=True)
-        rotated_template = (rotated_template * 255).astype(np.uint8)
+    # Ensure outline is closed (2 iterations of dilation and erosion)
+    erode = morphology.binary_erosion(edges)
+    dilate = morphology.binary_dilation(edges)
+    mask_1 = np.logical_and(dilate, ~erode)
 
-        result = cv2.matchTemplate(image, rotated_template, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+    erode = morphology.binary_erosion(mask_1)
+    dilate = morphology.binary_dilation(mask_1)
+    mask_2 = np.logical_and(dilate, ~erode)
 
-        if max_val > best_score:
-            best_score = max_val
-            best_match = rotated_template
-            best_angle = angle
-            best_location = max_loc
+    if plot_all:
+        plt.figure(figsize=(12.80, 10.24))
+        plt.imshow(edges)
+        plt.title("Edges")
+        plt.show()
+
+        plt.figure(figsize=(12.80, 10.24))
+        plt.imshow(mask_2)
+        plt.title("Mask after 2nd iteration of dilation and erosion")
+        plt.show()
+
+    # Fill in the holes in the edges
+    filled_mask = ndi.binary_fill_holes(mask_2)
+
+    if plot_all:
+        # Plot the filled mask
+        plt.imshow(filled_mask)
+        plt.title("Filled Mask")
+        plt.show()
+
+    # Convert bool to uint8
+    uint8_mask = filled_mask.astype(np.uint8)
+
+    """if image.dtype != np.uint8:
+        edges = (edges * 255).astype(np.uint8)"""
+
+    for r in range(radius - radius_threshold, radius + radius_threshold): # Iterate over different radii
+        # Create the shape template
+        template = make_shape(shape,r)
+
+        for angle in np.linspace(0, 45, num_rotations, endpoint=False): # Iterate over different rotations #Todo: Make stop value dependent on shape
+            # Rotate the template
+            rotated_template = transform.rotate(template, angle, resize=True)
+            rotated_template = (rotated_template * 255).astype(np.uint8)
+
+            # Perform template matching
+            result = cv2.matchTemplate(uint8_mask, rotated_template, cv2.TM_CCOEFF_NORMED)
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+
+            if max_val > best_score:
+                # Update the best match
+                best_score = max_val
+                best_match = rotated_template
+                best_angle = angle
+                best_location = max_loc
+                best_radius = r
 
     if best_match is not None:
-        # Convert best match position to grid of image
+        # Calculate the center of mass of the best match
+        com_position = best_location[0] + best_match.shape[1] // 2, best_location[1] + best_match.shape[0] // 2
 
-
-
-        best_match = best_match > 0
         # Change shape of best match to fit the image
-        best_match = np.pad(best_match, ((best_location[0], image.shape[0] - best_location[0] - best_match.shape[0]),
-                                         (best_location[1], image.shape[1] - best_location[1] - best_match.shape[1])),
+        best_match = np.pad(best_match, ((best_location[1], image.shape[0] - best_location[1] - best_match.shape[0]),
+                                         (best_location[0], image.shape[1] - best_location[0] - best_match.shape[1])),
                             mode='constant', constant_values=0)
-        plt.imshow(best_match)
-        plt.show()
-        plt.imshow(image, cmap='gray')
-        plt.title(f'Best match with angle: {best_angle:.2f} degrees')
-        plt.show()
+
+        # Convert the best match to a binary mask
+        best_match_binary = best_match > 0
+
+        if plot_best or plot_all:
+            # Plot the best match
+            plt.imshow(best_match_binary)
+
+
+        # Create an image with the best match removed
+        image_with_mask = np.copy(image)
+        image_with_mask[best_match_binary] = 0
+
+        # Create outline of the best match
+        best_match_outline = measure.find_contours(best_match, 0.5)[0]
+
+        if plot_best or plot_all:
+            # Plot filled_mask with outline
+            plt.plot(best_match_outline[:, 1], best_match_outline[:, 0], 'r', linewidth=0.5)
+            plt.imshow(filled_mask)
+            plt.show()
+
+            # Plot the image with the best match removed
+            plt.plot(best_match_outline[:, 1], best_match_outline[:, 0], 'r', linewidth=0.1)
+            plt.plot(com_position[0], com_position[1], 'ro', markersize=0.5)
+            plt.imshow(image, cmap='gray')
+            plt.title(f'Best match. Angle: {best_angle:.2f}°, Position: {com_position}, Radius: {best_radius}px')
+            plt.show()
+
+        return best_match
     else:
         print("No match found")
 
-def binary_filtering(image:np.ndarray, plot:bool=False):
+def binary_filtering(image:np.ndarray, plot:bool=False): # Unused
     """
     Apply binary filtering to the given image.
     Args:
@@ -214,18 +269,6 @@ def binary_filtering(image:np.ndarray, plot:bool=False):
     erode = morphology.binary_erosion(fill)
 
     mask = np.logical_and(dilate, ~erode)
-
-    filled_mask = ndi.binary_fill_holes(mask)
-
-    image_without_spot = np.copy(image)
-    image_without_spot[filled_mask] = 0
-    smooth_without_spot = filters.gaussian(image_without_spot, sigma=1.6)
-    thresh_value_without_spot = filters.threshold_otsu(smooth_without_spot)
-    thresh_without_spot = smooth_without_spot > thresh_value_without_spot
-    fill_without_spot = ndi.binary_fill_holes(thresh_without_spot)
-    dilate_without_spot = morphology.binary_dilation(fill_without_spot)
-    erode_without_spot = morphology.binary_erosion(fill_without_spot)
-    mask_without_spot = np.logical_and(dilate_without_spot, ~erode_without_spot)
 
     if plot:
         fig, ax = plt.subplots(2, 4, figsize=(12, 6), sharey=True)
@@ -257,59 +300,58 @@ def binary_filtering(image:np.ndarray, plot:bool=False):
         fig.tight_layout()
         plt.show()
 
-        # Plot images without spot
-        fig, ax = plt.subplots(2, 4, figsize=(12, 6), sharey=True)
-        ax[0, 0].imshow(image_without_spot, cmap="gray")
-        ax[0, 0].set_title('a) Raw')
+def detect_shape(image:np.ndarray, radius:int, shape:str, plot_mask:bool=False, plot_all:bool=False, plot_best:bool=False):
+    """
+    Detect the given shape in the image.
+    Args:
+        image: Input image as a NumPy array.
+        radius: Expected radius of the shape in pixels.
+        shape: Form of the shape. Must be either "circle", "square" or "octagon".
+        plot_mask: If True, plot the mask.
+        plot_all: If True, plot all the steps.
+        plot_best: If True, plot the best match.
 
-        ax[0, 1].imshow(smooth_without_spot, cmap="gray")
-        ax[0, 1].set_title('b) Blur')
+    Returns:
+        np.ndarray: The mask of the detected shape.
+        tuple: The center of mass of the detected
+    """
+    best_match = match_shape(image, radius, shape, plot_all=plot_all, plot_best=plot_best)
 
-        ax[0, 2].imshow(thresh_without_spot, cmap="gray")
-        ax[0, 2].set_title('c) Threshold')
+    com_of_mask = com_of_spot(best_match)
 
-        ax[0, 3].imshow(fill_without_spot, cmap="gray")
-        ax[0, 3].set_title('c-1) Fill in')
+    erode = morphology.binary_erosion(best_match)
+    dilate = morphology.binary_dilation(best_match)
 
-        ax[1, 1].imshow(dilate_without_spot, cmap="gray")
-        ax[1, 1].set_title('d) Dilate')
+    mask = np.logical_and(dilate, ~erode)
 
-        ax[1, 2].imshow(erode_without_spot, cmap="gray")
-        ax[1, 2].set_title('e) Erode')
+    filled_mask = ndi.binary_fill_holes(mask)
 
-        ax[1, 3].imshow(mask_without_spot, cmap="gray")
-        ax[1, 3].set_title('f) Nucleus Rim')
+    if plot_mask or plot_all:
+        fig, ax = plt.subplots(2, 2, figsize=(12, 6), sharey=True)
 
-        for a in ax.ravel():
-            a.set_axis_off()
+        ax[0, 0].imshow(image, cmap="gray")
+        ax[0, 0].plot(com_of_mask[1], com_of_mask[0], 'ro', markersize=0.5)
+        ax[0, 0].set_title('Original Image')
+
+        best_match_outline = measure.find_contours(best_match, 0.5)[0]
+        ax[0, 1].imshow(image, cmap="gray")
+        ax[0, 1].plot(best_match_outline[:, 1], best_match_outline[:, 0], 'r', linewidth=0.5)
+        ax[0, 1].set_title('Best Match')
+
+        maks_outline = measure.find_contours(mask, 0.5)[0]
+        ax[1, 0].imshow(image, cmap="gray")
+        ax[1, 0].plot(maks_outline[:, 1], maks_outline[:, 0], 'r', linewidth=0.5)
+        ax[1, 0].set_title('Mask')
+
+        ax[1, 1].imshow(filled_mask, cmap="gray")
+        ax[1, 1].set_title('Filled Mask')
 
         fig.tight_layout()
         plt.show()
 
-def detect_shape(image:np.ndarray, shape:str, radius:int, plot:bool=False):
-    import cv2
-    #image = cv2.imread('shapes.jpg', 0)  # Load grayscale image
-    #template = cv2.imread('octagon_template.jpg', 0)  # Load your shape template
+    return filled_mask, com_of_mask
 
-    template = make_shape(shape, radius)
-
-    # Perform template matching
-    result = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
-    threshold = 0.8  # Set a threshold for a good match
-    locations = np.where(result >= threshold)
-
-    # Draw rectangles around detected shapes
-    output = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-    for loc in zip(*locations[::-1]):
-        h, w = template.shape
-        cv2.rectangle(output, loc, (loc[0] + w, loc[1] + h), (0, 255, 0), 2)
-
-    # Show result
-    cv2.imshow('Detected Shapes', output)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-def create_circular_mask(image:np.ndarray, center:tuple[int,int], radius:int, margin=0):
+def create_circular_mask(image:np.ndarray, center:tuple[int,int], radius:int, margin=0, plot_mask:bool=False):
     """
     Creates a circular mask for the given image.
 
@@ -317,7 +359,8 @@ def create_circular_mask(image:np.ndarray, center:tuple[int,int], radius:int, ma
         image (np.ndarray): The input image as a NumPy array.
         center (tuple): The (y, x) coordinates of the circle center.
         radius (int): The radius of the circular mask.
-        margin (int): The margin to add to the radius.
+        margin (int): The margin to add to the radius. Unused for now.
+        plot_mask (bool): If True, plot the mask.
 
     Returns:
         np.ndarray: The circular mask as a NumPy array.
@@ -327,21 +370,24 @@ def create_circular_mask(image:np.ndarray, center:tuple[int,int], radius:int, ma
     mask = np.zeros(image.shape[:2], dtype=bool)
     rr, cc = disk(center, radius + margin, shape=image.shape)
     mask[rr, cc] = True
-    return mask
 
-def plot_histogram(image:np.ndarray):
-    """
-    Plots a histogram of the given image.
+    # Erode and dilate to ensure mask is big enough
+    erode = morphology.binary_erosion(mask)
+    dilate = morphology.binary_dilation(erode)
+    mask = np.logical_and(dilate, ~erode)
 
-    Parameters:
-        image (np.ndarray): The input image as a NumPy array.
-    """
-    plt.hist(image.ravel(), bins=256, density=True, color='gray', alpha=0.75)
-    plt.xlabel('Pixel Value')
-    plt.ylabel('Frequency')
-    plt.title('Image Histogram')
-    plt.show()
+    # Fill in the holes in the mask
+    filled_mask = ndi.binary_fill_holes(mask)
 
+    if plot_mask:
+        # Plot the outline of the mask
+        mask_outline = measure.find_contours(filled_mask, 0.5)[0]
+        plt.plot(mask_outline[:, 1], mask_outline[:, 0], 'r', linewidth=0.5)
+        plt.imshow(image, cmap='gray')
+        plt.title('Circular Mask')
+        plt.show()
+
+    return filled_mask
 
 def image_to_fits(image_path:str):
     """
@@ -428,13 +474,13 @@ def com_of_spot(image:np.ndarray, plot:bool=False):
 
     return com
 
-def plot_circle_movement(image_folder:str, fibre_diameter:int, cam_type:str): # Todo: This function doesn't make sense for now, due to precision issues with the circle detection
+def plot_circle_movement(image_folder:str, fiber_px_radius:int): # Todo: This function doesn't make sense for now,
+    # due to precision issues with the circle detection also needs to be updated
     """
     Plots the movement of the center of circle of the fibers in the given image folder.
     Args:
         image_folder: Path to the folder containing the images.
-        fibre_diameter: Diameter of the fiber in micrometers.
-        cam_type: Which camera type (position) was used. Must be either 'exit' or 'entrance'.
+        fiber_px_radius: Radius of the fiber in pixels.
 
     """
     image_files = [f for f in os.listdir(image_folder) if f.endswith('.png')]
@@ -443,7 +489,7 @@ def plot_circle_movement(image_folder:str, fibre_diameter:int, cam_type:str): # 
     for image_file in image_files:
         image_path = os.path.join(image_folder, image_file)
         image = io.imread(image_path)
-        center_y, center_x, radius = detect_circle(image, fibre_diameter, cam_type)
+        center_y, center_x, radius = detect_circle(image, fiber_px_radius)
         center = center_y, center_x
         cpos.append(center)
 
@@ -468,24 +514,33 @@ def plot_circle_movement(image_folder:str, fibre_diameter:int, cam_type:str): # 
     plt.legend()
     plt.show()
 
-def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, fibre_diameter:int, plot:bool=False) -> ndarray[
-    tuple[float, float]]:
+def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, fiber_diameter:int, fiber_shape:str,
+                              plot_result:bool=False, plot_mask:bool=False, plot_best:bool=False, plot_all:bool=False):
     """
     Calculate the scrambling gain of the fiber using the given images.
     Args:
         entrance_image_folder: Path to the folder containing the entrance images.
         exit_image_folder: Path to the folder containing the exit images.
-        fibre_diameter: Diameter of the fiber in micrometers.
+        fiber_diameter: Diameter of the fiber in micrometers.
+        fiber_shape: Shape of the fiber. Must be either "circle" or "octagon".
+        plot_result: If True, plot the result.
+        plot_mask: If True, plot the mask.
+        plot_best: If True, plot the best match.
+        plot_all: If True, plot all the steps.
 
     Returns:
     scrambling_gain: List of scrambling gains for each pair of entrance and exit images.
     """
-    # Get the COM of the entrance image spots
+    fiber_px_radius_entrance = int(fiber_diameter / 0.526 / 2)
+    fiber_px_radius_exit = int(fiber_diameter / 0.45 / 2)
+
+    # Get values of the entrance image
     entrance_image_files = [f for f in os.listdir(entrance_image_folder) if f.endswith('.png')]
-    entrance_coms = []
-    entrance_cocs = []
+    entrance_coms = [] # Center of mass of spot in the entrance image
+    entrance_comk = [] # Center of mask and with that the center of the fiber
     entrance_radii = []
 
+    # Process entrance images
     for image_file in entrance_image_files:
         image_path = os.path.join(entrance_image_folder, image_file)
         print(image_path)
@@ -493,65 +548,93 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
         com = com_of_spot(image)
         entrance_coms.append(com)
 
-        # Find center of circle
-        center_y, center_x, radius = detect_circle(image, fibre_diameter, cam_type='entrance')
-        coc = [center_y, center_x]
-        entrance_cocs.append(coc)
+        # Find center of fiber depending on the shape
+        if fiber_shape == "circle":
+            center_y, center_x, radius = detect_circle(image, fiber_px_radius_entrance, plot_mask=plot_mask)
+            comk = [center_y, center_x]
+
+        elif fiber_shape == "octagon":
+            mask, comk = detect_shape(image, fiber_px_radius_entrance, "octagon", plot_mask=plot_mask,
+                                      plot_all=plot_all, plot_best=plot_best)
+            radius = fiber_px_radius_entrance
+
+        else:
+            raise ValueError("Invalid fiber shape. Must be either 'circle' or 'octagon'.")
+
+        entrance_comk.append(comk)
         entrance_radii.append(radius)
 
+    # Convert lists to NumPy arrays
     entrance_coms = np.array(entrance_coms)
-    entrance_cocs = np.array(entrance_cocs)
+    entrance_comk = np.array(entrance_comk)
     entrance_radii = np.array(entrance_radii)
 
-    # Get the C.O.C (center of circle) of the exit image
+    # Get values of the exit image
     exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('.png')]
-    exit_cocs = []
+    exit_comk = []
     exit_coms = []
     exit_radii = []
 
-    print("entrance:", entrance_cocs, entrance_coms, entrance_radii)
+    print("Entrance center of mask:", entrance_comk)
+    print("Entrance center of mass:", entrance_coms)
+    print("Entrance radii:", entrance_radii)
 
+    # Process exit images
     for image_file in exit_image_files:
         image_path = os.path.join(exit_image_folder, image_file)
         print(image_path)
         image = io.imread(image_path)
-        center_y, center_x, radius = detect_circle(image, fibre_diameter, cam_type='exit')
-        coc = [center_y, center_x]
-        exit_cocs.append(coc)
+
+        # Find center of fiber
+        if fiber_shape == "circle":
+            center_y, center_x, radius = detect_circle(image, fiber_px_radius_exit)
+            comk = [center_y, center_x]
+            mask = create_circular_mask(image, (center_y, center_x), radius, plot_mask=plot_mask)
+
+        elif fiber_shape == "octagon":
+            mask, comk = detect_shape(image, fiber_px_radius_exit, "octagon", plot_mask=plot_mask,
+                                      plot_all=plot_all, plot_best=plot_best)
+            radius = fiber_px_radius_exit
+
+        else:
+            raise ValueError("Invalid fiber shape. Must be either 'circle' or 'octagon'.")
+
+        exit_comk.append(comk)
         exit_radii.append(radius)
 
-        # Use exit circle mask to set background to zero
-        mask = create_circular_mask(image, (center_y, center_x), radius, margin=0)
+        # Use exit fiber mask to set background to zero
         image[~mask] = 0
 
         # Find the center of mass of the image with reduced background
         com = com_of_spot(image)
         exit_coms.append(com)
 
-    exit_cocs = np.array(exit_cocs)
+    exit_comk = np.array(exit_comk)
     exit_coms = np.array(exit_coms)
     exit_radii = np.array(exit_radii)
 
-    print("exit:", exit_cocs, exit_coms, exit_radii)
+    print("Exit center of mask:", exit_comk)
+    print("Exit center of mass:", exit_coms)
+    print("Exit radii:", exit_radii)
 
-    # Calculate distance between entrance COC and COM
-    #entrance_distances = np.linalg.norm(entrance_coms - entrance_cocs, axis=1)
-    entrance_distances_x = entrance_coms[:, 0] - entrance_cocs[:, 0]
-    entrance_distances_y = entrance_coms[:, 1] - entrance_cocs[:, 1]
-    print("entrance distances x,y:", entrance_distances_x, entrance_distances_y)
+    # Calculate distance between entrance COMK and COM
+    #entrance_distances = np.linalg.norm(entrance_coms - exit_comk, axis=1)
+    entrance_distances_x = entrance_coms[:, 0] - entrance_comk[:, 0]
+    entrance_distances_y = entrance_coms[:, 1] - entrance_comk[:, 1]
+    print("Entrance distances x,y:", entrance_distances_x, entrance_distances_y)
 
-    # Calculate distance between exit COC and COM
-    #exit_distances = np.linalg.norm(exit_coms - exit_cocs, axis=1)
-    exit_distances_x = exit_coms[:, 0] - exit_cocs[:, 0] #Todo: Exit shift better calculate relative to reference? Alternatively raise precision of coc
-    exit_distances_y = exit_coms[:, 1] - exit_cocs[:, 1]
+    # Calculate distance between exit COMK and COM
+    #exit_distances = np.linalg.norm(exit_coms - exit_comk, axis=1)
+    exit_distances_x = exit_coms[:, 0] - exit_comk[:, 0] #Todo: Exit shift better calculate relative to reference? Alternatively raise precision of COMK
+    exit_distances_y = exit_coms[:, 1] - exit_comk[:, 1] #Todo: Also why are these values not partly negative?
 
-    print("exit distances x,y:", exit_distances_x, exit_distances_y)
+    print("Exit distances x,y:", exit_distances_x, exit_distances_y)
 
     # Calculate total distances with sign differences depending on the direction of the movement
     entrance_distances = np.sqrt(entrance_distances_x**2 + entrance_distances_y**2)
     exit_distances = np.sqrt(exit_distances_x**2 + exit_distances_y**2)
 
-    # Choose the exit/entrance pair with the smallest entrance distance from coc as reference
+    # Choose the exit/entrance pair with the smallest entrance distance from COMK as reference
     reference_index = np.argmin(entrance_distances)
     print("Reference index:", reference_index)
 
@@ -565,15 +648,17 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
     scrambling_gain = []
     for i in range(len(entrance_distances)):
         scrambling_gain.append(entrance_distances[i] - entrance_distances[reference_index] / 2 * entrance_radii[i] / exit_distances[i] - exit_distances[reference_index] / 2 * exit_radii[i])
+    # Todo: Maybe better use only the x or y distance for the scrambling gain calculation?
 
     scrambling_gain = np.array(scrambling_gain)
-    print("Scrambling gain:", scrambling_gain)
+    scrambling_gain_rounded = np.round(scrambling_gain, 2)
+    print(f"Scrambling gain: ", scrambling_gain_rounded)
 
-    # Delete the element which is zero
+    # Delete the reference element from the arrays
     scrambling_gain = np.delete(scrambling_gain, reference_index)
 
 
-    if plot:
+    if plot_result:
         entrance_distances = np.delete(entrance_distances, reference_index)
         exit_distances_y = np.delete(exit_distances_y, reference_index)
         exit_distances_x = np.delete(exit_distances_x, reference_index)
@@ -593,6 +678,10 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
 def main(fiber_diameter:int, number_of_positions:int=3):
     """
     Main function to run the scrambling gain calculation pipeline.
+
+    Args:
+        fiber_diameter: Diameter of the fiber in micrometers.
+        number_of_positions: Number of positions to take images at.
     """
     import image_reduction
     import thorlabs_cam_control as tcc
@@ -656,83 +745,39 @@ def main(fiber_diameter:int, number_of_positions:int=3):
     sg = calculate_scrambling_gain(reduced_entrance_image_folder, reduced_exit_image_folder, fiber_diameter, plot=True) # Todo: get fiber diameter from input GUI
     print("Scrambling gain:", sg)
 
-# Test functions
-# home path: E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images
-def process_these_images(): # Just for testing purposes
-    image_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/exit'
-    fibre_diameter = 100
-    image_files = [f for f in os.listdir(image_folder) if f.endswith('.png')]
-
-    for image_file in image_files:
-        image_path = os.path.join(image_folder, image_file)
-        image = io.imread(image_path)
-        center_y, center_x, radius = detect_circle(image, fibre_diameter, cam_type='exit')
-        plot_original_with_mask_unfilled(image, center_y, center_x, radius)
-
-        print(f"Detected circle: Center: ({center_y:.2f}, {center_x:.2f}), Radius: {radius:.2f}")
-
-    # Same procedure for entrance images
-    image_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/entrance'
-
-    image_files = [f for f in os.listdir(image_folder) if f.endswith('.png')]
-
-    for image_file in image_files:
-        image_path = os.path.join(image_folder, image_file)
-        image = io.imread(image_path)
-        center_y, center_x, radius = detect_circle(image, fibre_diameter, cam_type='entrance')
-        plot_original_with_mask_unfilled(image, center_y, center_x, radius)
-
-        print(f"Detected circle: Center: ({center_y:.2f}, {center_x:.2f}), Radius: {radius:.2f}")
-
-    exit()
-
-def process_image():
-    image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/exit/exit_cam_image.png'
+if __name__ == '__main__':
+    """
+    image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/entrance/entrance_cam_image1.png'
     image = io.imread(image_path)
+    print(com_of_spot(image, plot=True))
+    """
+    entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images/entrance/reduced'
+    exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images/exit/reduced'
 
-    # Detect the circle
-    center_y, center_x, radius = detect_circle(image, fibre_diameter=100, cam_type='exit')
-    print(f"Detected circle: Center: ({center_y:.2f}, {center_x:.2f}), Pixel Radius: {radius:.2f}")
-
-    # Plot the original image with the detected circle
-    plot_original_with_mask_unfilled(image, center_y, center_x, radius)
-
-#image_to_fits(image_path)
+    #entrance_folder = "entrance_images"
+    #exit_folder = "exit_images"
 
 
-"""
-image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/entrance/entrance_cam_image1.png'
-image = io.imread(image_path)
-print(com_of_spot(image, plot=True))
-"""
-entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct/entrance/reduced'
-exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images/exit/reduced'
+    fiber_diameter = 100 # Value in micrometers
+    """
+    # Plot com movement for entrance images
+    plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
+    
+    # Plot com movement for exit images
+    plot_circle_movement(exit_folder, fiber_diameter, 'exit')"""
 
-#entrance_folder = "entrance_images"
-#exit_folder = "exit_images"
+    #entrance_folder = "D:/Vincent/thorlabs_cams_images_oct/entrance/reduced"
+    #exit_folder = "D:/Vincent/thorlabs_cams_images_oct/exit/reduced"
 
+    sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, fiber_shape="circle",
+                                   plot_result=True, plot_mask=True)
+    print(sg)
 
-fiber_diameter = 100
-"""
-# Plot com movement for entrance images
-plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
+    #main(fiber_diameter)
 
-# Plot com movement for exit images
-plot_circle_movement(exit_folder, fiber_diameter, 'exit')"""
+    image = exit_folder + "/exit_cam_image000_reduced.png"
+    image = entrance_folder + "/entrance_cam_image000_reduced.png"
+    image = png_to_numpy(image)
+    #binary_filtering(image, plot=True)
 
-#entrance_folder = "D:/Vincent/thorlabs_cams_images_oct/entrance/reduced"
-#exit_folder = "D:/Vincent/thorlabs_cams_images_oct/exit/reduced"
-
-#sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, plot=True)
-#print(sg)
-
-#main(fiber_diameter)
-
-image = entrance_folder + "/entrance_cam_image0_reduced.png"
-image = png_to_numpy(image)
-#binary_filtering(image, plot=True)
-
-#make_shape("octagon", 100)
-#detect_shape(image, "octagon", 100, plot=True)
-match_shape(image, 110)
-# Todo: use predefined shapes to fit on fiber and then create mask from that with erosion/dilation
+    #filled_mask, com_of_mask = detect_shape(image, 92, "octagon", plot_best=True)
