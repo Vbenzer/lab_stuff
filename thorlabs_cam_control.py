@@ -8,7 +8,14 @@ def take_image(cam_name:str, save_file_name:str, wait:bool=False):
     cam = instrumental.instrument(cam_name, reopen_policy="new")
 
     cam.open()
-    frame = cam.grab_image(exposure_time="1s")
+
+    if cam_name == "entrance_cam":
+        frame = cam.grab_image(exposure_time="1s")
+    elif cam_name == "exit_cam":
+        frame = cam.grab_image(exposure_time="10ms")
+    else:
+        raise ValueError("Invalid camera name. Please provide a valid camera name.")
+
     if frame is not None:
         image = frame
         if wait:
@@ -52,5 +59,4 @@ cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     take_image("exit_cam", "exit_image_test.png", wait=True)
-    take_image("exit_cam", "exit_image_test.png")
-    take_image("entrance_cam", "entrance_image_test.png")
+    take_image("entrance_cam", "entrance_image_test.png", wait=True)

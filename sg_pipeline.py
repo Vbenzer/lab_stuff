@@ -24,7 +24,7 @@ def png_to_numpy(image_path):
     with Image.open(image_path) as img:
         return np.array(img)
 
-def detect_circle(image:np.ndarray, fiber_px_radius:int, plot_mask:bool=False):
+def detect_circle(image:np.ndarray, fiber_px_radius:int):
     """
     Detects a circle in the given image using Hough Circle Transform.
 
@@ -51,13 +51,6 @@ def detect_circle(image:np.ndarray, fiber_px_radius:int, plot_mask:bool=False):
 
     # Select the most prominent circle
     accums, cx, cy, radii = transform.hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1, normalize=False)
-
-    if plot_mask:
-        # Plot the detected circle
-        plt.imshow(image, cmap='gray')
-        circle_outline = plt.Circle((cx[0], cy[0]), radii[0], color='r', fill=False)
-        plt.gca().add_artist(circle_outline)
-        plt.show()
 
     return cy[0], cx[0], radii[0]
 
@@ -100,7 +93,7 @@ def make_shape(shape:str, radius:int):
         mask = np.zeros((total_size, total_size), dtype=np.uint8)
 
         # Calculate center of the mask
-        center = total_size // 2
+        center = total_size / 2
 
         # Calculate vertices of the octagon
         vertices = np.array([
@@ -207,7 +200,7 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
 
     if best_match is not None:
         # Calculate the center of mass of the best match
-        com_position = best_location[0] + best_match.shape[1] // 2, best_location[1] + best_match.shape[0] // 2
+        com_position = best_location[0] + best_match.shape[1] / 2, best_location[1] + best_match.shape[0] / 2
 
         # Change shape of best match to fit the image
         best_match = np.pad(best_match, ((best_location[1], image.shape[0] - best_location[1] - best_match.shape[0]),
@@ -300,7 +293,8 @@ def binary_filtering(image:np.ndarray, plot:bool=False): # Unused
         fig.tight_layout()
         plt.show()
 
-def detect_shape(image:np.ndarray, radius:int, shape:str, plot_mask:bool=False, plot_all:bool=False, plot_best:bool=False):
+def detect_shape(image:np.ndarray, radius:int, shape:str, plot_mask:bool=False, plot_all:bool=False,
+                 plot_best:bool=False, save_mask:str="-1"):
     """
     Detect the given shape in the image.
     Args:
@@ -326,7 +320,7 @@ def detect_shape(image:np.ndarray, radius:int, shape:str, plot_mask:bool=False, 
 
     filled_mask = ndi.binary_fill_holes(mask)
 
-    if plot_mask or plot_all:
+    if plot_mask or plot_all or save_mask != "-1":
         fig, ax = plt.subplots(2, 2, figsize=(12, 6), sharey=True)
 
         ax[0, 0].imshow(image, cmap="gray")
@@ -347,7 +341,13 @@ def detect_shape(image:np.ndarray, radius:int, shape:str, plot_mask:bool=False, 
         ax[1, 1].set_title('Filled Mask')
 
         fig.tight_layout()
-        plt.show()
+
+        if plot_mask or plot_all:
+            plt.show()
+
+        if save_mask != "-1":
+            plt.savefig(save_mask)
+            plt.close()
 
     return filled_mask, com_of_mask
 
@@ -515,6 +515,7 @@ def plot_circle_movement(image_folder:str, fiber_px_radius:int): # Todo: This fu
     plt.show()
 
 def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, fiber_diameter:int, fiber_shape:str,
+                              save_mask:bool=True,
                               plot_result:bool=False, plot_mask:bool=False, plot_best:bool=False, plot_all:bool=False):
     """
     Calculate the scrambling gain of the fiber using the given images.
@@ -550,10 +551,28 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
 
         # Find center of fiber depending on the shape
         if fiber_shape == "circle":
-            center_y, center_x, radius = detect_circle(image, fiber_px_radius_entrance, plot_mask=plot_mask)
+            center_y, center_x, radius = detect_circle(image, fiber_px_radius_entrance)
+
+            # Plot the detected circle
+            plt.imshow(image, cmap='gray')
+            circle_outline = plt.Circle((center_y, center_x), radius, color='r', fill=False)
+            plt.gca().add_artist(circle_outline)
+            if plot_mask:
+                plt.show()
+            if save_mask:
+                mask_name = image_path.replace(".png", "_mask.png")
+                plt.savefig(mask_name)
+                plt.close()
+
             comk = [center_y, center_x]
 
         elif fiber_shape == "octagon":
+
+            if save_mask:
+                save_mask = image_path.replace(".png", "_mask.png")
+            else:
+                save_mask = -1
+
             mask, comk = detect_shape(image, fiber_px_radius_entrance, "octagon", plot_mask=plot_mask,
                                       plot_all=plot_all, plot_best=plot_best)
             radius = fiber_px_radius_entrance
@@ -675,7 +694,7 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
 
     return scrambling_gain
 
-def main(fiber_diameter:int, number_of_positions:int=3):
+def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11):
     """
     Main function to run the scrambling gain calculation pipeline.
 
@@ -683,20 +702,30 @@ def main(fiber_diameter:int, number_of_positions:int=3):
         fiber_diameter: Diameter of the fiber in micrometers.
         number_of_positions: Number of positions to take images at.
     """
+
+    reduced_entrance_image_folder, reduced_exit_image_folder = capture_images_and_reduce(fiber_diameter, number_of_positions)
+
+    sg = calculate_scrambling_gain(reduced_entrance_image_folder, reduced_exit_image_folder, fiber_diameter, fiber_shape, plot_result=True) # Todo: get fiber diameter from input GUI
+    print("Scrambling gain:", sg)
+
+def capture_images_and_reduce(fiber_diameter:int, number_of_positions:int=11):
     import image_reduction
     import thorlabs_cam_control as tcc
     import file_mover
     import time
     import move_to_filter
+    import step_motor_control as smc
 
     # Define image folders
-    main_image_folder = ("D:/Vincent/thorlabs_cams_images_test")
+    main_image_folder = ("D:/Vincent/thorlabs_cams_images_test5")
+    os.makedirs(main_image_folder, exist_ok=False)
     entrance_image_folder = os.path.join(main_image_folder, "entrance")
     exit_image_folder = os.path.join(main_image_folder, "exit")
     entrance_dark_image_folder = os.path.join(entrance_image_folder, "dark")
     exit_dark_image_folder = os.path.join(exit_image_folder, "dark")
     reduced_entrance_image_folder = os.path.join(entrance_image_folder, "reduced")
     reduced_exit_image_folder = os.path.join(exit_image_folder, "reduced")
+    plots_folder = os.path.join(main_image_folder, "plots")
 
     # Clear folders before adding new images
     file_mover.clear_folder(main_image_folder)
@@ -710,40 +739,52 @@ def main(fiber_diameter:int, number_of_positions:int=3):
     os.makedirs(reduced_exit_image_folder, exist_ok=True)
 
     move_to_filter.move("none")
-    print("Taking darks in 30s")
-    time.sleep(30)
+    print("Taking darks")
 
     # Take darks
     for i in range(5):
-        tcc.take_image("entrance_cam", entrance_dark_image_folder+f"/entrance_cam_dark{i:03d}.png")
-        tcc.take_image("exit_cam", exit_dark_image_folder+f"/exit_cam_dark{i:03d}.png")
+        tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png")
+        tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png")
 
     entrance_master_dark = (image_reduction
                             .create_master_dark(entrance_dark_image_folder, plot=False))
     exit_master_dark = image_reduction.create_master_dark(exit_dark_image_folder, plot=False)
 
     move_to_filter.move("0")
-    print("Taking images in 30s")
-    time.sleep(30)
+
+    print("Taking images")
+
+    step_size = fiber_diameter / 1000 * 0.8 / (number_of_positions-1)  # Step size in mm
+    pos_left = 5 - fiber_diameter / 1000 * 0.8 / 2  # Leftmost position in mm
 
     # Take images
-    number_of_images = number_of_positions
-    for i in range(number_of_images):
-        tcc.take_image("entrance_cam", entrance_image_folder+f"/entrance_cam_image{i:03d}.png")
-        tcc.take_image("exit_cam",exit_image_folder+f"/exit_cam_image{i:03d}.png")
-        print(f"Image {i+1} out of {number_of_images} done! Move spot to next position")
-        time.sleep(10) # Time to move spot manually Todo: Automate spot movement
+    for i in range(number_of_positions):
+        print(i, pos_left + i * step_size)
+        smc.move_motor_to_position(pos_left + i * step_size)
+        tcc.take_image("entrance_cam", entrance_image_folder + f"/entrance_cam_image{i:03d}.png")
+        tcc.take_image("exit_cam", exit_image_folder + f"/exit_cam_image{i:03d}.png")
+        print(f"Image {i + 1} out of {number_of_positions} at Position {pos_left + i * step_size} done! "
+              f"Move spot to next position")
+        time.sleep(1)  # Time to move spot manually Todo: Automate spot movement
     print("All images taken!")
 
-    # Reduce images
-    for i in range(number_of_images):
-        image = png_to_numpy(entrance_image_folder+f"/entrance_cam_image{i:03d}.png")
-        image_reduction.reduce_image_with_dark(image, entrance_master_dark, reduced_entrance_image_folder+f"/entrance_cam_image{i:03d}_reduced.png", save=True)
-        image = png_to_numpy(exit_image_folder+f"/exit_cam_image{i:03d}.png")
-        image_reduction.reduce_image_with_dark(image, exit_master_dark, reduced_exit_image_folder+f"/exit_cam_image{i:03d}_reduced.png", save=True)
+    # Reset the motor to the initial position
+    smc.move_motor_to_position(5)
 
-    sg = calculate_scrambling_gain(reduced_entrance_image_folder, reduced_exit_image_folder, fiber_diameter, plot=True) # Todo: get fiber diameter from input GUI
-    print("Scrambling gain:", sg)
+    # Reduce images
+    for i in range(number_of_positions):
+        image = png_to_numpy(entrance_image_folder + f"/entrance_cam_image{i:03d}.png")
+        image_reduction.reduce_image_with_dark(image, entrance_master_dark,
+                                               reduced_entrance_image_folder + f"/entrance_cam_image{i:03d}_reduced.png",
+                                               save=True)
+        image = png_to_numpy(exit_image_folder + f"/exit_cam_image{i:03d}.png")
+        image_reduction.reduce_image_with_dark(image, exit_master_dark,
+                                               reduced_exit_image_folder + f"/exit_cam_image{i:03d}_reduced.png",
+                                               save=True)
+
+    print("All images reduced!")
+
+    return reduced_entrance_image_folder, reduced_exit_image_folder
 
 if __name__ == '__main__':
     """
@@ -766,14 +807,17 @@ if __name__ == '__main__':
     # Plot com movement for exit images
     plot_circle_movement(exit_folder, fiber_diameter, 'exit')"""
 
-    #entrance_folder = "D:/Vincent/thorlabs_cams_images_oct/entrance/reduced"
-    #exit_folder = "D:/Vincent/thorlabs_cams_images_oct/exit/reduced"
+    entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
+    exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, fiber_shape="circle",
-                                   plot_result=True, plot_mask=True)
-    print(sg)
+    #sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, fiber_shape="circle",
+    #                               plot_result=True, plot_mask=False)
+    #print(sg)
 
-    #main(fiber_diameter)
+    _, _ = capture_images_and_reduce(fiber_diameter, 11)
+
+    #main(fiber_diameter, "circle", number_of_positions=5)     # Always check if main folder is empty or if
+    # files are important before running
 
     image = exit_folder + "/exit_cam_image000_reduced.png"
     image = entrance_folder + "/entrance_cam_image000_reduced.png"

@@ -70,6 +70,12 @@ def run_experiment():
     def experiment_thread():
         folder_name = folder_name_var.get()
         folder_path = os.path.join(base_directory, folder_name)
+
+        if fiber_shape_var.get() == "":
+            raise ValueError("Fiber shape cannot be empty")
+        else:
+            fiber_shape = fiber_shape_var.get()
+
         if fiber_diameter_var.get() == "":
             fiber_diameter = 0
         else:
@@ -88,13 +94,14 @@ def run_experiment():
         if var4.get():
             run_code_4(folder_path, fiber_diameter)
         if var5.get():
-            run_code_5(folder_path, fiber_diameter)
+            run_code_5(folder_path, fiber_diameter, fiber_shape)
 
         root.after(1000, clear_message)
         root.after(0, root.destroy)
 
     entry.config(state='disabled')
     fiber_diameter_entry.config(state='disabled')
+    fiber_shape_entry.config(state='disabled')
     create_folder_button.config(state='disabled')
     run_experiment_button.config(state='disabled')
     checkbuttons = [var1_checkbutton, var2_checkbutton, var3_checkbutton, var4_checkbutton]
@@ -156,13 +163,13 @@ def run_code_4(folder_path, fiber_diameter):
     print(f"Running code 4 with fiber diameter: {fiber_diameter}")
     experiment_running_test.main(folder_path)
 
-def run_code_5(folder_path, fiber_diameter):
+def run_code_5(folder_path, fiber_diameter, fiber_shape):
     if fiber_diameter == 0:
         raise ValueError("Fiber diameter cannot be empty")
 
     import sg_pipeline
-    print(f"Running code 5 with fiber diameter: {fiber_diameter}")
-    sg_pipeline.main(folder_path, fiber_diameter)
+    print(f"Running code 5 with fiber diameter: {fiber_diameter} and fiber shape: {fiber_shape}")
+    sg_pipeline.main(fiber_diameter, fiber_shape)
 def on_closing():
     stop_event.set()
     root.destroy()
@@ -190,6 +197,12 @@ tk.Label(root, text="Fiber Diameter:").grid(row=1, column=0, padx=10, pady=10)
 fiber_diameter_var = tk.StringVar()
 fiber_diameter_entry = tk.Entry(root, textvariable=fiber_diameter_var)
 fiber_diameter_entry.grid(row=1, column=1, padx=5, pady=5)
+
+# Add a label for fiber shape
+tk.Label(root, text="Fiber Shape:").grid(row=2, column=0, padx=10, pady=10)
+fiber_shape_var = tk.StringVar()
+fiber_shape_entry = tk.Entry(root, textvariable=fiber_shape_var)
+fiber_shape_entry.grid(row=2, column=1, padx=5, pady=5)
 
 var1 = tk.BooleanVar()
 var2 = tk.BooleanVar()
@@ -235,4 +248,3 @@ progress_text.grid(row=9, column=0, columnspan=3, pady=10)
 stop_event = threading.Event()
 root.protocol("WM_DELETE_WINDOW", on_closing)
 root.mainloop()
-
