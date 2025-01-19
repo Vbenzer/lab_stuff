@@ -342,12 +342,13 @@ def detect_shape(image:np.ndarray, radius:int, shape:str, plot_mask:bool=False, 
 
         fig.tight_layout()
 
+        if save_mask != "-1":
+            plt.savefig(save_mask)
+
         if plot_mask or plot_all:
             plt.show()
 
-        if save_mask != "-1":
-            plt.savefig(save_mask)
-            plt.close()
+        plt.close()
 
     return filled_mask, com_of_mask
 
@@ -536,7 +537,7 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
     fiber_px_radius_exit = int(fiber_diameter / 0.45 / 2)
 
     # Get values of the entrance image
-    entrance_image_files = [f for f in os.listdir(entrance_image_folder) if f.endswith('.png')]
+    entrance_image_files = [f for f in os.listdir(entrance_image_folder) if f.endswith('reduced.png')]
     entrance_coms = [] # Center of mass of spot in the entrance image
     entrance_comk = [] # Center of mask and with that the center of the fiber
     entrance_radii = []
@@ -555,14 +556,16 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
 
             # Plot the detected circle
             plt.imshow(image, cmap='gray')
-            circle_outline = plt.Circle((center_y, center_x), radius, color='r', fill=False)
+            circle_outline = plt.Circle((center_x, center_y), radius, color='r', fill=False)
             plt.gca().add_artist(circle_outline)
-            if plot_mask:
-                plt.show()
+
             if save_mask:
                 mask_name = image_path.replace(".png", "_mask.png")
                 plt.savefig(mask_name)
                 plt.close()
+
+            if plot_mask:
+                plt.show()
 
             comk = [center_y, center_x]
 
@@ -574,7 +577,7 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
                 save_mask = -1
 
             mask, comk = detect_shape(image, fiber_px_radius_entrance, "octagon", plot_mask=plot_mask,
-                                      plot_all=plot_all, plot_best=plot_best)
+                                      plot_all=plot_all, plot_best=plot_best, save_mask=save_mask)
             radius = fiber_px_radius_entrance
 
         else:
@@ -589,7 +592,7 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
     entrance_radii = np.array(entrance_radii)
 
     # Get values of the exit image
-    exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('.png')]
+    exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('reduced.png')]
     exit_comk = []
     exit_coms = []
     exit_radii = []
@@ -610,9 +613,28 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
             comk = [center_y, center_x]
             mask = create_circular_mask(image, (center_y, center_x), radius, plot_mask=plot_mask)
 
+            # Plot the detected circle
+            plt.imshow(image, cmap='gray')
+            circle_outline = plt.Circle((center_x, center_y), radius, color='r', fill=False)
+            plt.gca().add_artist(circle_outline)
+
+            if save_mask:
+                mask_name = image_path.replace(".png", "_mask.png")
+                plt.savefig(mask_name)
+                plt.close()
+
+            if plot_mask:
+                plt.show()
+
         elif fiber_shape == "octagon":
+
+            if save_mask:
+                save_mask = image_path.replace(".png", "_mask.png")
+            else:
+                save_mask = -1
+
             mask, comk = detect_shape(image, fiber_px_radius_exit, "octagon", plot_mask=plot_mask,
-                                      plot_all=plot_all, plot_best=plot_best)
+                                      plot_all=plot_all, plot_best=plot_best, save_mask=save_mask)
             radius = fiber_px_radius_exit
 
         else:
@@ -689,6 +711,8 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
         plt.ylabel('Exit COM y-distance [px]')
         plt.title('COM Movement of Fiber Output')
         plt.grid(True)
+        result_name = os.path.join(entrance_image_folder, "scrambling_gain_result.png")
+        plt.savefig(result_name)
         plt.show()
 
 
@@ -792,8 +816,8 @@ if __name__ == '__main__':
     image = io.imread(image_path)
     print(com_of_spot(image, plot=True))
     """
-    entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images/entrance/reduced'
-    exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images/exit/reduced'
+    entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/entrance/reduced'
+    exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/exit/reduced'
 
     #entrance_folder = "entrance_images"
     #exit_folder = "exit_images"
@@ -807,21 +831,21 @@ if __name__ == '__main__':
     # Plot com movement for exit images
     plot_circle_movement(exit_folder, fiber_diameter, 'exit')"""
 
-    entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
-    exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
+    #entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
+    #exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    #sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, fiber_shape="circle",
-    #                               plot_result=True, plot_mask=False)
+    sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, fiber_shape="octagon",
+                                  plot_result=True, plot_mask=True, save_mask=True)
     #print(sg)
 
-    _, _ = capture_images_and_reduce(fiber_diameter, 11)
+    #_, _ = capture_images_and_reduce(fiber_diameter, 11)
 
     #main(fiber_diameter, "circle", number_of_positions=5)     # Always check if main folder is empty or if
     # files are important before running
 
-    image = exit_folder + "/exit_cam_image000_reduced.png"
+    """image = exit_folder + "/exit_cam_image000_reduced.png"
     image = entrance_folder + "/entrance_cam_image000_reduced.png"
-    image = png_to_numpy(image)
+    image = png_to_numpy(image)"""
     #binary_filtering(image, plot=True)
 
     #filled_mask, com_of_mask = detect_shape(image, 92, "octagon", plot_best=True)
