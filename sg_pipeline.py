@@ -619,7 +619,7 @@ def calculate_scrambling_gain(entrance_image_folder:str, exit_image_folder:str, 
             plt.gca().add_artist(circle_outline)
 
             if save_mask:
-                mask_name = image_path.replace(".png", "_mask.png")
+                mask_name = image_path.replace(".png", "_mask.png")     # Todo: Also plot com of spot
                 plt.savefig(mask_name)
                 plt.close()
 
@@ -729,7 +729,7 @@ def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11):
 
     reduced_entrance_image_folder, reduced_exit_image_folder = capture_images_and_reduce(fiber_diameter, number_of_positions)
 
-    sg = calculate_scrambling_gain(reduced_entrance_image_folder, reduced_exit_image_folder, fiber_diameter, fiber_shape, plot_result=True) # Todo: get fiber diameter from input GUI
+    sg = calculate_scrambling_gain(reduced_entrance_image_folder, reduced_exit_image_folder, fiber_diameter, fiber_shape, plot_result=True)
     print("Scrambling gain:", sg)
 
 def capture_images_and_reduce(fiber_diameter:int, number_of_positions:int=11):
@@ -741,7 +741,7 @@ def capture_images_and_reduce(fiber_diameter:int, number_of_positions:int=11):
     import step_motor_control as smc
 
     # Define image folders
-    main_image_folder = ("D:/Vincent/thorlabs_cams_images_test5")
+    main_image_folder = ("D:/Vincent/thorlabs_cams_images_oct_89_other_way+camclean")
     os.makedirs(main_image_folder, exist_ok=False)
     entrance_image_folder = os.path.join(main_image_folder, "entrance")
     exit_image_folder = os.path.join(main_image_folder, "exit")
@@ -776,6 +776,8 @@ def capture_images_and_reduce(fiber_diameter:int, number_of_positions:int=11):
 
     move_to_filter.move("0")
 
+    smc.make_reference_move()
+
     print("Taking images")
 
     step_size = fiber_diameter / 1000 * 0.8 / (number_of_positions-1)  # Step size in mm
@@ -789,7 +791,7 @@ def capture_images_and_reduce(fiber_diameter:int, number_of_positions:int=11):
         tcc.take_image("exit_cam", exit_image_folder + f"/exit_cam_image{i:03d}.png")
         print(f"Image {i + 1} out of {number_of_positions} at Position {pos_left + i * step_size} done! "
               f"Move spot to next position")
-        time.sleep(1)  # Time to move spot manually Todo: Automate spot movement
+        time.sleep(1)  # Probably not necessary
     print("All images taken!")
 
     # Reset the motor to the initial position
@@ -823,7 +825,7 @@ if __name__ == '__main__':
     #exit_folder = "exit_images"
 
 
-    fiber_diameter = 100 # Value in micrometers
+    fiber_diameter = 89 # Value in micrometers
     """
     # Plot com movement for entrance images
     plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
@@ -834,13 +836,13 @@ if __name__ == '__main__':
     #entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
     #exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, fiber_shape="octagon",
-                                  plot_result=True, plot_mask=True, save_mask=True)
+    #sg = calculate_scrambling_gain(entrance_folder, exit_folder, fiber_diameter, fiber_shape="octagon",
+    #                              plot_result=True, plot_mask=True, save_mask=True)
     #print(sg)
 
     #_, _ = capture_images_and_reduce(fiber_diameter, 11)
 
-    #main(fiber_diameter, "circle", number_of_positions=5)     # Always check if main folder is empty or if
+    main(fiber_diameter, "octagon", number_of_positions=11)     # Always check if main folder is empty or if
     # files are important before running
 
     """image = exit_folder + "/exit_cam_image000_reduced.png"
