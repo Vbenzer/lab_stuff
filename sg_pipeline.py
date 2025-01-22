@@ -1,3 +1,5 @@
+from cProfile import label
+
 import numpy as np
 from PIL import Image
 from astropy.io import fits
@@ -209,7 +211,7 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
 
     if best_match is not None:
         # Calculate the center of mass of the best match
-        com_position = best_location[0] + best_match.shape[1] / 2, best_location[1] + best_match.shape[0] / 2
+        com_position = best_location[0] + best_match.shape[1]/ 2, best_location[1] + best_match.shape[0] / 2
 
         # Change shape of best match to fit the image
         best_match = np.pad(best_match, ((best_location[1], image.shape[0] - best_location[1] - best_match.shape[0]),
@@ -351,7 +353,7 @@ def detect_shape(image:np.ndarray, radius:int, shape:str, plot_mask:bool=False, 
 
         fig.tight_layout()
 
-        if save_mask != "-1":
+        if save_mask != -1:
             plt.savefig(save_mask)
 
         if plot_mask or plot_all:
@@ -559,7 +561,7 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
     fiber_px_radius_entrance = int(fiber_diameter / 0.526 / 2)
     fiber_px_radius_exit = int(fiber_diameter / 0.45 / 2)
 
-    mask_scale_factor = 1.03
+    mask_scale_factor = 1.05
 
     # Get values of the entrance image
     entrance_image_files = [f for f in os.listdir(entrance_image_folder_reduced) if f.endswith('reduced.png')]
@@ -628,6 +630,7 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
     exit_comk = []
     exit_coms = []
     exit_radii = []
+    max_flux_list = []
 
     print("Entrance center of mask:", entrance_comk)
     print("Entrance center of mass:", entrance_coms)
@@ -669,7 +672,7 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
             else:
                 save_mask = -1
 
-            mask, comk = detect_shape(image, fiber_px_radius_exit, "octagon", plot_mask=plot_mask,
+            mask, comk = detect_shape(image, fiber_px_radius_exit, "octagon", mask_scale_factor, plot_mask=plot_mask,
                                       plot_all=plot_all, plot_best=plot_best, save_mask=save_mask)
             radius = fiber_px_radius_exit
 
@@ -680,6 +683,13 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
 
         exit_comk.append(comk)
         exit_radii.append(radius)
+
+        # Check flux outside mask
+        max_flux = int(check_mask_flux_single(image, mask, plot=False))
+        max_flux_list.append(max_flux)
+
+        # Convert mask to bool
+        mask.astype(bool)
 
         # Use exit fiber mask to set background to zero
         image[~mask] = 0
@@ -747,7 +757,9 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
         "exit_radii": exit_radii.tolist(),
         "exit_distances_x": exit_distances_x.tolist(),
         "exit_distances_y": exit_distances_y.tolist(),
-        "scrambling_gain": scrambling_gain_rounded.tolist()
+        "scrambling_gain": scrambling_gain_rounded.tolist(),
+        "reference_index": int(reference_index),
+        "max_flux": max_flux_list
     }
 
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'w') as f:
@@ -893,8 +905,8 @@ def cut_image_around_comk(image, comk, fiber_px_radius, margin):
     Returns:
         np.ndarray: The cut image.
     """
-    cut_image = image[comk[0] - fiber_px_radius - margin:comk[0]  + fiber_px_radius + margin,
-                comk[1] - fiber_px_radius- margin:comk[1] + fiber_px_radius + margin]
+    cut_image = image[int(comk[0]) - fiber_px_radius - margin:int(comk[0])  + fiber_px_radius + margin,
+                int(comk[1]) - fiber_px_radius- margin:int(comk[1]) + fiber_px_radius + margin]
 
     return cut_image
 
@@ -981,6 +993,9 @@ def plot_masks(main_folder:str, fiber_diameter:int):
     exit_mask_folder = os.path.join(main_folder, "exit/mask")
     plot_folder = os.path.join(main_folder, "plots")
 
+    # Create plot folder if it doesn't exist
+    os.makedirs(plot_folder, exist_ok=True)
+
     entrance_mask_files = [f for f in os.listdir(entrance_mask_folder) if f.endswith('mask.png')]
     exit_mask_files = [f for f in os.listdir(exit_mask_folder) if f.endswith('mask.png')]
 
@@ -1051,17 +1066,119 @@ def plot_masks(main_folder:str, fiber_diameter:int):
         plt.savefig(os.path.join(plot_folder, exit_mask_files[i].replace(".png", "_overlay.png")), dpi="figure")
         plt.show()
 
+def check_mask_flux_all(main_folder:str):
+    exit_mask_folder = os.path.join(main_folder, "exit/mask")
+    exit_image_folder = os.path.join(main_folder, "exit/reduced")
+
+    exit_mask_files = [f for f in os.listdir(exit_mask_folder) if f.endswith('mask.png')]
+    exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('reduced.png')]
+
+    for i in range(len(exit_mask_files)):
+        mask = io.imread(os.path.join(exit_mask_folder, exit_mask_files[i]))
+        image = io.imread(os.path.join(exit_image_folder, exit_image_files[i]))
+
+        check_mask_flux_single(image, mask)
+
+def check_mask_flux_single(image:np.ndarray, mask:np.ndarray, plot:bool=False):
+    """
+    Check the flux of the mask in the image.
+    Args:
+        image: The input image as a NumPy array.
+        mask: The mask as a NumPy array.
+        plot: If True, plot the image with the mask removed.
+    """
+    # Convert mask to bool
+    mask = mask.astype(bool)
+
+    image_wo_mask = image.copy()
+    image_wo_mask[mask] = 0
+
+    if plot:
+        plt.imshow(image_wo_mask, cmap='gray')
+        plt.title('Image with Mask Removed')
+        plt.show()
+
+    print("Max flux value outside of mask:", np.max(image_wo_mask))
+
+    return np.max(image_wo_mask)
+
+def plot_sg_cool_like(main_folder:str):
+    """
+    Plot the scrambling gain in a cool way.
+    Args:
+        main_folder: Path to the main folder containing the images.
+    """
+    with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
+        parameters = json.load(f)
+
+    entrance_coms = parameters["entrance_coms"]
+    entrance_comk = parameters["entrance_comk"]
+    entrance_distances_x = parameters["entrance_distances_x"]
+    entrance_distances_y = parameters["entrance_distances_y"]
+    exit_coms = parameters["exit_coms"]
+    exit_comk = parameters["exit_comk"]
+    exit_distances_x = parameters["exit_distances_x"]
+    exit_distances_y = parameters["exit_distances_y"]
+    reference_index = parameters["reference_index"]
+    max_flux = parameters["max_flux"]
+
+    # Calculate total distances with sign differences depending on the direction of the movement
+    entrance_distances = np.sqrt(np.array(entrance_distances_x) ** 2 + np.array(entrance_distances_y) ** 2)
+
+    # Change sign of entrance distance depending on the direction of the movement
+    for i in range(len(entrance_distances)):
+        if entrance_distances_y[i] < 0:
+            entrance_distances[i] = -entrance_distances[i]
+
+    """plt.scatter(entrance_distances_x, entrance_distances_y, label='Entrance')
+    plt.scatter(exit_distances_x, exit_distances_y, label='Exit')
+    plt.legend()
+    plt.show()"""
+
+    # Rebalance distances with zero as the reference index
+    exit_distances_x = np.array(exit_distances_x) - exit_distances_x[reference_index]
+    exit_distances_y = np.array(exit_distances_y) - exit_distances_y[reference_index]
+
+    # Change unit to mu
+    entrance_distances = np.array(entrance_distances) * 0.45
+    exit_distances_x = np.array(exit_distances_x) * 0.526
+    exit_distances_y = np.array(exit_distances_y) * 0.526
+
+    def func(x, a, b):
+        return a * x + b
+
+    def sg_func(d_in, D_in, d_out, D_out):
+        return (d_in / D_in) / (d_out / D_out)
+
+    for i in range(len(entrance_distances)):
+        if i == reference_index:
+            continue
+        sg = sg_func(entrance_distances[i], 100, exit_distances_x[i], 100)
+        print(f"Scrambling gain {i}: {sg}")
+
+    plt.scatter(entrance_distances, exit_distances_x, label='X movement')
+    plt.scatter(entrance_distances, exit_distances_y, label='Y movement')
+    plt.plot(entrance_distances, func(entrance_distances, 5e-4, 0), 'g--', label='SG 2000')
+    plt.plot(entrance_distances, func(entrance_distances, -5e-4, 0), 'g--')
+    plt.plot(entrance_distances, func(entrance_distances, 2e-3, 0), 'r--', label='SG 500')
+    plt.plot(entrance_distances, func(entrance_distances, -2e-3, 0), 'r--')
+    plt.legend()
+    plt.ylim(-0.08, 0.08)
+    plt.ylabel('Exit COM distance [mu]')
+    plt.xlabel('Entrance Spot displacement [mu]')
+    plt.show()
+
 if __name__ == '__main__':
 
     image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test6/exit/reduced/exit_cam_image020_reduced.png'
-    image = io.imread(image_path)
+    #image = io.imread(image_path)
     #print(com_of_spot(image, plot=True))
 
-    image_to_fits(image_path)
+    #image_to_fits(image_path)
 
     entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/entrance/reduced'
     exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/exit/reduced'
-    main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test6"
+    main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5"
 
     # entrance_folder = "entrance_images"
     # exit_folder = "exit_images"
@@ -1077,11 +1194,11 @@ if __name__ == '__main__':
     #entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
     #exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    #sg = calculate_scrambling_gain(main_folder, fiber_diameter, fiber_shape="circle",
+    #sg = calculate_scrambling_gain(main_folder, fiber_diameter, fiber_shape="octagon",
     #                              plot_result=True, plot_mask=False, save_mask=False)
     #print(sg)
 
-    #plot_masks(main_folder, fiber_diameter)
+    plot_masks(main_folder, fiber_diameter)
 
     #_, _ = capture_images_and_reduce(fiber_diameter, 11)
 
@@ -1089,3 +1206,5 @@ if __name__ == '__main__':
     # files are important before running
 
     #make_comparison_video(main_folder, fiber_diameter)
+    #check_mask_flux_all(main_folder)
+    #plot_sg_cool_like(main_folder)
