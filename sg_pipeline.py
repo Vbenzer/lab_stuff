@@ -8,7 +8,7 @@ import json
 import image_analysation
 import matplotlib.pyplot as plt
 from skimage import io, color, feature, transform, filters, morphology, measure
-from skimage.draw import disk, circle_perimeter
+from skimage.draw import disk, circle_perimeter, polygon
 from scipy import ndimage as ndi
 import cv2
 
@@ -44,7 +44,10 @@ def detect_circle(image:np.ndarray, fiber_px_radius:int):
         image_gray = image
 
     # Detect edges using Canny edge detector
-    edges = feature.canny(image_gray, sigma=1.6, low_threshold=0.1, high_threshold=2)
+    edges = feature.canny(image_gray, sigma=1.6, low_threshold=7, high_threshold=20)
+
+    """plt.imshow(edges)
+    plt.show()"""
 
     # Perform Hough Circle Transform
     hough_radii = np.arange(fiber_px_radius - 5, fiber_px_radius + 5, 1)
@@ -109,7 +112,6 @@ def make_shape(shape:str, radius:int):
         ])
 
         # Create the polygon (octagon) mask
-        from skimage.draw import polygon
         rr, cc = polygon(vertices[:, 1], vertices[:, 0], mask.shape)
         mask[rr, cc] = 255
 
@@ -132,7 +134,9 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
         plot_best: If True, plot the best match.
 
     Returns:
-        best_match (np.ndarray): Image of the best match.
+        best_angle: The angle of the best match.
+        com_position: The center of mass of the best match.
+        best_radius: The radius of the best match.
     """
     best_match = None
     best_score = -np.inf
@@ -141,7 +145,7 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
     best_radius = radius
 
     # Detect edges using Canny edge detector
-    edges = feature.canny(image, sigma=2, low_threshold=1, high_threshold=7)
+    edges = feature.canny(image, sigma=2, low_threshold=1, high_threshold=15)
 
     # Ensure outline is closed (2 iterations of dilation and erosion)
     erode = morphology.binary_erosion(edges)
@@ -175,22 +179,29 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
     # Set the stop value for the rotation depending on the shape
     if shape == "circle":
         stop_value = 0
-    elif shape == "square":
+    elif shape == "rectangle":
         stop_value = 180
     elif shape == "octagon":
         stop_value = 45
     else:
-        raise ValueError("Invalid shape. Must be either 'circle', 'square' or 'octagon")
+        raise ValueError("Invalid shape. Must be either 'circle', 'rectangle' or 'octagon")
 
     # Convert bool to uint8
     uint8_mask = filled_mask.astype(np.uint8)
+    #uint8_mask = image
 
     """if image.dtype != np.uint8:
         edges = (edges * 255).astype(np.uint8)"""
 
     for r in range(radius - radius_threshold, radius + radius_threshold): # Iterate over different radii
-        # Create the shape template
-        template = make_shape(shape,r)
+        # Create the octagon
+        full_oct = make_shape(shape,r)
+
+        # Convert the full_oct to just the outline of the octagon
+        erode = morphology.binary_erosion(full_oct)
+        dilate = morphology.binary_dilation(full_oct)
+
+        template = np.logical_and(dilate, ~erode)
 
         #print("Template shape:", template.shape)
 
@@ -301,8 +312,8 @@ def binary_filtering(image:np.ndarray, plot:bool=False): # Unused
         fig.tight_layout()
         plt.show()
 
-def detect_shape(image:np.ndarray, radius:int, shape:str, mask_scale_factor:float, plot_mask:bool=False, plot_all:bool=False,
-                 plot_best:bool=False, save_mask=-1):
+def build_mask(image, radius:int, shape:str, mask_margin:int, position:tuple[int,int],
+               angle:int, plot_mask:bool=False, save_mask:str="-1"):
     """
     Detect the given shape in the image.
     Args:
@@ -317,10 +328,8 @@ def detect_shape(image:np.ndarray, radius:int, shape:str, mask_scale_factor:floa
         np.ndarray: The mask of the detected shape.
         tuple: The center of mass of the detected
     """
-    angle, position, radius = match_shape(image, radius, shape, plot_all=plot_all, plot_best=plot_best)
 
-
-    radius = int(radius * mask_scale_factor)
+    radius = radius + mask_margin
 
     best_match = make_shape(shape, radius)
 
@@ -355,7 +364,7 @@ def detect_shape(image:np.ndarray, radius:int, shape:str, mask_scale_factor:floa
     mask_dis = cut_image_around_comk(mask, com_of_mask, radius, 20)
     filled_mask_dis = cut_image_around_comk(filled_mask, com_of_mask, radius, 20)
 
-    if plot_mask or plot_all or save_mask != "-1":
+    if plot_mask or save_mask != "-1":
         fig, ax = plt.subplots(2, 2, figsize=(12, 6), sharey=True)
 
         ax[0, 0].imshow(image_dis, cmap="gray")
@@ -380,7 +389,7 @@ def detect_shape(image:np.ndarray, radius:int, shape:str, mask_scale_factor:floa
         if save_mask != -1:
             plt.savefig(save_mask)
 
-        if plot_mask or plot_all:
+        if plot_mask:
             plt.show()
 
         plt.close()
@@ -554,7 +563,7 @@ def plot_circle_movement(image_folder:str, fiber_px_radius:int): # Todo: This fu
     plt.legend()
     plt.show()
 
-def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:str,
+def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str,
                               save_mask:bool=True,
                               plot_result:bool=False, plot_mask:bool=False, plot_best:bool=False, plot_all:bool=False):
     """
@@ -633,9 +642,10 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
             else:
                 save_mask = -1
 
-            mask, comk = detect_shape(image, fiber_px_radius_entrance, "octagon", 1, plot_mask=plot_mask,
-                                      plot_all=plot_all, plot_best=plot_best, save_mask=save_mask)
-            radius = fiber_px_radius_entrance
+            angle, position, radius = match_shape(image, fiber_px_radius_entrance, fiber_shape, plot_all=plot_all, plot_best=plot_best)
+
+            mask, comk = build_mask(image, radius, "octagon", 1, position, angle, plot_mask=plot_mask,
+                                    save_mask=save_mask)
 
             io.imsave(mask_path, mask.astype(np.uint8) * 255)
 
@@ -673,22 +683,10 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
         if fiber_shape == "circle":
             center_y, center_x, radius = detect_circle(image, fiber_px_radius_exit)
             comk = [center_y, center_x]
-            mask = create_circular_mask(image, (center_y, center_x), radius*mask_scale_factor_circ, plot_mask=plot_mask)
-            io.imsave(mask_path, mask.astype(np.uint8) * 255)
 
-            # Plot the detected circle
-            plt.imshow(image, cmap='gray')
-            circle_outline = plt.Circle((center_x, center_y), radius, color='r', fill=False)
-            plt.gca().add_artist(circle_outline)
+            mask_margin_circ = grow_mask(image, comk, radius, "circle")
 
-            if save_mask:
-                mask_name = image_path.replace(".png", "_mask.png")     # Todo: Also plot com of spot
-                plt.savefig(mask_name)
-
-            if plot_mask:
-                plt.show()
-
-            plt.close()
+            mask = create_circular_mask(image, (center_y, center_x), radius + mask_margin_circ, plot_mask=plot_mask)
 
         elif fiber_shape == "octagon":
 
@@ -697,8 +695,14 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
             else:
                 save_mask = -1
 
-            mask, comk = detect_shape(image, fiber_px_radius_exit, "octagon", mask_scale_factor_oct, plot_mask=plot_mask,
-                                      plot_all=plot_all, plot_best=plot_best, save_mask=save_mask)
+            angle, position, radius = match_shape(image, fiber_px_radius_exit, fiber_shape, plot_all=plot_all,
+                                                  plot_best=plot_best)
+
+            mask_margin_oct = grow_mask(image, position, radius, "octagon", angle=angle)
+
+            mask, comk = build_mask(image, radius, "octagon", mask_margin_oct, position, angle, plot_mask=plot_mask,
+                                    save_mask=save_mask)
+
             radius = fiber_px_radius_exit
 
             io.imsave(mask_path, mask.astype(np.uint8) * 255)
@@ -723,6 +727,16 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
         com = com_of_spot(image)
         exit_coms.append(com)
 
+        """print(com)
+        # Save image
+        io.imsave(main_folder+"/test_image_com.png", image)
+
+
+        plt.imshow(image, cmap='gray')
+        plt.plot(com, 'ro', markersize=0.5)
+        plt.title("Reduced exit image with mask")
+        plt.show()"""
+
     exit_comk = np.array(exit_comk)
     exit_coms = np.array(exit_coms)
     exit_radii = np.array(exit_radii)
@@ -744,7 +758,7 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
 
     print("Exit distances x,y:", exit_distances_x, exit_distances_y)
 
-    # Calculate total distances with sign differences depending on the direction of the movement
+    # Calculate total distances
     entrance_distances = np.sqrt(entrance_distances_x**2 + entrance_distances_y**2)
     exit_distances = np.sqrt(exit_distances_x**2 + exit_distances_y**2)
 
@@ -752,7 +766,7 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
     distance_avg = np.mean(exit_distances)
     is_bad = []
     for i in range(len(exit_distances)):
-        if exit_distances[i] > distance_avg * 1.5:
+        if exit_distances[i] > distance_avg * 2.5:
             flag = True
             is_bad.append(flag)
         else:
@@ -764,25 +778,80 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
     reference_index = np.argmin(entrance_distances)
     print("Reference index:", reference_index)
 
+    # Save all parameters in json file
+    parameters = {
+        "entrance_coms": entrance_coms.tolist(),
+        "entrance_comk": entrance_comk.tolist(),
+        "entrance_radii": entrance_radii.tolist(),
+        "entrance_distances_x": entrance_distances_x.tolist(),
+        "entrance_distances_y": entrance_distances_y.tolist(),
+        "entrance_distances": entrance_distances.tolist(),
+        "exit_coms": exit_coms.tolist(),
+        "exit_comk": exit_comk.tolist(),
+        "exit_radii": exit_radii.tolist(),
+        "exit_distances_x": exit_distances_x.tolist(),
+        "exit_distances_y": exit_distances_y.tolist(),
+        "exit_distances": exit_distances.tolist(),
+        "reference_index": int(reference_index),
+        "max_flux": max_flux_list,
+        "bad_measurements": is_bad,
+        "fiber_px_radius_entrance": fiber_px_radius_entrance,
+        "fiber_px_radius_exit": fiber_px_radius_exit
+    }
+
+    with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'w') as f:
+        json.dump(parameters, f, indent=4)
+
+def calc_sg(main_folder:str, plot_result:bool=False):
+
+    with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
+        parameters = json.load(f)
+
+    entrance_coms = parameters["entrance_coms"]
+    entrance_comk = parameters["entrance_comk"]
+    entrance_radii = parameters["entrance_radii"]
+    entrance_distances_x = parameters["entrance_distances_x"]
+    entrance_distances_y = parameters["entrance_distances_y"]
+    entrance_distances = parameters["entrance_distances"]
+    exit_coms = parameters["exit_coms"]
+    exit_comk = parameters["exit_comk"]
+    exit_radii = parameters["exit_radii"]
+    exit_distances_x = parameters["exit_distances_x"]
+    exit_distances_y = parameters["exit_distances_y"]
+    exit_distances = parameters["exit_distances"]
+    reference_index = parameters["reference_index"]
+    max_flux = parameters["max_flux"]
+    is_bad = parameters["bad_measurements"]
+    fiber_px_radius_entrance = parameters["fiber_px_radius_entrance"]
+    fiber_px_radius_exit = parameters["fiber_px_radius_exit"]
+
+    # Convert lists to NumPy arrays
+    entrance_distances = np.array(entrance_distances)
+    exit_distances = np.array(exit_distances)
+    exit_distances_x = np.array(exit_distances_x)
+    exit_distances_y = np.array(exit_distances_y)
+
     # Rescale values with reference index as zero
     entrance_distances = entrance_distances - entrance_distances[reference_index]
     exit_distances = exit_distances - exit_distances[reference_index]
     exit_distances_x = exit_distances_x - exit_distances_x[reference_index]
     exit_distances_y = exit_distances_y - exit_distances_y[reference_index]
 
-
     # Change sign of entrance distance depending on the direction of the movement
     for i in range(len(entrance_distances)):
         if entrance_distances_y[i] < 0:
             entrance_distances[i] = -entrance_distances[i]
-
 
     # Calculate the scrambling gain for each pair
     scrambling_gain = []
     for i in range(len(entrance_distances)):
         if i == reference_index:
             continue
-        scrambling_gain.append((entrance_distances[i] / 2 * entrance_radii[i]) / (exit_distances[i] / 2 * exit_radii[i]))
+        scrambling_gain.append(
+            (entrance_distances[i] / 2 * fiber_px_radius_entrance) / (exit_distances[i] / 2 * fiber_px_radius_exit))
+
+    sg_min = np.max(entrance_distances / fiber_px_radius_entrance) / np.max(exit_distances / fiber_px_radius_exit)
+    print(f"SG_min value: {sg_min}")
 
     scrambling_gain = np.array(scrambling_gain)
     scrambling_gain_rounded = np.round(scrambling_gain, 2)
@@ -791,34 +860,13 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
     # Delete the reference element from the arrays
     scrambling_gain = np.delete(scrambling_gain, reference_index)
 
-    # Save all parameters in json file
-    parameters = {
-        "entrance_coms": entrance_coms.tolist(),
-        "entrance_comk": entrance_comk.tolist(),
-        "entrance_radii": entrance_radii.tolist(),
-        "entrance_distances_x": entrance_distances_x.tolist(),
-        "entrance_distances_y": entrance_distances_y.tolist(),
-        "exit_coms": exit_coms.tolist(),
-        "exit_comk": exit_comk.tolist(),
-        "exit_radii": exit_radii.tolist(),
-        "exit_distances_x": exit_distances_x.tolist(),
-        "exit_distances_y": exit_distances_y.tolist(),
-        "scrambling_gain": scrambling_gain_rounded.tolist(),
-        "reference_index": int(reference_index),
-        "max_flux": max_flux_list,
-        "bad_measurements": is_bad
-    }
-
-    with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'w') as f:
-        json.dump(parameters, f, indent=4)
-
     # Plot the results
     if plot_result:
         entrance_distances = np.delete(entrance_distances, np.where(is_bad))
         exit_distances_y = np.delete(exit_distances_y, np.where(is_bad))
         exit_distances_x = np.delete(exit_distances_x, np.where(is_bad))
 
-        #reference_index = np.argmin(entrance_distances)
+        # reference_index = np.argmin(entrance_distances)
 
         # Plot COM x and y movement of the fiber output with different spot positions as colorbar
         scatter = plt.scatter(exit_distances_x, exit_distances_y, c=entrance_distances, cmap='plasma')
@@ -831,8 +879,15 @@ def calculate_scrambling_gain(main_folder:str, fiber_diameter:int, fiber_shape:s
         plt.savefig(result_name)
         plt.show()
 
+    # Write the scrambling gain to a json file
+    sg_params = {
+        "scrambling_gain": scrambling_gain.tolist(),
+        "sg_min": sg_min
+    }
 
-    return scrambling_gain
+    with open(os.path.join(main_folder, "scrambling_gain.json"), 'w') as f:
+        json.dump(sg_params, f, indent=4)
+
 
 def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11):
     """
@@ -848,9 +903,9 @@ def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11):
 
     capture_images_and_reduce(fiber_diameter, main_image_folder, number_of_positions)
 
-    sg = calculate_scrambling_gain(main_image_folder, fiber_diameter, fiber_shape, plot_result=True)
+    get_sg_params(main_image_folder, fiber_diameter, fiber_shape, plot_result=True)
 
-    print("Scrambling gain:", sg)
+    calc_sg(main_image_folder, plot_result=True)
 
 def capture_images_and_reduce(fiber_diameter:int, main_image_folder:str, number_of_positions:int=11):
     """
@@ -1128,7 +1183,7 @@ def check_mask_flux_all(main_folder:str):
 
         check_mask_flux_single(image, mask)
 
-def check_mask_flux_single(image:np.ndarray, mask:np.ndarray, plot:bool=False):
+def check_mask_flux_single(image:np.ndarray, mask:np.ndarray, plot:bool=False, print_text:bool=True):
     """
     Check the flux of the mask in the image.
     Args:
@@ -1147,11 +1202,12 @@ def check_mask_flux_single(image:np.ndarray, mask:np.ndarray, plot:bool=False):
         plt.title('Image with Mask Removed')
         plt.show()
 
-    print("Max flux value outside of mask:", np.max(image_wo_mask))
+    if print_text:
+        print("Max flux value outside of mask:", np.max(image_wo_mask))
 
     return np.max(image_wo_mask)
 
-def plot_sg_cool_like(main_folder:str):
+def plot_sg_cool_like(main_folder:str, fiber_diameter:int):
     """
     Plot the scrambling gain in a cool way.
     Args:
@@ -1177,7 +1233,6 @@ def plot_sg_cool_like(main_folder:str):
     for i in range(len(exit_distances_x)):
         exit_distance = np.sqrt(exit_distances_x[i] ** 2 + exit_distances_y[i] ** 2)
         exit_distances.append(exit_distance)
-
 
     print("Bad measurements:", is_bad)
 
@@ -1224,9 +1279,9 @@ def plot_sg_cool_like(main_folder:str):
     for i in range(len(entrance_distances)):
         if i == reference_index:
             continue
-        sgx = sg_func(entrance_distances[i], 100, exit_distances_x[i], 100)
-        sgy = sg_func(entrance_distances[i], 100, exit_distances_y[i], 100)
-        sg = sg_func(entrance_distances[i], 100, exit_distances[i], 100)
+        sgx = sg_func(entrance_distances[i], fiber_diameter, exit_distances_x[i], fiber_diameter)
+        sgy = sg_func(entrance_distances[i], fiber_diameter, exit_distances_y[i], fiber_diameter)
+        sg = sg_func(entrance_distances[i], fiber_diameter, exit_distances[i], fiber_diameter)
         print(f"Scrambling gain {i}: {sgx}, {sgy}, {sg}")
 
     plt.figure(figsize=(10, 5), dpi=100)
@@ -1238,29 +1293,97 @@ def plot_sg_cool_like(main_folder:str):
     plt.fill_between(entrance_distances, func(entrance_distances, 5e-4, 0), func(entrance_distances, -5e-4, 0), color='g', alpha=0.3, hatch="//", zorder=2)
     plt.plot(entrance_distances, func(entrance_distances, 2e-3, 0), 'r--', label='SG 500', alpha=1, linewidth=0.5)
     plt.plot(entrance_distances, func(entrance_distances, -2e-3, 0), 'r--', alpha=1, linewidth=0.5)
-    plt.fill_between(entrance_distances, func(entrance_distances, 2e-3, 0), func(entrance_distances, -2e-3, 0), where=(), color='r', alpha=0.2, hatch="/", zorder=1)
+    plt.fill_between(entrance_distances, func(entrance_distances, 2e-3, 0), func(entrance_distances, -2e-3, 0), color='r', alpha=0.2, hatch="/", zorder=1)
     plt.legend()
     plt.ylim(-0.08, 0.08)
     plt.ylabel('Exit COM distance [mu]')
     plt.xlabel('Entrance Spot displacement [mu]')
     plt.show()
 
+def grow_mask(image, position, radius, shape, angle = 0):
+    min_flux = np.inf
+
+    center_y, center_x = position[0], position[1]
+
+    for margin in range(0, 1000, 2):
+        if shape == "circle":
+            mask = create_circular_mask(image, (center_y, center_x), radius + margin, plot_mask=False)
+
+        elif shape == "octagon":
+            mask, comk = build_mask(image, radius, "octagon", margin, position, angle)
+
+        else:
+            raise ValueError("Invalid fiber shape. Must be either 'circle' or 'octagon'.")
+
+
+        # Check flux outside mask
+        max_flux = int(check_mask_flux_single(image, mask, plot=False, print_text=False))
+
+        if max_flux < min_flux:
+            min_flux = max_flux
+
+        elif max_flux == min_flux:
+            print(f"Margin: {margin}, Flux: {max_flux}")
+            return margin
+
+        elif radius + margin > 1.2 * radius:
+            print(f"Max margin reached. Margin: {margin}, Flux: {max_flux}")
+            return margin
+
+def plot_coms(main_folder):
+    # Read from json file
+    with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
+        parameters = json.load(f)
+
+    entrance_coms = parameters["entrance_coms"]
+    exit_coms = parameters["exit_coms"]
+    entrance_comk = parameters["entrance_comk"]
+    exit_comk = parameters["exit_comk"]
+    reference_index = parameters["reference_index"]
+
+    # Convert lists to NumPy arrays
+    entrance_coms = np.array(entrance_coms)
+    exit_coms = np.array(exit_coms)
+    entrance_comk = np.array(entrance_comk)
+    exit_comk = np.array(exit_comk)
+
+    plt.scatter(entrance_coms[:, 1], entrance_coms[:, 0], label="COMs")
+    for i, com in enumerate(entrance_coms):
+        plt.text(com[1], com[0], str(i), fontsize=8, ha='right')
+    plt.scatter(entrance_comk[:, 1], entrance_comk[:, 0], label="COMKs")
+    plt.legend()
+    plt.title("Entrance")
+    plt.show()
+
+    plt.figure()
+    plt.scatter(exit_coms[:, 1], exit_coms[:, 0], label="COMs")
+    plt.scatter(exit_comk[:, 1], exit_comk[:, 0], label="COMKs")
+    ref_com = exit_coms[reference_index]
+    plt.text(ref_com[1], ref_com[0], "Ref", fontsize=8, ha='right')
+    ref_comk = exit_comk[reference_index]
+    plt.text(ref_comk[1], ref_comk[0], "Ref", fontsize=8, ha='right')
+    plt.gca().get_yaxis().get_major_formatter().set_useOffset(False)
+    plt.legend()
+    plt.title("Exit")
+    plt.show()
+
 if __name__ == '__main__':
 
-    #image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test6/exit/reduced/exit_cam_image020_reduced.png'
-    #image = io.imread(image_path)
+    image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean/exit/reduced/exit_cam_image000_reduced.png'
+    image = io.imread(image_path)
     #print(com_of_spot(image, plot=True))
 
     #image_to_fits(image_path)
 
     entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/entrance/reduced'
     exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/exit/reduced'
-    main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5"
+
+    main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
     # entrance_folder = "entrance_images"
     # exit_folder = "exit_images"
 
-    fiber_diameter = 100  # Value in micrometers
+    fiber_diameter = 89  # Value in micrometers
     """
     # Plot com movement for entrance images
     plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
@@ -1271,9 +1394,9 @@ if __name__ == '__main__':
     #entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
     #exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    sg = calculate_scrambling_gain(main_folder, fiber_diameter, fiber_shape="octagon",
-                                  plot_result=True, plot_mask=True, save_mask=False)
-    #print(sg)
+    get_sg_params(main_folder, fiber_diameter, fiber_shape="octagon", plot_all=False, plot_result=True, plot_mask=True, save_mask=False)
+
+    calc_sg(main_folder, plot_result=True)
 
     #plot_masks(main_folder, fiber_diameter)
 
@@ -1284,5 +1407,12 @@ if __name__ == '__main__':
 
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
-    #plot_sg_cool_like(main_folder)
+    plot_sg_cool_like(main_folder, fiber_diameter)
     #make_shape("octagon", 100)
+
+    #angle, position, radius = match_shape(image, 96, "octagon", plot_all=False, plot_best=False)
+    #grow_mask(image, position, radius, "octagon", angle)
+
+    #match_shape(image, 89, "octagon", plot_all=True, plot_best=True)
+
+    #plot_coms(main_folder)
