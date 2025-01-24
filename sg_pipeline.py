@@ -1276,6 +1276,8 @@ def plot_sg_cool_like(main_folder:str, fiber_diameter:int):
     def sg_func(d_in, D_in, d_out, D_out):
         return (d_in / D_in) / (d_out / D_out)
 
+    print(entrance_distances)
+
     for i in range(len(entrance_distances)):
         if i == reference_index:
             continue
@@ -1380,6 +1382,8 @@ if __name__ == '__main__':
 
     main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
+    main_folder = "D:/Vincent/oct_89_good/SG"
+
     # entrance_folder = "entrance_images"
     # exit_folder = "exit_images"
 
@@ -1394,9 +1398,9 @@ if __name__ == '__main__':
     #entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
     #exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    get_sg_params(main_folder, fiber_diameter, fiber_shape="octagon", plot_all=False, plot_result=True, plot_mask=True, save_mask=False)
+    #get_sg_params(main_folder, fiber_diameter, fiber_shape="octagon", plot_all=False, plot_result=True, plot_mask=True, save_mask=False)
 
-    calc_sg(main_folder, plot_result=True)
+    #calc_sg(main_folder, plot_result=True)
 
     #plot_masks(main_folder, fiber_diameter)
 
