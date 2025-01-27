@@ -714,7 +714,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str,
         exit_radii.append(radius)
 
         # Check flux outside mask
-        max_flux = int(check_mask_flux_single(image, mask, plot=True))
+        max_flux = int(check_mask_flux_single(image, mask, plot=False))
         max_flux_list.append(max_flux)
 
         # Convert mask to bool
@@ -1143,7 +1143,8 @@ def plot_masks(main_folder:str, fiber_diameter:int):
         plt.title('Entrance Mask Overlay')
         plt.axis('off')
         plt.savefig(os.path.join(plot_folder, entrance_mask_files[i].replace(".png", "_overlay.png")), dpi="figure")
-        plt.show()
+        plt.close()
+        #plt.show()
 
     for i in range(len(exit_mask_files)):
         comk = exit_comk[i]
@@ -1168,7 +1169,8 @@ def plot_masks(main_folder:str, fiber_diameter:int):
         plt.title('Exit Mask Overlay')
         plt.axis('off')
         plt.savefig(os.path.join(plot_folder, exit_mask_files[i].replace(".png", "_overlay.png")), dpi="figure")
-        plt.show()
+        plt.close()
+        #plt.show()
 
 def check_mask_flux_all(main_folder:str):
     exit_mask_folder = os.path.join(main_folder, "exit/mask")
@@ -1300,7 +1302,10 @@ def plot_sg_cool_like(main_folder:str, fiber_diameter:int):
     plt.ylim(-0.08, 0.08)
     plt.ylabel('Exit COM distance [mu]')
     plt.xlabel('Entrance Spot displacement [mu]')
-    plt.show()
+    plt.title('Scrambling Gain')
+    plt.savefig(os.path.join(main_folder, "plots/scrambling_gain_plot.png"))
+    plt.close()
+    #plt.show()
 
 def grow_mask(image, position, radius, shape, angle = 0):
     min_flux = np.inf
@@ -1355,7 +1360,9 @@ def plot_coms(main_folder):
     plt.scatter(entrance_comk[:, 1], entrance_comk[:, 0], label="COMKs")
     plt.legend()
     plt.title("Entrance")
-    plt.show()
+    plt.savefig(os.path.join(main_folder, "plots/Entrance_coms.png"))
+    plt.close()
+    #plt.show()
 
     plt.figure()
     plt.scatter(exit_coms[:, 1], exit_coms[:, 0], label="COMs")
@@ -1367,12 +1374,13 @@ def plot_coms(main_folder):
     plt.gca().get_yaxis().get_major_formatter().set_useOffset(False)
     plt.legend()
     plt.title("Exit")
-    plt.show()
+    plt.savefig(os.path.join(main_folder, "plots/Exit_coms.png"))
+    plt.close()
 
 if __name__ == '__main__':
 
-    image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean/exit/reduced/exit_cam_image000_reduced.png'
-    image = io.imread(image_path)
+    #image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean/exit/reduced/exit_cam_image000_reduced.png'
+    #image = io.imread(image_path)
     #print(com_of_spot(image, plot=True))
 
     #image_to_fits(image_path)
@@ -1382,7 +1390,7 @@ if __name__ == '__main__':
 
     main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
-    main_folder = "D:/Vincent/oct_89_good/SG"
+    main_folder = "D:/Vincent/oct_89/SG"
 
     # entrance_folder = "entrance_images"
     # exit_folder = "exit_images"
@@ -1402,7 +1410,7 @@ if __name__ == '__main__':
 
     #calc_sg(main_folder, plot_result=True)
 
-    #plot_masks(main_folder, fiber_diameter)
+    plot_masks(main_folder, fiber_diameter)
 
     #_, _ = capture_images_and_reduce(fiber_diameter, 11)
 
@@ -1411,7 +1419,7 @@ if __name__ == '__main__':
 
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
-    plot_sg_cool_like(main_folder, fiber_diameter)
+    #plot_sg_cool_like(main_folder, fiber_diameter)
     #make_shape("octagon", 100)
 
     #angle, position, radius = match_shape(image, 96, "octagon", plot_all=False, plot_best=False)

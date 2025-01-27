@@ -5,6 +5,7 @@ import threading
 import time
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox
 
+# Todo: Add feature to view plots in GUI
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -28,6 +29,10 @@ class MainWindow(QMainWindow):
         self.fiber_diameter_label = QLabel("Fiber Diameter (microns):")
         self.fiber_diameter_input = QLineEdit()
 
+        self.fiber_shape_label = QLabel("Fiber Shape:")
+        self.fiber_shape_combo = QComboBox()
+        self.fiber_shape_combo.addItems(["circular", "octagon"])
+
         self.working_dir_label = QLabel("Working Directory:")
         self.working_dir_display = QLabel("")
 
@@ -47,6 +52,8 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.fiber_name_input)
         self.layout.addWidget(self.fiber_diameter_label)
         self.layout.addWidget(self.fiber_diameter_input)
+        self.layout.addWidget(self.fiber_shape_label)
+        self.layout.addWidget(self.fiber_shape_combo)
         self.layout.addWidget(self.working_dir_label)
         self.layout.addWidget(self.working_dir_display)
 
@@ -83,25 +90,30 @@ class MainWindow(QMainWindow):
         if folder:
             self.working_dir_display.setText(folder)
             self.fiber_name_input.setText(os.path.basename(folder))
-            self.load_fiber_diameter(folder)
+            self.load_fiber_data(folder)
             if self.inputs_locked:
                 self.check_existing_measurements(folder)
 
-    def load_fiber_diameter(self, folder):
-        file_path = os.path.join(folder, "fiber_diameter.json")
+    def load_fiber_data(self, folder):
+        file_path = os.path.join(folder, "fiber_data.json")
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 data = json.load(file)
                 fiber_diameter = data.get("fiber_diameter", "")
+                fiber_shape = data.get("fiber_shape", "")
                 if fiber_diameter:
                     self.fiber_diameter_input.setText(str(int(fiber_diameter)))
                 else:
                     self.fiber_diameter_input.setText("")
+                if fiber_shape:
+                    self.fiber_shape_combo.setCurrentText(fiber_shape)
+                else:
+                    self.fiber_shape_combo.setCurrentIndex(-1)
 
-    def save_fiber_diameter(self, folder, fiber_diameter):
-        file_path = os.path.join(folder, "fiber_diameter.json")
+    def save_fiber_data(self, folder, fiber_diameter, fiber_shape):
+        file_path = os.path.join(folder, "fiber_data.json")
         with open(file_path, "w") as file:
-            json.dump({"fiber_diameter": int(fiber_diameter)}, file)
+            json.dump({"fiber_diameter": int(fiber_diameter), "fiber_shape": fiber_shape}, file)
 
     def show_message(self, message):
         self.message_label.setText(message)
@@ -109,9 +121,10 @@ class MainWindow(QMainWindow):
     def lock_inputs(self):
         fiber_name = self.fiber_name_input.text()
         fiber_diameter = self.fiber_diameter_input.text()
+        fiber_shape = self.fiber_shape_combo.currentText()
 
-        if not fiber_name or not fiber_diameter:
-            self.show_message("Please enter both fiber name and diameter.")
+        if not fiber_name or not fiber_diameter or not fiber_shape:
+            self.show_message("Please enter fiber name, diameter, and shape.")
             return
 
         working_dir = self.working_dir_display.text()
@@ -120,6 +133,7 @@ class MainWindow(QMainWindow):
 
         self.fiber_name_input.setDisabled(True)
         self.fiber_diameter_input.setDisabled(True)
+        self.fiber_shape_combo.setDisabled(True)
         self.inputs_locked = True
         self.show_message("Inputs locked.")
         self.run_measurement_button.setDisabled(True)
@@ -130,6 +144,7 @@ class MainWindow(QMainWindow):
     def unlock_inputs(self):
         self.fiber_name_input.setDisabled(False)
         self.fiber_diameter_input.setDisabled(False)
+        self.fiber_shape_combo.setDisabled(False)
         self.inputs_locked = False
         self.show_message("Inputs unlocked.")
         self.run_measurement_button.setDisabled(True)
@@ -182,10 +197,14 @@ class MainWindow(QMainWindow):
         self.plot_sg_checkbox = QCheckBox("Plot SG")
         self.calc_sg_checkbox = QCheckBox("Calc SG")
         self.plot_coms_checkbox = QCheckBox("Plot COMs")
+        self.get_params_checkbox = QCheckBox("Get Parameters")
+        self.plot_masks_checkbox = QCheckBox("Plot Masks")
 
         self.plot_sg_checkbox.stateChanged.connect(self.update_analysis_button_state)
         self.calc_sg_checkbox.stateChanged.connect(self.update_analysis_button_state)
         self.plot_coms_checkbox.stateChanged.connect(self.update_analysis_button_state)
+        self.get_params_checkbox.stateChanged.connect(self.update_analysis_button_state)
+        self.plot_masks_checkbox.stateChanged.connect(self.update_analysis_button_state)
 
         self.run_analysis_button = QPushButton("Run Analysis")
         self.run_analysis_button.setDisabled(True)
@@ -196,12 +215,15 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.plot_sg_checkbox)
         layout.addWidget(self.calc_sg_checkbox)
         layout.addWidget(self.plot_coms_checkbox)
+        layout.addWidget(self.get_params_checkbox)
+        layout.addWidget(self.plot_masks_checkbox)
         layout.addWidget(self.run_analysis_button)
 
         self.analyse_tab.setLayout(layout)
 
     def update_analysis_button_state(self):
-        if self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked():
+        if (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked() or self.plot_coms_checkbox.isChecked()
+                or self.get_params_checkbox.isChecked() or self.plot_masks_checkbox.isChecked()):
             self.run_analysis_button.setDisabled(False)
         else:
             self.run_analysis_button.setDisabled(True)
@@ -223,9 +245,9 @@ class MainWindow(QMainWindow):
     def update_checklist(self):
         measurement_type = self.measurement_type_combo.currentText()
         if measurement_type == "SG":
-            self.check1.setText("SG Check 1")
-            self.check2.setText("SG Check 2")
-            self.check3.setText("SG Check 3")
+            self.check1.setText("Fiber in place")
+            self.check2.setText("Spot in center")
+            self.check3.setText("Spot in focus")
         elif measurement_type == "FRD":
             self.check1.setText("FRD Check 1")
             self.check2.setText("FRD Check 2")
@@ -257,24 +279,25 @@ class MainWindow(QMainWindow):
 
         fiber_name = self.fiber_name_input.text()
         fiber_diameter = int(self.fiber_diameter_input.text())
+        fiber_shape = self.fiber_shape_combo.currentText()
         measurement_type = self.measurement_type_combo.currentText()
         working_dir = self.working_dir_display.text()
 
-        self.save_fiber_diameter(working_dir, fiber_diameter)
+        self.save_fiber_data(working_dir, fiber_diameter, fiber_shape)
 
         self.experiment_running = True
         self.update_ui_state()
 
-        threading.Thread(target=self.run_measurement_thread, args=(measurement_type, working_dir, fiber_diameter)).start()
+        threading.Thread(target=self.run_measurement_thread, args=(measurement_type, working_dir, fiber_diameter, fiber_shape)).start()
 
-    def run_measurement_thread(self, measurement_type, working_dir, fiber_diameter):
+    def run_measurement_thread(self, measurement_type, working_dir, fiber_diameter, fiber_shape):
         # Call the appropriate measurement function
         if measurement_type == "SG":
-            self.measure_sg(working_dir, fiber_diameter)
+            self.measure_sg(working_dir, fiber_diameter, fiber_shape)
         elif measurement_type == "FRD":
-            self.measure_frd(working_dir, fiber_diameter)
+            self.measure_frd(working_dir, fiber_diameter, fiber_shape)
         elif measurement_type == "Throughput":
-            self.measure_throughput(working_dir, fiber_diameter)
+            self.measure_throughput(working_dir, fiber_diameter, fiber_shape)
 
         self.experiment_running = False
         self.update_ui_state()
@@ -287,13 +310,14 @@ class MainWindow(QMainWindow):
         analysis_type = self.analysis_type_combo.currentText()
         working_dir = self.working_dir_display.text()
         fiber_diameter = int(self.fiber_diameter_input.text())
+        fiber_shape = self.fiber_shape_combo.currentText()
 
         self.experiment_running = True
         self.update_ui_state()
 
-        threading.Thread(target=self.run_analysis_thread, args=(analysis_type, working_dir, fiber_diameter)).start()
+        threading.Thread(target=self.run_analysis_thread, args=(analysis_type, working_dir, fiber_diameter, fiber_shape)).start()
 
-    def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter):
+    def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter, fiber_shape):
         if analysis_type == "SG":
             directory = os.path.join(working_dir, "SG")
             import sg_pipeline
@@ -305,6 +329,12 @@ class MainWindow(QMainWindow):
 
             if self.plot_coms_checkbox.isChecked():
                 sg_pipeline.plot_coms(directory)
+
+            if self.get_params_checkbox.isChecked():
+                sg_pipeline.get_sg_params(directory, fiber_diameter, fiber_shape=fiber_shape)
+
+            if self.plot_masks_checkbox.isChecked():
+                sg_pipeline.plot_masks(directory, fiber_diameter)
 
         elif analysis_type == "FRD":
             # Add corresponding functions for FRD analysis
@@ -324,15 +354,16 @@ class MainWindow(QMainWindow):
         self.run_measurement_button.setDisabled(not state or not (self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked()))
         self.run_analysis_button.setDisabled(not state)
 
-    def measure_sg(self, working_dir, fiber_diameter):
-        time.sleep(10)
-        self.show_message(f"Running SG measurement with working dir: {working_dir} and fiber diameter: {fiber_diameter}")
+    def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
+        self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
+        import sg_pipeline
+        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter)  # Todo: Add number of positions as input
 
-    def measure_frd(self, working_dir, fiber_diameter):
-        self.show_message(f"Running FRD measurement with working dir: {working_dir} and fiber diameter: {fiber_diameter}")
+    def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
+        self.show_message(f"Running FRD measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
 
-    def measure_throughput(self, working_dir, fiber_diameter):
-        self.show_message(f"Running Throughput measurement with working dir: {working_dir} and fiber diameter: {fiber_diameter}")
+    def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
+        self.show_message(f"Running Throughput measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
 
     def analyse_sg(self, working_dir):
         self.show_message(f"Running SG analysis with working dir: {working_dir}")
