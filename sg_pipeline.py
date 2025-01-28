@@ -1,3 +1,4 @@
+import time
 from cProfile import label
 
 import numpy as np
@@ -77,15 +78,26 @@ def make_shape(shape:str, radius:int):
         plt.show()"""
         return mask
 
-    if shape == "square":
+    if shape == "rectangle":
         mask = np.zeros((2 * radius, 2 * radius), dtype=bool)
-        mask[0:radius, 0:radius] = True
+        aspect_ratio = 5/3 # >1
 
-        """plt.imshow(mask, cmap='gray')
-        plt.xlim(0, 2 * radius)
-        plt.ylim(0, 2 * radius)
-        plt.axis("off")
-        plt.show()"""
+        # Radius defines the longer side of the rectangle
+        height = int(radius / aspect_ratio)
+        width = radius
+
+        # Calculate the start and end points of the rectangle
+        start_x = radius - width // 2
+        end_x = radius + width // 2
+        start_y = radius - height // 2
+        end_y = radius + height // 2
+
+        mask[start_y:end_y, start_x:end_x] = True
+
+        plt.imshow(mask, cmap='gray')
+        #plt.axis("off")
+        plt.show()
+
         return mask
 
     if shape == "octagon":
@@ -563,7 +575,7 @@ def plot_circle_movement(image_folder:str, fiber_px_radius:int): # Todo: This fu
     plt.legend()
     plt.show()
 
-def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str,
+def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress_signal=None,
                               save_mask:bool=True,
                               plot_result:bool=False, plot_mask:bool=False, plot_best:bool=False, plot_all:bool=False):
     """
@@ -594,18 +606,22 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str,
     fiber_px_radius_entrance = int(fiber_diameter / 0.526 / 2)
     fiber_px_radius_exit = int(fiber_diameter / 0.45 / 2)
 
-    mask_scale_factor_circ = 1.05
-    mask_scale_factor_oct = 1.08
-
     # Get values of the entrance image
     entrance_image_files = [f for f in os.listdir(entrance_image_folder_reduced) if f.endswith('reduced.png')]
     entrance_coms = [] # Center of mass of spot in the entrance image
     entrance_comk = [] # Center of mask and with that the center of the fiber
     entrance_radii = []
 
+    if progress_signal:
+        progress_signal.emit("Processing entrance images")
+
     # Process entrance images
     for image_file in entrance_image_files:
         image_path = os.path.join(entrance_image_folder_reduced, image_file)
+
+        if progress_signal:
+            progress_signal.emit(f"Processing entrance image {image_file}")
+
         print(image_path)
         image = io.imread(image_path)
         com = com_of_spot(image, threshold=200)
@@ -671,10 +687,18 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str,
     print("Entrance center of mass:", entrance_coms)
     print("Entrance radii:", entrance_radii)
 
+    if progress_signal:
+        progress_signal.emit("Input images done. Processing exit images")
+
     # Process exit images
     for image_file in exit_image_files:
         image_path = os.path.join(exit_image_folder_reduced, image_file)
+
+        if progress_signal:
+            progress_signal.emit(f"Processing exit image {image_file}")
+
         print(image_path)
+
         image = io.imread(image_path)
 
         mask_path = os.path.join(exit_mask_folder, image_file.replace(".png", "_mask.png"))
@@ -745,6 +769,9 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str,
     print("Exit center of mass:", exit_coms)
     print("Exit radii:", exit_radii)
 
+    if progress_signal:
+        progress_signal.emit("Exit images done. Calculating scrambling gain")
+
     # Calculate distance between entrance COMK and COM
     #entrance_distances = np.linalg.norm(entrance_coms - exit_comk, axis=1)
     entrance_distances_x = entrance_coms[:, 0] - entrance_comk[:, 0]
@@ -802,7 +829,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str,
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'w') as f:
         json.dump(parameters, f, indent=4)
 
-def calc_sg(main_folder:str, plot_result:bool=False):
+def calc_sg(main_folder:str, progress_signal=None, plot_result:bool=False):
 
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
         parameters = json.load(f)
@@ -860,6 +887,9 @@ def calc_sg(main_folder:str, plot_result:bool=False):
     # Delete the reference element from the arrays
     scrambling_gain = np.delete(scrambling_gain, reference_index)
 
+    if progress_signal:
+        progress_signal.emit("Scrambling gain calculations completed.")
+
     # Plot the results
     if plot_result:
         entrance_distances = np.delete(entrance_distances, np.where(is_bad))
@@ -888,6 +918,8 @@ def calc_sg(main_folder:str, plot_result:bool=False):
     with open(os.path.join(main_folder, "scrambling_gain.json"), 'w') as f:
         json.dump(sg_params, f, indent=4)
 
+    if progress_signal:
+        progress_signal.emit("Scrambling gain results saved and plotted.")
 
 def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11):
     """
@@ -907,7 +939,7 @@ def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11):
 
     calc_sg(main_image_folder, plot_result=True)
 
-def capture_images_and_reduce(fiber_diameter:int, main_image_folder:str, number_of_positions:int=11):
+def capture_images_and_reduce(fiber_diameter:int, main_image_folder:str, progress_signal=None, number_of_positions:int=11):
     """
     Capture images and reduce them for the scrambling gain calculation
     Args:
@@ -953,6 +985,9 @@ def capture_images_and_reduce(fiber_diameter:int, main_image_folder:str, number_
     move_to_filter.move("none")
     print("Taking darks")
 
+    if progress_signal:
+        progress_signal.emit("Taking darks")
+
     # Take darks
     for i in range(5):
         tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png")
@@ -967,6 +1002,9 @@ def capture_images_and_reduce(fiber_diameter:int, main_image_folder:str, number_
     smc.make_reference_move()
 
     print("Taking images")
+
+    if progress_signal:
+        progress_signal.emit("Darks Done! Taking lights.")
 
     step_size = fiber_diameter / 1000 * 0.8 / (number_of_positions-1)  # Step size in mm
     pos_left = 5 - fiber_diameter / 1000 * 0.8 / 2  # Leftmost position in mm
@@ -985,6 +1023,9 @@ def capture_images_and_reduce(fiber_diameter:int, main_image_folder:str, number_
     # Reset the motor to the initial position
     smc.move_motor_to_position(5)
 
+    if progress_signal:
+        progress_signal.emit("Images taken! Reducing images.")
+
     # Reduce images
     for i in range(number_of_positions):
         image = png_to_numpy(entrance_light_folder + f"/entrance_cam_image{i:03d}.png")
@@ -997,6 +1038,9 @@ def capture_images_and_reduce(fiber_diameter:int, main_image_folder:str, number_
                                                save=True)
 
     print("All images reduced!")
+
+    if progress_signal:
+        progress_signal.emit("Images reduced!")
 
 def cut_image_around_comk(image, comk, fiber_px_radius, margin):
     """
@@ -1089,16 +1133,20 @@ def make_comparison_video(main_folder:str, fiber_diameter):
     final_clip = clips_array([[entrance_clip, exit_clip]])
     final_clip.write_videofile(video_name, fps=5)
 
-def plot_masks(main_folder:str, fiber_diameter:int):
+def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
     fiber_input_radius = int(fiber_diameter / 0.526 / 2)
     fiber_exit_radius = int(fiber_diameter / 0.45 / 2)
 
     entrance_mask_folder = os.path.join(main_folder, "entrance/mask")
     exit_mask_folder = os.path.join(main_folder, "exit/mask")
     plot_folder = os.path.join(main_folder, "plots")
+    entrance_overlay_folder = os.path.join(plot_folder, "entrance_overlay")
+    exit_overlay_folder = os.path.join(plot_folder, "exit_overlay")
 
     # Create plot folder if it doesn't exist
     os.makedirs(plot_folder, exist_ok=True)
+    os.makedirs(entrance_overlay_folder, exist_ok=True)
+    os.makedirs(exit_overlay_folder, exist_ok=True)
 
     entrance_mask_files = [f for f in os.listdir(entrance_mask_folder) if f.endswith('mask.png')]
     exit_mask_files = [f for f in os.listdir(exit_mask_folder) if f.endswith('mask.png')]
@@ -1142,9 +1190,11 @@ def plot_masks(main_folder:str, fiber_diameter:int):
         plt.plot(entrance_mask_outline[:, 1], entrance_mask_outline[:, 0], 'r', linewidth=0.5)
         plt.title('Entrance Mask Overlay')
         plt.axis('off')
-        plt.savefig(os.path.join(plot_folder, entrance_mask_files[i].replace(".png", "_overlay.png")), dpi="figure")
+        plt.savefig(os.path.join(entrance_overlay_folder, entrance_mask_files[i].replace(".png", "_overlay.png")), dpi="figure")
         plt.close()
-        #plt.show()
+
+    if progress_signal:
+        progress_signal.emit("Masks plotted.")
 
     for i in range(len(exit_mask_files)):
         comk = exit_comk[i]
@@ -1168,7 +1218,7 @@ def plot_masks(main_folder:str, fiber_diameter:int):
         plt.plot(exit_mask_outline[:, 1], exit_mask_outline[:, 0], 'r', linewidth=0.5)
         plt.title('Exit Mask Overlay')
         plt.axis('off')
-        plt.savefig(os.path.join(plot_folder, exit_mask_files[i].replace(".png", "_overlay.png")), dpi="figure")
+        plt.savefig(os.path.join(exit_overlay_folder, exit_mask_files[i].replace(".png", "_overlay.png")), dpi="figure")
         plt.close()
         #plt.show()
 
@@ -1209,7 +1259,7 @@ def check_mask_flux_single(image:np.ndarray, mask:np.ndarray, plot:bool=False, p
 
     return np.max(image_wo_mask)
 
-def plot_sg_cool_like(main_folder:str, fiber_diameter:int):
+def plot_sg_cool_like(main_folder:str, fiber_diameter:int, progress_signal=None):
     """
     Plot the scrambling gain in a cool way.
     Args:
@@ -1305,7 +1355,9 @@ def plot_sg_cool_like(main_folder:str, fiber_diameter:int):
     plt.title('Scrambling Gain')
     plt.savefig(os.path.join(main_folder, "plots/scrambling_gain_plot.png"))
     plt.close()
-    #plt.show()
+
+    if progress_signal:
+        progress_signal.emit("Scrambling gain plot done!")
 
 def grow_mask(image, position, radius, shape, angle = 0):
     min_flux = np.inf
@@ -1337,7 +1389,7 @@ def grow_mask(image, position, radius, shape, angle = 0):
             print(f"Max margin reached. Margin: {margin}, Flux: {max_flux}")
             return margin
 
-def plot_coms(main_folder):
+def plot_coms(main_folder, progress_signal=None):
     # Read from json file
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
         parameters = json.load(f)
@@ -1376,6 +1428,8 @@ def plot_coms(main_folder):
     plt.title("Exit")
     plt.savefig(os.path.join(main_folder, "plots/Exit_coms.png"))
     plt.close()
+    if progress_signal:
+        progress_signal.emit("Plotting COMs done!")
 
 if __name__ == '__main__':
 
@@ -1390,7 +1444,7 @@ if __name__ == '__main__':
 
     main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
-    main_folder = "D:/Vincent/oct_89/SG"
+    #main_folder = "D:/Vincent/oct_89/SG"
 
     # entrance_folder = "entrance_images"
     # exit_folder = "exit_images"
@@ -1410,7 +1464,7 @@ if __name__ == '__main__':
 
     #calc_sg(main_folder, plot_result=True)
 
-    plot_masks(main_folder, fiber_diameter)
+    #plot_masks(main_folder, fiber_diameter)
 
     #_, _ = capture_images_and_reduce(fiber_diameter, 11)
 
@@ -1419,8 +1473,8 @@ if __name__ == '__main__':
 
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
-    #plot_sg_cool_like(main_folder, fiber_diameter)
-    #make_shape("octagon", 100)
+    plot_sg_cool_like(main_folder, fiber_diameter)
+    #make_shape("rectangle", 100)
 
     #angle, position, radius = match_shape(image, 96, "octagon", plot_all=False, plot_best=False)
     #grow_mask(image, position, radius, "octagon", angle)

@@ -3,10 +3,16 @@ import os
 import json
 import threading
 import time
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit)
+from PyQt6.QtCore import pyqtSignal
+import sg_pipeline
+
 
 # Todo: Add feature to view plots in GUI
 class MainWindow(QMainWindow):
+    progress_signal = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
 
@@ -26,12 +32,12 @@ class MainWindow(QMainWindow):
         self.fiber_name_input = QLineEdit()
         self.fiber_name_input.textChanged.connect(self.update_working_dir)
 
-        self.fiber_diameter_label = QLabel("Fiber Diameter (microns):")
+        self.fiber_diameter_label = QLabel("Fiber Diameter (µm):")
         self.fiber_diameter_input = QLineEdit()
 
         self.fiber_shape_label = QLabel("Fiber Shape:")
         self.fiber_shape_combo = QComboBox()
-        self.fiber_shape_combo.addItems(["circular", "octagon"])
+        self.fiber_shape_combo.addItems(["None", "circular", "octagon"])
 
         self.working_dir_label = QLabel("Working Directory:")
         self.working_dir_display = QLabel("")
@@ -77,6 +83,31 @@ class MainWindow(QMainWindow):
         self.init_measure_tab()
         self.init_analyse_tab()
 
+        self.progress_signal.connect(self.update_progress)
+
+        self.progress_label = QLabel("")
+        self.layout.addWidget(self.progress_label)
+
+        self.progress_text_edit = QTextEdit()
+        self.progress_text_edit.setReadOnly(True)
+        self.progress_text_edit.hide()  # Initially hidden
+
+        self.layout.addWidget(self.progress_text_edit)
+
+    def update_progress(self, message):
+        if not self.progress_text_edit.isVisible():
+            self.progress_text_edit.show()
+        self.progress_text_edit.append(message)
+
+        # Calculate the height based on the number of lines
+        line_height = self.progress_text_edit.fontMetrics().height()
+        num_lines = self.progress_text_edit.document().blockCount()
+        max_lines = 10
+        new_height = min(num_lines, max_lines) * line_height + 10  # Add some padding
+
+        # Set the new height
+        self.progress_text_edit.setFixedHeight(new_height)
+
     def update_working_dir(self):
         fiber_name = self.fiber_name_input.text()
         if fiber_name:
@@ -94,6 +125,8 @@ class MainWindow(QMainWindow):
             if self.inputs_locked:
                 self.check_existing_measurements(folder)
 
+        self.lock_inputs()
+
     def load_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
         if os.path.exists(file_path):
@@ -108,11 +141,15 @@ class MainWindow(QMainWindow):
                 if fiber_shape:
                     self.fiber_shape_combo.setCurrentText(fiber_shape)
                 else:
-                    self.fiber_shape_combo.setCurrentIndex(-1)
+                    self.fiber_shape_combo.setCurrentText("None")
+        else:
+            self.fiber_diameter_input.setText("")
+            self.fiber_shape_combo.setCurrentText("None")
 
     def save_fiber_data(self, folder, fiber_diameter, fiber_shape):
         file_path = os.path.join(folder, "fiber_data.json")
         with open(file_path, "w") as file:
+            # noinspection PyTypeChecker
             json.dump({"fiber_diameter": int(fiber_diameter), "fiber_shape": fiber_shape}, file)
 
     def show_message(self, message):
@@ -141,6 +178,17 @@ class MainWindow(QMainWindow):
         self.check_existing_measurements(working_dir)
         self.update_checklist()
 
+        # Save fiber data to JSON
+        self.save_fiber_data(working_dir, fiber_diameter, fiber_shape)
+
+        # Update all run buttons
+        self.update_measurement_button_state()
+        self.update_throughput_analysis_button_state()
+        self.update_general_analysis_button_state()
+
+        # Update the UI state
+        self.update_ui_state()
+
     def unlock_inputs(self):
         self.fiber_name_input.setDisabled(False)
         self.fiber_diameter_input.setDisabled(False)
@@ -159,31 +207,41 @@ class MainWindow(QMainWindow):
         self.measurement_type_combo.addItems(["SG", "FRD", "Throughput"])
         self.measurement_type_combo.currentIndexChanged.connect(self.update_checklist)
 
+        # Create a widget for the measurement type chooser and set its position
+        measurement_type_widget = QWidget()
+        measurement_type_layout = QHBoxLayout(measurement_type_widget)
+        measurement_type_layout.addWidget(self.measurement_type_label)
+        measurement_type_layout.addWidget(self.measurement_type_combo)
+        measurement_type_layout.addStretch()
+
+        layout.addWidget(measurement_type_widget)
+
         self.checklist_label = QLabel("Checklist:")
         self.checklist_label.setStyleSheet("font-weight: bold;")
         self.check1 = QCheckBox("Check 1")
         self.check2 = QCheckBox("Check 2")
         self.check3 = QCheckBox("Check 3")
 
-        self.check1.stateChanged.connect(self.update_run_button_state)
-        self.check2.stateChanged.connect(self.update_run_button_state)
-        self.check3.stateChanged.connect(self.update_run_button_state)
+        self.check1.stateChanged.connect(self.update_measurement_button_state)
+        self.check2.stateChanged.connect(self.update_measurement_button_state)
+        self.check3.stateChanged.connect(self.update_measurement_button_state)
 
-        self.run_measurement_button = QPushButton("Run Measurement")
-        self.run_measurement_button.setDisabled(True)
-        self.run_measurement_button.clicked.connect(self.run_measurement)
-
-        self.existing_measurements_label = QLabel("")
-        self.existing_measurements_label.setStyleSheet("color: green; font-weight: bold;")
-
-        layout.addWidget(self.measurement_type_label)
-        layout.addWidget(self.measurement_type_combo)
         layout.addWidget(self.checklist_label)
         layout.addWidget(self.check1)
         layout.addWidget(self.check2)
         layout.addWidget(self.check3)
-        layout.addWidget(self.run_measurement_button)
+
+        self.existing_measurements_label = QLabel("")
+        self.existing_measurements_label.setStyleSheet("color: green; font-weight: bold;")
         layout.addWidget(self.existing_measurements_label)
+
+        # Add a spacer item to push the run_measurement_button to the bottom
+        layout.addStretch()
+
+        self.run_measurement_button = QPushButton("Run Measurement")
+        self.run_measurement_button.setDisabled(True)
+        self.run_measurement_button.clicked.connect(self.run_measurement)
+        layout.addWidget(self.run_measurement_button)
 
         self.measure_tab.setLayout(layout)
 
@@ -193,6 +251,16 @@ class MainWindow(QMainWindow):
         self.analysis_type_label = QLabel("Analysis Type:")
         self.analysis_type_combo = QComboBox()
         self.analysis_type_combo.addItems(["SG", "FRD", "Throughput"])
+        self.analysis_type_combo.currentIndexChanged.connect(self.update_analysis_tab)
+
+        # Create a widget for the analysis type chooser and set its position
+        analysis_type_widget = QWidget()
+        analysis_type_layout = QHBoxLayout(analysis_type_widget)
+        analysis_type_layout.addWidget(self.analysis_type_label)
+        analysis_type_layout.addWidget(self.analysis_type_combo)
+        analysis_type_layout.addStretch()
+
+        layout.addWidget(analysis_type_widget)
 
         self.plot_sg_checkbox = QCheckBox("Plot SG")
         self.calc_sg_checkbox = QCheckBox("Calc SG")
@@ -200,30 +268,86 @@ class MainWindow(QMainWindow):
         self.get_params_checkbox = QCheckBox("Get Parameters")
         self.plot_masks_checkbox = QCheckBox("Plot Masks")
 
-        self.plot_sg_checkbox.stateChanged.connect(self.update_analysis_button_state)
-        self.calc_sg_checkbox.stateChanged.connect(self.update_analysis_button_state)
-        self.plot_coms_checkbox.stateChanged.connect(self.update_analysis_button_state)
-        self.get_params_checkbox.stateChanged.connect(self.update_analysis_button_state)
-        self.plot_masks_checkbox.stateChanged.connect(self.update_analysis_button_state)
+        self.plot_sg_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
+        self.calc_sg_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
+        self.plot_coms_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
+        self.get_params_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
+        self.plot_masks_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
 
-        self.run_analysis_button = QPushButton("Run Analysis")
-        self.run_analysis_button.setDisabled(True)
-        self.run_analysis_button.clicked.connect(self.run_analysis)
+        self.calibration_file_label = QLabel("Calibration File:")
+        self.calibration_file_input = QLineEdit()
+        self.calibration_file_input.textChanged.connect(self.update_throughput_analysis_button_state)
+        self.calibration_file_button = QPushButton("Choose Calibration File")
+        self.calibration_file_button.clicked.connect(self.choose_calibration_file)
 
-        layout.addWidget(self.analysis_type_label)
-        layout.addWidget(self.analysis_type_combo)
         layout.addWidget(self.plot_sg_checkbox)
         layout.addWidget(self.calc_sg_checkbox)
         layout.addWidget(self.plot_coms_checkbox)
         layout.addWidget(self.get_params_checkbox)
         layout.addWidget(self.plot_masks_checkbox)
+        layout.addWidget(self.calibration_file_label)
+        layout.addWidget(self.calibration_file_input)
+        layout.addWidget(self.calibration_file_button)
+
+        # Add a spacer item to push the run_analysis_button to the bottom
+        layout.addStretch()
+
+        self.run_analysis_button = QPushButton("Run Analysis")
+        self.run_analysis_button.setDisabled(True)
+        self.run_analysis_button.clicked.connect(self.run_analysis)
         layout.addWidget(self.run_analysis_button)
 
         self.analyse_tab.setLayout(layout)
+        self.update_analysis_tab()
 
-    def update_analysis_button_state(self):
-        if (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked() or self.plot_coms_checkbox.isChecked()
-                or self.get_params_checkbox.isChecked() or self.plot_masks_checkbox.isChecked()):
+    def update_throughput_analysis_button_state(self):
+        if self.inputs_locked and self.analysis_type_combo.currentText() == "Throughput" and self.calibration_file_input.text():
+            self.run_analysis_button.setDisabled(False)
+        else:
+            self.update_general_analysis_button_state()
+
+    def update_analysis_tab(self):
+        analysis_type = self.analysis_type_combo.currentText()
+        if analysis_type == "SG":
+            self.plot_sg_checkbox.show()
+            self.calc_sg_checkbox.show()
+            self.plot_coms_checkbox.show()
+            self.get_params_checkbox.show()
+            self.plot_masks_checkbox.show()
+            self.calibration_file_label.hide()
+            self.calibration_file_input.hide()
+            self.calibration_file_button.hide()
+        elif analysis_type == "FRD":
+            # Add options for FRD analysis here
+            self.plot_sg_checkbox.hide()
+            self.calc_sg_checkbox.hide()
+            self.plot_coms_checkbox.hide()
+            self.get_params_checkbox.hide()
+            self.plot_masks_checkbox.hide()
+            self.calibration_file_label.hide()
+            self.calibration_file_input.hide()
+            self.calibration_file_button.hide()
+        elif analysis_type == "Throughput":
+            self.plot_sg_checkbox.hide()
+            self.calc_sg_checkbox.hide()
+            self.plot_coms_checkbox.hide()
+            self.get_params_checkbox.hide()
+            self.plot_masks_checkbox.hide()
+            self.calibration_file_label.show()
+            self.calibration_file_input.show()
+            self.calibration_file_button.show()
+
+    def choose_calibration_file(self):
+        file_path = \
+        QFileDialog.getOpenFileName(self, "Select Calibration File", self.base_directory + "/Calibration", "JSON Files (*.json)")[0]
+        if file_path:
+            self.calibration_file_input.setText(file_path)
+
+    def update_general_analysis_button_state(self):
+        if self.inputs_locked and (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked()
+                                   or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
+                                   or self.plot_masks_checkbox.isChecked()
+        ):
             self.run_analysis_button.setDisabled(False)
         else:
             self.run_analysis_button.setDisabled(True)
@@ -260,10 +384,10 @@ class MainWindow(QMainWindow):
         self.check1.setChecked(False)
         self.check2.setChecked(False)
         self.check3.setChecked(False)
-        self.update_run_button_state()
+        self.update_measurement_button_state()
 
-    def update_run_button_state(self):
-        if self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked():
+    def update_measurement_button_state(self):
+        if self.inputs_locked and self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked():
             self.run_measurement_button.setDisabled(False)
         else:
             self.run_measurement_button.setDisabled(True)
@@ -283,22 +407,26 @@ class MainWindow(QMainWindow):
         measurement_type = self.measurement_type_combo.currentText()
         working_dir = self.working_dir_display.text()
 
-        self.save_fiber_data(working_dir, fiber_diameter, fiber_shape)
-
         self.experiment_running = True
         self.update_ui_state()
 
         threading.Thread(target=self.run_measurement_thread, args=(measurement_type, working_dir, fiber_diameter, fiber_shape)).start()
 
     def run_measurement_thread(self, measurement_type, working_dir, fiber_diameter, fiber_shape):
+        self.progress_signal.emit("Starting measurement...")
         # Call the appropriate measurement function
         if measurement_type == "SG":
+            working_dir = os.path.join(working_dir, "SG")
             self.measure_sg(working_dir, fiber_diameter, fiber_shape)
         elif measurement_type == "FRD":
+            working_dir = os.path.join(working_dir, "FRD")
             self.measure_frd(working_dir, fiber_diameter, fiber_shape)
         elif measurement_type == "Throughput":
+            working_dir = os.path.join(working_dir, "Throughput")
             self.measure_throughput(working_dir, fiber_diameter, fiber_shape)
 
+
+        self.progress_signal.emit("Measurement complete.")
         self.experiment_running = False
         self.update_ui_state()
 
@@ -311,38 +439,45 @@ class MainWindow(QMainWindow):
         working_dir = self.working_dir_display.text()
         fiber_diameter = int(self.fiber_diameter_input.text())
         fiber_shape = self.fiber_shape_combo.currentText()
+        calibration_file = self.calibration_file_input.text() if analysis_type == "Throughput" else None
 
         self.experiment_running = True
         self.update_ui_state()
 
-        threading.Thread(target=self.run_analysis_thread, args=(analysis_type, working_dir, fiber_diameter, fiber_shape)).start()
+        threading.Thread(target=self.run_analysis_thread,
+                         args=(analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_file)).start()
 
-    def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter, fiber_shape):
+    def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_file):
+        self.progress_signal.emit("Starting analysis...")
         if analysis_type == "SG":
             directory = os.path.join(working_dir, "SG")
             import sg_pipeline
             if self.plot_sg_checkbox.isChecked():
-                sg_pipeline.plot_sg_cool_like(directory, fiber_diameter)
+                sg_pipeline.plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.progress_signal)
 
             if self.calc_sg_checkbox.isChecked():
-                sg_pipeline.calc_sg(directory)
+                sg_pipeline.calc_sg(directory, progress_signal=self.progress_signal)
 
             if self.plot_coms_checkbox.isChecked():
-                sg_pipeline.plot_coms(directory)
+                sg_pipeline.plot_coms(directory, progress_signal=self.progress_signal)
 
             if self.get_params_checkbox.isChecked():
-                sg_pipeline.get_sg_params(directory, fiber_diameter, fiber_shape=fiber_shape)
+                sg_pipeline.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.progress_signal)
 
             if self.plot_masks_checkbox.isChecked():
-                sg_pipeline.plot_masks(directory, fiber_diameter)
+                sg_pipeline.plot_masks(directory, fiber_diameter, progress_signal=self.progress_signal)
 
         elif analysis_type == "FRD":
-            # Add corresponding functions for FRD analysis
-            pass
-        elif analysis_type == "Throughput":
-            # Add corresponding functions for Throughput analysis
-            pass
+            directory = os.path.join(working_dir, "FRD")
+            import analyse_main
+            analyse_main.run_from_existing_files(directory, progress_signal=self.progress_signal)
 
+        elif analysis_type == "Throughput":
+            directory = os.path.join(working_dir, "Throughput")
+            import throughput_analysis
+            throughput_analysis.main(directory, calibration_file)
+
+        self.progress_signal.emit("Analysis complete.")
         self.experiment_running = False
         self.update_ui_state()
 
@@ -357,22 +492,17 @@ class MainWindow(QMainWindow):
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
         import sg_pipeline
-        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter)  # Todo: Add number of positions as input
+        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.progress_signal)  # Todo: Add number of positions as input
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
+        import analyse_main
         self.show_message(f"Running FRD measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
+        analyse_main.main_measure(working_dir, progress_signal=self.progress_signal)
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running Throughput measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
-
-    def analyse_sg(self, working_dir):
-        self.show_message(f"Running SG analysis with working dir: {working_dir}")
-
-    def analyse_frd(self, working_dir):
-        self.show_message(f"Running FRD analysis with working dir: {working_dir}")
-
-    def analyse_throughput(self, working_dir):
-        self.show_message(f"Running Throughput analysis with working dir: {working_dir}")
+        import throughput_analysis
+        throughput_analysis.measure_all_filters(working_dir, progress_signal=self.progress_signal)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

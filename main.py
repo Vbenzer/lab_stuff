@@ -145,7 +145,7 @@ def update_progress_text(lines):
 
 def run_code_1(folder_path, folder_name):
     import analyse_main
-    analyse_main.main(folder_path, folder_name)
+    analyse_main.main_measure(folder_path, folder_name)
 
 def run_code_2(folder_path):
     import collimation_test

@@ -16,7 +16,8 @@ def main(project_folder:str, measurement_name:str):
         file_save_managment.write_progress(f"Starting analysis for filter: {i}")
 
         # Run the main analysis pipeline for each filter
-        analyse_main.main(project_folder, measurement_name, batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat")
+        analyse_main.main_measure(project_folder, measurement_name,
+                                  batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat")
 
         # Load the f-number and its error from the JSON file
         with open(project_folder+"/Measurements/f_number.json") as f:

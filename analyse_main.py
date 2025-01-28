@@ -23,7 +23,7 @@ def run_batch_file(batch_file_path:str):
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while running the batch file: {e}")
 
-def main(project_folder:str, measurement_name:str, batch_file_path:str="D:\stepper_motor\start_nina_with_fstop.bat"):
+def main_measure(project_folder:str, progress_signal=None, batch_file_path:str="D:\stepper_motor\start_nina_with_fstop.bat"):
     """
     Main function to run the analysis pipeline
     Args:
@@ -38,16 +38,22 @@ def main(project_folder:str, measurement_name:str, batch_file_path:str="D:\stepp
     # Write progress to file
     file_save_managment.write_progress("Starting N.I.N.A. with F-stop analysis sequence")
 
+    if progress_signal:
+        progress_signal.emit("Starting N.I.N.A. with F-stop analysis sequence")
+
     # Waiting for N.I.N.A. to complete
     flag_file = "D:/stepper_motor/nina_flag.txt" # Flag file created by N.I.N.A. when sequence is complete
     print("Waiting for N.I.N.A. to complete...")
+
+    if progress_signal:
+        progress_signal.emit("Waiting for N.I.N.A. to complete...")
 
     while not os.path.exists(flag_file):
         time.sleep(10)  # Check every 5 seconds
     print("N.I.N.A. completed!")
 
-    # Write progress to file
-    file_save_managment.write_progress("N.I.N.A. completed")
+    if progress_signal:
+        progress_signal.emit("N.I.N.A. completed!")
 
     # Clean up the flag file
     os.remove(flag_file)
@@ -64,10 +70,13 @@ def main(project_folder:str, measurement_name:str, batch_file_path:str="D:\stepp
     # Write progress to file
     file_save_managment.write_progress("N.I.N.A. closed, starting analysis pipeline")
 
-    # Run analysis pipeline
-    run_from_existing_files(project_folder, measurement_name)
+    if progress_signal:
+        progress_signal.emit("N.I.N.A. closed, starting analysis pipeline")
 
-def run_from_existing_files(project_folder:str, measurement_name:str):
+    """# Run analysis pipeline
+    run_from_existing_files(project_folder, measurement_name)"""
+
+def run_from_existing_files(project_folder:str, progress_signal=None):
     """
     Run the analysis pipeline using existing files in the project folder.
     Args:
@@ -87,14 +96,14 @@ def run_from_existing_files(project_folder:str, measurement_name:str):
 
     pos_values = [9.9, 5, 0]  # Values of the stepper motor positions (temporary(hopefully))
 
-    # Write progress to file
-    file_save_managment.write_progress("Creating master dark frame")
+    if progress_signal:
+        progress_signal.emit("Creating master dark frame")
 
     # Create master dark frame
     m_dark = image_reduction.create_master_dark(dark_folder, plot=False)
 
-    # Write progress to file
-    file_save_managment.write_progress("Reducing light frames")
+    if progress_signal:
+        progress_signal.emit("Reducing light frames")
 
     # Light frame reduction loop
     reduced_data = []
@@ -108,8 +117,8 @@ def run_from_existing_files(project_folder:str, measurement_name:str):
             red_file = image_reduction.reduce_image_with_dark(light_frame, m_dark, output_file, save=True)
             reduced_data.append(red_file)
 
-    # Write progress to file
-    file_save_managment.write_progress("Calculating radii")
+    if progress_signal:
+        progress_signal.emit("Calculating radii")
 
     # Radius calculation loop
     radii = image_analysation.calculate_multiple_radii(reduced_data, measurements_folder)
@@ -120,8 +129,8 @@ def run_from_existing_files(project_folder:str, measurement_name:str):
 
     print('radii:', radii, 'pos:', pos_values)
 
-    # Write progress to file
-    file_save_managment.write_progress("Calculating F-number")
+    if progress_signal:
+        progress_signal.emit("Calculating F-number")
 
     # Calculate F-number
     f_number, f_number_err = find_f_number.calculate_f_number(radii, pos_values, plot_regression=False,
