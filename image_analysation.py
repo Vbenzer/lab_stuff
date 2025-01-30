@@ -44,8 +44,9 @@ def LocateFocus(array, **kwargs):
     threshold = kwargs.get("threshold", None)
     if threshold is None:
         threshold = threshold_otsu(array)
-        threshold = max(threshold, 50)
+        #threshold = max(threshold, 50)     # Not sure if this is necessary
     binary = array > threshold
+
     filter = median(binary, disk(10))
     com = center_of_mass(binary)
     # temp1   = convex_hull_image(filter)

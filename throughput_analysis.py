@@ -27,20 +27,25 @@ def measure_single_filter(main_folder, filter_name, number_of_measurements):
 
     import power_meter_control as pmc
     # Make the measurement
-    pmc.make_measurement(main_folder, number_of_measurements, filter_name)
+    pmc.make_measurement(main_folder, number_of_measurements, filter_name + ".json")
 
-def measure_all_filters(main_folder, number_of_measurements=100, progress_signal=None):
+def measure_all_filters(main_folder, number_of_measurements=100, progress_signal=None, calibration:str=None):
     """
     Measure the transmission of all filters.
     Args:
         main_folder: Path to the main folder.
         number_of_measurements: Number of data points to take.
     """
-
+    import datetime
     import move_to_filter
 
+    if calibration:
+        date = datetime.datetime.now().strftime("%Y-%m-%d")
+        main_folder = "D:/Vincent/Calibration/" + date + "_" + calibration + "/"
+        os.makedirs(main_folder, exist_ok=False)
+
     # Make the measurement for all filters
-    filter_list = ["350", "400", "450", "500", "600", "700", "800"]
+    filter_list = ["400", "450", "500", "600", "700", "800"]
 
     for filter_name in filter_list:
         move_to_filter.move(filter_name)
@@ -55,7 +60,7 @@ def plot_throughput(main_folder:str, save:bool=False):
         main_folder: Path to the main folder.
     """
     # Load the data
-    filter_list = ["350", "400", "450", "500", "600", "700", "800"]
+    filter_list = ["400", "450", "500", "600", "700", "800"]
     data = {}
     with open(os.path.join(main_folder, "throughput.json"), 'r') as f:
         data = json.load(f)
@@ -80,15 +85,11 @@ def calculate_throughput(main_folder, calibration_file):
         main_folder: Path to the main folder.
 
     """
-    # Load the calibration data
-    with open(calibration_file, 'r') as f:
-        calibration_data = json.load(f)
-
-    # Calculate calibration quotient
-    calibration_quotient = np.mean(calibration_data["channel_1"]) / np.mean(calibration_data["channel_2"])
+    # Get calibration quotient
+    calibration_quotient = calc_cal_quotient(calibration_file)
 
     # Load the data
-    filter_list = ["350", "400", "450", "500", "600", "700", "800"]
+    filter_list = ["400", "450", "500", "600", "700", "800"]
     data = {}
 
     for filter_name in filter_list:
@@ -106,7 +107,40 @@ def calculate_throughput(main_folder, calibration_file):
     with open(throughput_file, 'w') as f:
         json.dump(throughput, f, indent=4)
 
+def calc_cal_quotient_folder(calibration_folder:str):
+    calibration_file_list = os.listdir(calibration_folder)
 
+    cal_qou_list = []
+
+    for file in calibration_file_list:
+        calibration_quotient = calc_cal_quotient(os.path.join(calibration_folder, file))
+        cal_qou_list.append(calibration_quotient)
+
+    # Write calibration quotient to json
+    cal_qou_file = os.path.join(calibration_folder, "calibration_quotient.json")
+    with open(cal_qou_file, 'w') as f:
+        json.dump(cal_qou_list, f, indent=4)
+
+def calc_cal_quotient(calibration_file:str, folder:bool=False):
+    # Load the calibration data
+
+    if folder:
+        calibration_file_list = os.listdir(calibration_file)
+        for file in calibration_file_list:
+            with open(file, 'r') as f:
+                calibration_data = json.load(f)
+
+    with open(calibration_file, 'r') as f:
+        calibration_data = json.load(f)
+
+    # Remove infinities from the data
+    calibration_data["channel_1"] = [x for x in calibration_data["channel_1"] if x != float("inf")]
+    calibration_data["channel_2"] = [x for x in calibration_data["channel_2"] if x != float("inf")]
+
+    # Calculate calibration quotient
+    calibration_quotient = np.mean(calibration_data["channel_1"]) / np.mean(calibration_data["channel_2"])
+
+    return calibration_quotient
 def create_test_data(main_folder):
     """
     Create test data for the throughput analysis.
@@ -118,7 +152,7 @@ def create_test_data(main_folder):
     import json
 
     # Create test data
-    for filter_name in ["350", "400", "450", "500", "600", "700", "800"]:
+    for filter_name in ["400", "450", "500", "600", "700", "800"]:
         data = {"channel_1": np.random.rand(100).tolist(),
                 "channel_2": np.random.rand(100).tolist()}
 
@@ -128,7 +162,11 @@ def create_test_data(main_folder):
 
 if __name__ == "__main__":
     main_folder = "D:/Vincent/Test3/"
-    calibration_file = "D:/Vincent/Calibration/calibration.json"
+    calibration_file = "D:/Vincent/Calibration/2025-01-27_calibration_1_good.json"
+    calibration_file = "D:/Vincent/Calibration/2025-01-30_calibration_450_6.json"
+    measure_all_filters(main_folder, calibration="calibration_1")
+    calc_cal_quotient_folder("D:/Vincent/Calibration/2025-01-30_calibration_1")
+    #print(calc_cal_qoutient(calibration_file))
     #measure_all_filters(main_folder)
     #calculate_throughput(main_folder, calibration_file)
     #plot_throughput(main_folder)

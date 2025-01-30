@@ -58,7 +58,7 @@ def make_measurement(main_folder, number_of_measurements, file_name):
 
 if __name__ == '__main__':
     date = datetime.datetime.now().strftime("%Y-%m-%d")
-    make_calibration_measurement(date + '_calibration_1_good.json')
+    make_calibration_measurement(date + '_calibration_450.json')
 
 
     """"print(power_meter.query(":POW1:VAL?"))

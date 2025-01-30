@@ -4,32 +4,43 @@ import matplotlib.pyplot as plt
 import file_save_managment
 import analyse_main
 
-def main(project_folder:str, measurement_name:str):
+def main_measure_all_filters(project_folder:str, progress_signal=None):
+    for i in range(2, 7):
+        # Create project subfolder for each filter
+        filter_folder = project_folder + f"/filter_{i}"
+
+        progress_signal.emit(f"Starting measurement for filter {i}")
+
+        # Run the main measuring pipeline for each filter
+        analyse_main.main_measure(filter_folder, progress_signal,
+                                  batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat")
+
+        progress_signal.emit(f"Measurement for filter {i} complete!")
+
+    print("All filters complete!")
+    progress_signal.emit("All filters complete!")
+
+def main_analyse_all_filters(project_folder:str, progress_signal=None):
     f_num = np.zeros(5)
     f_num_err = np.zeros(5)
 
-    for i in range(2,7):
+    for i in range(2, 7):
         # Create project subfolder for each filter
-        project_folder += f"/filter_{i}"
+        filter_folder = project_folder + f"/filter_{i}"
 
-        # Write progress to file
-        file_save_managment.write_progress(f"Starting analysis for filter: {i}")
+        progress_signal.emit(f"Starting analysis for filter {i}")
 
-        # Run the main analysis pipeline for each filter
-        analyse_main.main_measure(project_folder, measurement_name,
-                                  batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat")
+        analyse_main.run_from_existing_files(filter_folder, progress_signal)
+
+        progress_signal.emit(f"Analysis for filter {i} complete!")
 
         # Load the f-number and its error from the JSON file
-        with open(project_folder+"/Measurements/f_number.json") as f:
+        with open(filter_folder + "/Measurements/f_number.json") as f:
             data = json.load(f)
-            f_num[i-2] = data["f_number"]
-            f_num_err[i-2] = data["f_number_err"]
+            f_num[i - 2] = data["f_number"]
+            f_num_err[i - 2] = data["f_number_err"]
 
-        print(f"Filter {i} complete!")
-    print("All filters complete!")
-
-    # Write progress to file
-    file_save_managment.write_progress("All filters complete, forming final plot")
+    progress_signal.emit("All filters complete! Starting final plot.")
 
     # Input f-numbers
     input_f_num = np.array([6, 5, 4.5, 4, 3.5])
@@ -47,11 +58,16 @@ def main(project_folder:str, measurement_name:str):
     plt.ylabel("Output f/#")
     plt.title("Output f/# vs. Input f/#")
     plt.grid(True)
-    plt.savefig(project_folder+"/f_number_vs_input.png")
     plt.legend()
-    plt.show()
+    plt.savefig(project_folder + "/f_number_vs_input.png")
+    plt.close()
+    #plt.show()
+
+    # Set measurement name to last folder name of project folder
+    measurement_name = project_folder.split("/")[-1]
 
     file_save_managment.save_measurement_hdf5("D:/Vincent/frd_measurements.h5", measurement_name, f_num, f_num_err)
 
+
 if __name__ == "__main__":
-    main("D:/Vincent/fiber_full_frd_0", "fiber_full_frd_0")
+    exit()

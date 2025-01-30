@@ -371,10 +371,10 @@ def build_mask(image, radius:int, shape:str, mask_margin:int, position:tuple[int
     filled_mask = ndi.binary_fill_holes(mask)
 
     # Cut images for display
-    image_dis = cut_image_around_comk(image, com_of_mask, radius, 20)
-    best_match_dis = cut_image_around_comk(best_match, com_of_mask, radius, 20)
-    mask_dis = cut_image_around_comk(mask, com_of_mask, radius, 20)
-    filled_mask_dis = cut_image_around_comk(filled_mask, com_of_mask, radius, 20)
+    image_dis = cut_image_around_comk(image, com_of_mask, radius, 50)
+    best_match_dis = cut_image_around_comk(best_match, com_of_mask, radius, 50)
+    mask_dis = cut_image_around_comk(mask, com_of_mask, radius, 50)
+    filled_mask_dis = cut_image_around_comk(filled_mask, com_of_mask, radius, 50)
 
     if plot_mask or save_mask != "-1":
         fig, ax = plt.subplots(2, 2, figsize=(12, 6), sharey=True)
@@ -939,7 +939,7 @@ def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11):
 
     calc_sg(main_image_folder, plot_result=True)
 
-def capture_images_and_reduce(fiber_diameter:int, main_image_folder:str, progress_signal=None, number_of_positions:int=11):
+def capture_images_and_reduce(main_image_folder:str, fiber_diameter:int, progress_signal=None, number_of_positions:int=11):
     """
     Capture images and reduce them for the scrambling gain calculation
     Args:
@@ -1072,7 +1072,7 @@ def make_comparison_video(main_folder:str, fiber_diameter):
     fiber_exit_radius = int(fiber_diameter / 0.45 / 2)
 
     # Margin for better visuals
-    margin = 20
+    margin = 50
 
     # Create folders if they don't exist
     os.makedirs(video_prep_entrance_folder, exist_ok=True)
@@ -1159,7 +1159,7 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
     entrance_comk = parameters["entrance_comk"]
     exit_comk = parameters["exit_comk"]
 
-    margin = 20
+    margin = 50
 
     # Plot Mask outline overlaid on the image
     for i in range(len(entrance_mask_files)):
@@ -1473,7 +1473,7 @@ if __name__ == '__main__':
 
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
-    plot_sg_cool_like(main_folder, fiber_diameter)
+    #plot_sg_cool_like(main_folder, fiber_diameter)
     #make_shape("rectangle", 100)
 
     #angle, position, radius = match_shape(image, 96, "octagon", plot_all=False, plot_best=False)

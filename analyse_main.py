@@ -70,9 +70,6 @@ def main_measure(project_folder:str, progress_signal=None, batch_file_path:str="
     # Write progress to file
     file_save_managment.write_progress("N.I.N.A. closed, starting analysis pipeline")
 
-    if progress_signal:
-        progress_signal.emit("N.I.N.A. closed, starting analysis pipeline")
-
     """# Run analysis pipeline
     run_from_existing_files(project_folder, measurement_name)"""
 
