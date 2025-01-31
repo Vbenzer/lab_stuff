@@ -10,6 +10,9 @@ import sg_pipeline
 
 
 # Todo: Add feature to view plots in GUI
+# Todo: This would be cool: For more complex fiber shapes add a custom feature where the user can trace the fiber shape around the fiber image
+# the mask can then be scaled and used for the calculations
+
 class MainWindow(QMainWindow):
     progress_signal = pyqtSignal(str)
 
@@ -35,12 +38,23 @@ class MainWindow(QMainWindow):
         self.fiber_diameter_label = QLabel("Fiber Diameter (µm):")
         self.fiber_diameter_input = QLineEdit()
 
+        self.fiber_width_label = QLabel("Fiber Width (µm):")
+        self.fiber_width_input = QLineEdit()
+        self.fiber_width_label.hide()
+        self.fiber_width_input.hide()
+
+        self.fiber_height_label = QLabel("Fiber Height (µm):")
+        self.fiber_height_input = QLineEdit()
+        self.fiber_height_label.hide()
+        self.fiber_height_input.hide()
+
         self.fiber_length_label = QLabel("Fiber Length (m):")
         self.fiber_length_input = QLineEdit()
 
         self.fiber_shape_label = QLabel("Fiber Shape:")
         self.fiber_shape_combo = QComboBox()
-        self.fiber_shape_combo.addItems(["None", "circular", "octagon"])
+        self.fiber_shape_combo.addItems(["None", "circular", "octagonal", "rectangular"])
+        self.fiber_shape_combo.currentIndexChanged.connect(self.update_fiber_shape_inputs)
 
         self.working_dir_label = QLabel("Working Directory:")
         self.working_dir_display = QLabel("")
@@ -61,6 +75,14 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.fiber_name_input)
         self.layout.addWidget(self.fiber_diameter_label)
         self.layout.addWidget(self.fiber_diameter_input)
+
+        width_height_layout = QHBoxLayout()
+        width_height_layout.addWidget(self.fiber_width_label)
+        width_height_layout.addWidget(self.fiber_width_input)
+        width_height_layout.addWidget(self.fiber_height_label)
+        width_height_layout.addWidget(self.fiber_height_input)
+        self.layout.addLayout(width_height_layout)
+
         self.layout.addWidget(self.fiber_length_label)
         self.layout.addWidget(self.fiber_length_input)
         self.layout.addWidget(self.fiber_shape_label)
@@ -68,10 +90,15 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.working_dir_label)
         self.layout.addWidget(self.working_dir_display)
 
+        self.metadata_button = QPushButton("Add Metadata")
+        self.metadata_button.clicked.connect(self.access_metadata)
+        self.metadata_button.setDisabled(True)
+
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.choose_folder_button)
         button_layout.addWidget(self.lock_button)
         button_layout.addWidget(self.unlock_button)
+        button_layout.addWidget(self.metadata_button)
         self.layout.addLayout(button_layout)
 
         self.layout.addWidget(self.message_label)
@@ -98,6 +125,45 @@ class MainWindow(QMainWindow):
         self.progress_text_edit.hide()  # Initially hidden
 
         self.layout.addWidget(self.progress_text_edit)
+
+    def update_fiber_shape_inputs(self):
+        fiber_shape = self.fiber_shape_combo.currentText()
+        if fiber_shape == "rectangular":
+            self.fiber_diameter_label.hide()
+            self.fiber_diameter_input.hide()
+            self.fiber_width_label.show()
+            self.fiber_width_input.show()
+            self.fiber_height_label.show()
+            self.fiber_height_input.show()
+        else:
+            self.fiber_diameter_label.show()
+            self.fiber_diameter_input.show()
+            self.fiber_width_label.hide()
+            self.fiber_width_input.hide()
+            self.fiber_height_label.hide()
+            self.fiber_height_input.hide()
+
+    def access_metadata(self):
+        working_dir = self.working_dir_display.text()
+        if not working_dir:
+            self.show_message("Please select a working directory first.")
+            return
+
+        metadata_file_path = os.path.join(working_dir, "metadata.txt")
+        if not os.path.exists(metadata_file_path):
+            with open(metadata_file_path, "w") as file:
+                file.write("Metadata for the fiber measurements.\n")
+            self.metadata_button.setText("Access Metadata")
+        else:
+            os.startfile(metadata_file_path)
+
+    def update_metadata_button(self):
+        working_dir = self.working_dir_display.text()
+        metadata_file_path = os.path.join(working_dir, "metadata.txt")
+        if os.path.exists(metadata_file_path) and os.path.getsize(metadata_file_path) > 0:
+            self.metadata_button.setText("Access Metadata")
+        else:
+            self.metadata_button.setText("Add Metadata")
 
     def update_progress(self, message):
         if not self.progress_text_edit.isVisible():
@@ -130,7 +196,12 @@ class MainWindow(QMainWindow):
             if self.inputs_locked:
                 self.check_existing_measurements(folder)
 
-        self.lock_inputs()
+            # Check if all required inputs are filled before locking
+            if self.fiber_name_input.text() and (self.fiber_diameter_input.text() or (self.fiber_length_input.text() and self.fiber_width_input.text())) and self.fiber_length_input.text() and self.fiber_shape_combo.currentText() != "None":
+                self.lock_inputs()
+            else:
+                self.show_message("Please enter fiber name, diameter, length, and shape before locking inputs.")
+            self.update_metadata_button()
 
     def load_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
@@ -140,29 +211,35 @@ class MainWindow(QMainWindow):
                 fiber_diameter = data.get("fiber_diameter", "")
                 fiber_shape = data.get("fiber_shape", "")
                 fiber_length = data.get("fiber_length", "")
-                if fiber_diameter:
-                    self.fiber_diameter_input.setText(str(int(fiber_diameter)))
-                else:
-                    self.fiber_diameter_input.setText("")
+
                 if fiber_shape:
                     self.fiber_shape_combo.setCurrentText(fiber_shape)
                 else:
                     self.fiber_shape_combo.setCurrentText("None")
+                if fiber_shape == "rectangular" and isinstance(fiber_diameter, list) and len(fiber_diameter) == 2:
+                    self.fiber_width_input.setText(str(fiber_diameter[0]))
+                    self.fiber_height_input.setText(str(fiber_diameter[1]))
+                    self.fiber_diameter_input.setText("")
+                else:
+                    self.fiber_diameter_input.setText(str(fiber_diameter))
+                    self.fiber_width_input.setText("")
+                    self.fiber_height_input.setText("")
                 if fiber_length:
                     self.fiber_length_input.setText(str(fiber_length))
                 else:
                     self.fiber_length_input.setText("")
-
         else:
             self.fiber_diameter_input.setText("")
             self.fiber_shape_combo.setCurrentText("None")
             self.fiber_length_input.setText("")
+            self.fiber_width_input.setText("")
+            self.fiber_height_input.setText("")
 
     def save_fiber_data(self, folder, fiber_diameter, fiber_shape, fiber_length):
         file_path = os.path.join(folder, "fiber_data.json")
         with open(file_path, "w") as file:
             # noinspection PyTypeChecker
-            json.dump({"fiber_diameter": int(fiber_diameter), "fiber_shape": fiber_shape,
+            json.dump({"fiber_diameter": fiber_diameter, "fiber_shape": fiber_shape,
                        "fiber_length": fiber_length}, file)
 
     def show_message(self, message):
@@ -170,9 +247,13 @@ class MainWindow(QMainWindow):
 
     def lock_inputs(self):
         fiber_name = self.fiber_name_input.text()
-        fiber_diameter = self.fiber_diameter_input.text()
-        fiber_length = self.fiber_length_input.text()
         fiber_shape = self.fiber_shape_combo.currentText()
+        fiber_length = self.fiber_length_input.text()
+
+        if fiber_shape == "rectangular":
+            fiber_diameter = (int(self.fiber_width_input.text()), int(self.fiber_height_input.text()))
+        else:
+            fiber_diameter = int(self.fiber_diameter_input.text())
 
         if not fiber_name or not fiber_diameter or not fiber_shape or not fiber_length:
             self.show_message("Please enter fiber name, diameter, length and shape.")
@@ -186,6 +267,8 @@ class MainWindow(QMainWindow):
         self.fiber_diameter_input.setDisabled(True)
         self.fiber_length_input.setDisabled(True)
         self.fiber_shape_combo.setDisabled(True)
+        self.fiber_width_input.setDisabled(True)
+        self.fiber_height_input.setDisabled(True)
         self.inputs_locked = True
         self.show_message("Inputs locked.")
         self.run_measurement_button.setDisabled(True)
@@ -201,8 +284,14 @@ class MainWindow(QMainWindow):
         self.update_throughput_analysis_button_state()
         self.update_general_analysis_button_state()
 
+        self.metadata_button.setDisabled(False)
+        self.update_metadata_button()
+
         # Update the UI state
         self.update_ui_state()
+
+        self.unlock_button.setDisabled(False)
+        self.lock_button.setDisabled(True)
 
     def unlock_inputs(self):
         self.fiber_name_input.setDisabled(False)
@@ -214,6 +303,9 @@ class MainWindow(QMainWindow):
         self.run_measurement_button.setDisabled(True)
         self.run_analysis_button.setDisabled(True)
         self.existing_measurements_label.setText("")
+        self.metadata_button.setDisabled(True)
+        self.lock_button.setDisabled(False)
+        self.unlock_button.setDisabled(True)
 
     def init_measure_tab(self):
         layout = QVBoxLayout()
@@ -234,18 +326,21 @@ class MainWindow(QMainWindow):
 
         self.checklist_label = QLabel("Checklist:")
         self.checklist_label.setStyleSheet("font-weight: bold;")
-        self.check1 = QCheckBox("Check 1")
-        self.check2 = QCheckBox("Check 2")
-        self.check3 = QCheckBox("Check 3")
+        self.check1 = QCheckBox("Fiber in place: Output at small camera")
+        self.check2 = QCheckBox("Input spot in center and in focus. Exit camera fiber also in focus")
+        self.check3 = QCheckBox("ThorCam software closed")
+        self.check4 = QCheckBox("Lights Out")
 
         self.check1.stateChanged.connect(self.update_measurement_button_state)
         self.check2.stateChanged.connect(self.update_measurement_button_state)
         self.check3.stateChanged.connect(self.update_measurement_button_state)
+        self.check4.stateChanged.connect(self.update_measurement_button_state)
 
         layout.addWidget(self.checklist_label)
         layout.addWidget(self.check1)
         layout.addWidget(self.check2)
         layout.addWidget(self.check3)
+        layout.addWidget(self.check4)
 
         self.existing_measurements_label = QLabel("")
         self.existing_measurements_label.setStyleSheet("color: green; font-weight: bold;")
@@ -298,10 +393,10 @@ class MainWindow(QMainWindow):
         self.calibration_file_button = QPushButton("Choose Calibration File")
         self.calibration_file_button.clicked.connect(self.choose_calibration_file)
 
+        layout.addWidget(self.get_params_checkbox)
         layout.addWidget(self.plot_sg_checkbox)
         layout.addWidget(self.calc_sg_checkbox)
         layout.addWidget(self.plot_coms_checkbox)
-        layout.addWidget(self.get_params_checkbox)
         layout.addWidget(self.plot_masks_checkbox)
         layout.addWidget(self.make_video_checkbox)
         layout.addWidget(self.calibration_file_label)
@@ -391,13 +486,17 @@ class MainWindow(QMainWindow):
     def update_checklist(self):
         measurement_type = self.measurement_type_combo.currentText()
         if measurement_type == "SG":
-            self.check1.setText("Fiber in place")
-            self.check2.setText("Spot in center")
-            self.check3.setText("Spot in focus")
+            self.check1.setText("Fiber in place: Output at small camera")
+            self.check2.setText("Input spot in center and in focus. Exit camera fiber also in focus")
+            self.check3.setText("ThorCam software closed")
+            self.check4.setText("Lights Out")
+
         elif measurement_type == "FRD":
-            self.check1.setText("Fiber in place: Input and Output")
+            self.check1.setText("Fiber in place: Output at large camera")
             self.check2.setText("Spot on Fiber")
             self.check3.setText("Camera Enabled and max counts in range")
+            self.check4.setText("Lights Out")
+
         elif measurement_type == "Throughput":
             self.check1.setText("Throughput Check 1")
             self.check2.setText("Throughput Check 2")
@@ -406,10 +505,11 @@ class MainWindow(QMainWindow):
         self.check1.setChecked(False)
         self.check2.setChecked(False)
         self.check3.setChecked(False)
+        self.check4.setChecked(False)
         self.update_measurement_button_state()
 
     def update_measurement_button_state(self):
-        if self.inputs_locked and self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked():
+        if self.inputs_locked and self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked() and self.check4.isChecked():
             self.run_measurement_button.setDisabled(False)
         else:
             self.run_measurement_button.setDisabled(True)
@@ -419,12 +519,12 @@ class MainWindow(QMainWindow):
             self.show_message("Please lock the inputs before running the measurement.")
             return
 
-        if not (self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked()):
+        if not (self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked() and self.check4.isChecked()):
             self.show_message("Please complete all checklist items before running the measurement.")
             return
 
         fiber_name = self.fiber_name_input.text()
-        fiber_diameter = int(self.fiber_diameter_input.text())
+        fiber_diameter = self.fiber_diameter_input.text()
         fiber_shape = self.fiber_shape_combo.currentText()
         measurement_type = self.measurement_type_combo.currentText()
         working_dir = self.working_dir_display.text()
@@ -460,8 +560,13 @@ class MainWindow(QMainWindow):
 
         analysis_type = self.analysis_type_combo.currentText()
         working_dir = self.working_dir_display.text()
-        fiber_diameter = int(self.fiber_diameter_input.text())
         fiber_shape = self.fiber_shape_combo.currentText()
+
+        if fiber_shape == "rectangular":
+            fiber_diameter = (int(self.fiber_width_input.text()), int(self.fiber_height_input.text()))
+        else:
+            fiber_diameter = int(self.fiber_diameter_input.text())
+
         calibration_file = self.calibration_file_input.text() if analysis_type == "Throughput" else None
 
         self.experiment_running = True
@@ -475,6 +580,10 @@ class MainWindow(QMainWindow):
         if analysis_type == "SG":
             directory = os.path.join(working_dir, "SG")
             import sg_pipeline
+            if self.get_params_checkbox.isChecked():
+                print("Getting SG parameters with fiber diameter:", fiber_diameter, "and fiber shape:", fiber_shape)
+                sg_pipeline.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.progress_signal)
+
             if self.plot_sg_checkbox.isChecked():
                 sg_pipeline.plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.progress_signal)
 
@@ -483,9 +592,6 @@ class MainWindow(QMainWindow):
 
             if self.plot_coms_checkbox.isChecked():
                 sg_pipeline.plot_coms(directory, progress_signal=self.progress_signal)
-
-            if self.get_params_checkbox.isChecked():
-                sg_pipeline.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.progress_signal)
 
             if self.plot_masks_checkbox.isChecked():
                 sg_pipeline.plot_masks(directory, fiber_diameter, progress_signal=self.progress_signal)
@@ -512,7 +618,8 @@ class MainWindow(QMainWindow):
         self.choose_folder_button.setDisabled(not state)
         self.lock_button.setDisabled(not state)
         self.unlock_button.setDisabled(not state)
-        self.run_measurement_button.setDisabled(not state or not (self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked()))
+        self.run_measurement_button.setDisabled(not state or not (self.check1.isChecked() and self.check2.isChecked()
+                                                            and self.check3.isChecked() and self.check4.isChecked()))
         self.run_analysis_button.setDisabled(not state)
 
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):

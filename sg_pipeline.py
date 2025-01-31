@@ -59,7 +59,7 @@ def detect_circle(image:np.ndarray, fiber_px_radius:int):
 
     return cy[0], cx[0], radii[0]
 
-def make_shape(shape:str, radius:int):
+def make_shape(shape:str, radius:[int, tuple[int, int]]):
     """
     Create a shape for the fiber with the given radius.
     Args:
@@ -69,7 +69,7 @@ def make_shape(shape:str, radius:int):
     Returns:
         np.ndarray: The shape as a NumPy array.
     """
-    if shape == "circle":
+    if shape == "circular":
         mask = np.zeros((2 * radius, 2 * radius), dtype=bool)
         rr, cc = disk((radius, radius), radius)
         mask[rr, cc] = True
@@ -78,29 +78,33 @@ def make_shape(shape:str, radius:int):
         plt.show()"""
         return mask
 
-    if shape == "rectangle":
-        mask = np.zeros((2 * radius, 2 * radius), dtype=bool)
-        aspect_ratio = 5/3 # >1
+    if shape == "rectangular":
+        # Get values directly from radius tuple
+        width = radius[0]
+        height = radius[1]
 
-        # Radius defines the longer side of the rectangle
-        height = int(radius / aspect_ratio)
-        width = radius
+        # Create a fitting mask
+        bigger_side = max(width, height)
+        mask = np.zeros((4 * bigger_side, 4 * bigger_side), dtype=bool)
+        #aspect_ratio = 3 # >1
 
         # Calculate the start and end points of the rectangle
-        start_x = radius - width // 2
-        end_x = radius + width // 2
-        start_y = radius - height // 2
-        end_y = radius + height // 2
+        start_x = width
+        end_x = width * 3
+        start_y = height
+        end_y = height * 3
 
-        mask[start_y:end_y, start_x:end_x] = True
+        #print(start_x, end_x, start_y, end_y)
 
-        plt.imshow(mask, cmap='gray')
+        mask[start_x:end_x, start_y:end_y] = True
+
+        #plt.imshow(mask, cmap='gray')
         #plt.axis("off")
-        plt.show()
+        #plt.show()
 
         return mask
 
-    if shape == "octagon":
+    if shape == "octagonal":
         # Calculate side length from the radius
         size = 2 * radius * (np.sqrt(2) - 1)
 
@@ -189,11 +193,11 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
         plt.show()
 
     # Set the stop value for the rotation depending on the shape
-    if shape == "circle":
+    if shape == "circular":
         stop_value = 0
-    elif shape == "rectangle":
+    elif shape == "rectangular":
         stop_value = 180
-    elif shape == "octagon":
+    elif shape == "octagonal":
         stop_value = 45
     else:
         raise ValueError("Invalid shape. Must be either 'circle', 'rectangle' or 'octagon")
@@ -205,7 +209,12 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
     """if image.dtype != np.uint8:
         edges = (edges * 255).astype(np.uint8)"""
 
-    for r in range(radius - radius_threshold, radius + radius_threshold): # Iterate over different radii
+    for i in range( -radius_threshold, radius_threshold): # Iterate over different radii
+        if shape == "rectangular":
+            r = [radius[0] + i, radius[1] + i]
+        else:
+            r = radius + i
+
         # Create the octagon
         full_oct = make_shape(shape,r)
 
@@ -324,7 +333,7 @@ def binary_filtering(image:np.ndarray, plot:bool=False): # Unused
         fig.tight_layout()
         plt.show()
 
-def build_mask(image, radius:int, shape:str, mask_margin:int, position:tuple[int,int],
+def build_mask(image, radius:[int, tuple[int,int]], shape:str, mask_margin:int, position:tuple[int,int],
                angle:int, plot_mask:bool=False, save_mask:str="-1"):
     """
     Detect the given shape in the image.
@@ -341,7 +350,10 @@ def build_mask(image, radius:int, shape:str, mask_margin:int, position:tuple[int
         tuple: The center of mass of the detected
     """
 
-    radius = radius + mask_margin
+    if shape == "rectangular":
+        radius = [radius[0] + mask_margin, radius[1] + mask_margin]
+    else:
+        radius += mask_margin
 
     best_match = make_shape(shape, radius)
 
@@ -603,8 +615,12 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     os.makedirs(exit_mask_folder, exist_ok=True)
 
     # Calculate the radius of the fiber in pixels
-    fiber_px_radius_entrance = int(fiber_diameter / 0.526 / 2)
-    fiber_px_radius_exit = int(fiber_diameter / 0.45 / 2)
+    if fiber_shape == "rectangular":
+        fiber_px_radius_entrance = (int(fiber_diameter[0] / 0.526 / 2), int(fiber_diameter[1] / 0.526 / 2))
+        fiber_px_radius_exit = (int(fiber_diameter[0] / 0.45 / 2), int(fiber_diameter[1] / 0.45 / 2))
+    else:
+        fiber_px_radius_entrance = int(fiber_diameter / 0.526 / 2)
+        fiber_px_radius_exit = int(fiber_diameter / 0.45 / 2)
 
     # Get values of the entrance image
     entrance_image_files = [f for f in os.listdir(entrance_image_folder_reduced) if f.endswith('reduced.png')]
@@ -629,7 +645,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         mask_path = os.path.join(entrance_mask_folder, image_file.replace(".png", "_mask.png"))
 
         # Find center of fiber depending on the shape
-        if fiber_shape == "circle":
+        if fiber_shape == "circular":
             center_y, center_x, radius = detect_circle(image, fiber_px_radius_entrance)
 
             mask = create_circular_mask(image, (center_y, center_x), radius, plot_mask=plot_mask)
@@ -651,7 +667,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
 
             comk = [center_y, center_x]
 
-        elif fiber_shape == "octagon":
+        elif fiber_shape == "octagonal" or "rectangular":
 
             if save_mask:
                 save_mask = image_path.replace(".png", "_mask.png")
@@ -660,13 +676,13 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
 
             angle, position, radius = match_shape(image, fiber_px_radius_entrance, fiber_shape, plot_all=plot_all, plot_best=plot_best)
 
-            mask, comk = build_mask(image, radius, "octagon", 1, position, angle, plot_mask=plot_mask,
+            mask, comk = build_mask(image, radius, fiber_shape, 1, position, angle, plot_mask=plot_mask,
                                     save_mask=save_mask)
 
             io.imsave(mask_path, mask.astype(np.uint8) * 255)
 
         else:
-            raise ValueError("Invalid fiber shape. Must be either 'circle' or 'octagon'.")
+            raise ValueError("Invalid fiber shape. Must be either 'circular' or 'octagonal'.")
 
         entrance_comk.append(comk)
         entrance_radii.append(radius)
@@ -712,7 +728,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
 
             mask = create_circular_mask(image, (center_y, center_x), radius + mask_margin_circ, plot_mask=plot_mask)
 
-        elif fiber_shape == "octagon":
+        elif fiber_shape == "octagonal" or "rectangular":
 
             if save_mask:
                 save_mask = image_path.replace(".png", "_mask.png")
@@ -722,9 +738,9 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
             angle, position, radius = match_shape(image, fiber_px_radius_exit, fiber_shape, plot_all=plot_all,
                                                   plot_best=plot_best)
 
-            mask_margin_oct = grow_mask(image, position, radius, "octagon", angle=angle)
+            mask_margin = grow_mask(image, position, radius, fiber_shape, angle=angle)
 
-            mask, comk = build_mask(image, radius, "octagon", mask_margin_oct, position, angle, plot_mask=plot_mask,
+            mask, comk = build_mask(image, radius, fiber_shape, mask_margin, position, angle, plot_mask=plot_mask,
                                     save_mask=save_mask)
 
             radius = fiber_px_radius_exit
@@ -874,6 +890,10 @@ def calc_sg(main_folder:str, progress_signal=None, plot_result:bool=False):
     for i in range(len(entrance_distances)):
         if i == reference_index:
             continue
+        if isinstance(fiber_px_radius_entrance, (tuple, list)):
+            fiber_px_radius_entrance = fiber_px_radius_entrance[0]
+            fiber_px_radius_exit = fiber_px_radius_exit[0]
+
         scrambling_gain.append(
             (entrance_distances[i] / 2 * fiber_px_radius_entrance) / (exit_distances[i] / 2 * fiber_px_radius_exit))
 
@@ -939,7 +959,7 @@ def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11):
 
     calc_sg(main_image_folder, plot_result=True)
 
-def capture_images_and_reduce(main_image_folder:str, fiber_diameter:int, progress_signal=None, number_of_positions:int=11):
+def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None, number_of_positions:int=11):
     """
     Capture images and reduce them for the scrambling gain calculation
     Args:
@@ -1006,8 +1026,13 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:int, progres
     if progress_signal:
         progress_signal.emit("Darks Done! Taking lights.")
 
-    step_size = fiber_diameter / 1000 * 0.8 / (number_of_positions-1)  # Step size in mm
-    pos_left = 5 - fiber_diameter / 1000 * 0.8 / 2  # Leftmost position in mm
+    if fiber_shape == "rectangular":
+        min_size = min(fiber_diameter)
+        step_size = min_size / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
+        pos_left = 5 - min_size / 1000 * 0.8 / 2  # Leftmost position in mm
+    else:
+        step_size = fiber_diameter / 1000 * 0.8 / (number_of_positions-1)  # Step size in mm
+        pos_left = 5 - fiber_diameter / 1000 * 0.8 / 2  # Leftmost position in mm
 
     # Take images
     for i in range(number_of_positions):
@@ -1042,7 +1067,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:int, progres
     if progress_signal:
         progress_signal.emit("Images reduced!")
 
-def cut_image_around_comk(image, comk, fiber_px_radius, margin):
+def cut_image_around_comk(image, comk, fiber_px_radius:[int, tuple[int,int]], margin):
     """
     Cut the image around the center of the mask.
     Args:
@@ -1053,8 +1078,13 @@ def cut_image_around_comk(image, comk, fiber_px_radius, margin):
     Returns:
         np.ndarray: The cut image.
     """
-    cut_image = image[int(comk[0]) - fiber_px_radius - margin:int(comk[0])  + fiber_px_radius + margin,
-                int(comk[1]) - fiber_px_radius- margin:int(comk[1]) + fiber_px_radius + margin]
+    if isinstance(fiber_px_radius, (list, tuple)):
+        bigger_side = max(fiber_px_radius)
+        cut_image = image[int(comk[0]) - bigger_side - margin:int(comk[0]) + bigger_side + margin,
+                    int(comk[1]) - bigger_side - margin:int(comk[1]) + bigger_side + margin]
+    else:
+        cut_image = image[int(comk[0]) - fiber_px_radius - margin:int(comk[0])  + fiber_px_radius + margin,
+                    int(comk[1]) - fiber_px_radius- margin:int(comk[1]) + fiber_px_radius + margin]
 
     return cut_image
 
@@ -1068,8 +1098,12 @@ def make_comparison_video(main_folder:str, fiber_diameter):
     entrance_image_files = [f for f in os.listdir(entrance_image_folder) if f.endswith('reduced.png')]
     exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('reduced.png')]
 
-    fiber_input_radius = int(fiber_diameter / 0.526 / 2)
-    fiber_exit_radius = int(fiber_diameter / 0.45 / 2)
+    if isinstance(fiber_diameter, (tuple,list)):
+        fiber_input_radius = (int(fiber_diameter[0] / 0.526 / 2), int(fiber_diameter[1] / 0.526 / 2))
+        fiber_exit_radius = (int(fiber_diameter[0] / 0.45 / 2), int(fiber_diameter[1] / 0.45 / 2))
+    else:
+        fiber_input_radius = int(fiber_diameter / 0.526 / 2)
+        fiber_exit_radius = int(fiber_diameter / 0.45 / 2)
 
     # Margin for better visuals
     margin = 50
@@ -1134,8 +1168,13 @@ def make_comparison_video(main_folder:str, fiber_diameter):
     final_clip.write_videofile(video_name, fps=5)
 
 def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
-    fiber_input_radius = int(fiber_diameter / 0.526 / 2)
-    fiber_exit_radius = int(fiber_diameter / 0.45 / 2)
+    # Calculate the radius of the fiber in pixels
+    if isinstance(fiber_diameter, tuple):
+        fiber_input_radius = (int(fiber_diameter[0] / 0.526 / 2), int(fiber_diameter[1] / 0.526 / 2))
+        fiber_exit_radius = (int(fiber_diameter[0] / 0.45 / 2), int(fiber_diameter[1] / 0.45 / 2))
+    else:
+        fiber_input_radius = int(fiber_diameter / 0.526 / 2)
+        fiber_exit_radius = int(fiber_diameter / 0.45 / 2)
 
     entrance_mask_folder = os.path.join(main_folder, "entrance/mask")
     exit_mask_folder = os.path.join(main_folder, "exit/mask")
@@ -1173,7 +1212,11 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
         entrance_image_cut = cut_image_around_comk(entrance_image, comk, fiber_input_radius, margin)
 
         # Adjust com to the cut image
-        com = [com[0] - comk[0] + fiber_input_radius + margin, com[1] - comk[1] + fiber_input_radius + margin]
+        if isinstance(fiber_diameter, tuple):
+            bigger_side = max(fiber_input_radius)
+            com = [com[0] - comk[0] + bigger_side + margin, com[1] - comk[1] + bigger_side + margin]
+        else:
+            com = [com[0] - comk[0] + fiber_input_radius + margin, com[1] - comk[1] + fiber_input_radius + margin]
 
         # Cut the mask to the fiber size
         entrance_mask_cut = cut_image_around_comk(entrance_mask, comk, fiber_input_radius, margin)
@@ -1259,12 +1302,17 @@ def check_mask_flux_single(image:np.ndarray, mask:np.ndarray, plot:bool=False, p
 
     return np.max(image_wo_mask)
 
-def plot_sg_cool_like(main_folder:str, fiber_diameter:int, progress_signal=None):
+def plot_sg_cool_like(main_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None):
     """
     Plot the scrambling gain in a cool way.
     Args:
         main_folder: Path to the main folder containing the images.
+        fiber_diameter: Diameter of the fiber in micrometers.
+        progress_signal: Signal to send progress updates.
     """
+    plot_folder = os.path.join(main_folder, "plots")
+    os.makedirs(plot_folder, exist_ok=True)
+
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
         parameters = json.load(f)
 
@@ -1314,6 +1362,9 @@ def plot_sg_cool_like(main_folder:str, fiber_diameter:int, progress_signal=None)
     # Rebalance distances with zero as the reference index
     exit_distances_x = np.array(exit_distances_x) - exit_distances_x[reference_index]
     exit_distances_y = np.array(exit_distances_y) - exit_distances_y[reference_index]
+
+
+
     exit_distances = np.array(exit_distances) - exit_distances[reference_index]
 
     # Change unit to mu
@@ -1333,7 +1384,10 @@ def plot_sg_cool_like(main_folder:str, fiber_diameter:int, progress_signal=None)
     for i in range(len(entrance_distances)):
         if i == reference_index:
             continue
-        sgx = sg_func(entrance_distances[i], fiber_diameter, exit_distances_x[i], fiber_diameter)
+        if isinstance(fiber_diameter, list):
+            fiber_diameter = fiber_diameter[0]
+
+        sgx = sg_func(entrance_distances[i], fiber_diameter, exit_distances_x[i], fiber_diameter)   # Todo: ok if fiber_diameter is same for rectang fiber?
         sgy = sg_func(entrance_distances[i], fiber_diameter, exit_distances_y[i], fiber_diameter)
         sg = sg_func(entrance_distances[i], fiber_diameter, exit_distances[i], fiber_diameter)
         print(f"Scrambling gain {i}: {sgx}, {sgy}, {sg}")
@@ -1353,7 +1407,7 @@ def plot_sg_cool_like(main_folder:str, fiber_diameter:int, progress_signal=None)
     plt.ylabel('Exit COM distance [mu]')
     plt.xlabel('Entrance Spot displacement [mu]')
     plt.title('Scrambling Gain')
-    plt.savefig(os.path.join(main_folder, "plots/scrambling_gain_plot.png"))
+    plt.savefig(os.path.join(plot_folder, "scrambling_gain_plot.png"))
     plt.close()
 
     if progress_signal:
@@ -1365,27 +1419,32 @@ def grow_mask(image, position, radius, shape, angle = 0):
     center_y, center_x = position[0], position[1]
 
     for margin in range(0, 1000, 2):
-        if shape == "circle":
+        if shape == "circular":
             mask = create_circular_mask(image, (center_y, center_x), radius + margin, plot_mask=False)
 
-        elif shape == "octagon":
-            mask, comk = build_mask(image, radius, "octagon", margin, position, angle)
+        elif shape == "octagonal" or "rectangular":
+            mask, comk = build_mask(image, radius, shape, margin, position, angle)
 
         else:
-            raise ValueError("Invalid fiber shape. Must be either 'circle' or 'octagon'.")
+            raise ValueError("Invalid fiber shape. Must be either 'circular', 'octagonal' or 'rectangular'.")
 
 
         # Check flux outside mask
         max_flux = int(check_mask_flux_single(image, mask, plot=False, print_text=False))
 
+        if shape == "rectangular":
+            radius_1 = radius[0]
+        else:
+            radius_1 = radius
+
         if max_flux < min_flux:
             min_flux = max_flux
 
-        elif max_flux == min_flux:
+        elif max_flux == min_flux and max_flux < 10:
             print(f"Margin: {margin}, Flux: {max_flux}")
             return margin
 
-        elif radius + margin > 1.2 * radius:
+        elif radius_1 + margin > 1.2 * radius_1:
             print(f"Max margin reached. Margin: {margin}, Flux: {max_flux}")
             return margin
 
@@ -1473,8 +1532,9 @@ if __name__ == '__main__':
 
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
-    #plot_sg_cool_like(main_folder, fiber_diameter)
-    #make_shape("rectangle", 100)
+    main_folder = "D:/Vincent/40x120_300A/SG"
+    plot_sg_cool_like(main_folder, [40, 120])
+    #make_shape("rectangular", [40, 120])
 
     #angle, position, radius = match_shape(image, 96, "octagon", plot_all=False, plot_best=False)
     #grow_mask(image, position, radius, "octagon", angle)
