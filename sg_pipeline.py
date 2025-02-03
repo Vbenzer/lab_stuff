@@ -1490,6 +1490,156 @@ def plot_coms(main_folder, progress_signal=None):
     if progress_signal:
         progress_signal.emit("Plotting COMs done!")
 
+def sg_new(main_folder:str):
+
+    with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
+        parameters = json.load(f)
+
+    entrance_coms = parameters["entrance_coms"]
+    entrance_comk = parameters["entrance_comk"]
+    entrance_radii = parameters["entrance_radii"]
+    entrance_distances_x = parameters["entrance_distances_x"]
+    entrance_distances_y = parameters["entrance_distances_y"]
+    entrance_distances = parameters["entrance_distances"]
+    exit_coms = parameters["exit_coms"]
+    exit_comk = parameters["exit_comk"]
+    exit_radii = parameters["exit_radii"]
+    exit_distances_x = parameters["exit_distances_x"]
+    exit_distances_y = parameters["exit_distances_y"]
+    exit_distances = parameters["exit_distances"]
+    reference_index = parameters["reference_index"]
+    max_flux = parameters["max_flux"]
+    is_bad = parameters["bad_measurements"]
+    fiber_px_radius_entrance = parameters["fiber_px_radius_entrance"]
+    fiber_px_radius_exit = parameters["fiber_px_radius_exit"]
+
+    # Convert lists to NumPy arrays
+    entrance_coms = np.array(entrance_coms)
+    entrance_comk = np.array(entrance_comk)
+
+    exit_coms = np.array(exit_coms)
+    exit_comk = np.array(exit_comk)
+
+    dist_to_comk = np.zeros(len(entrance_coms))
+    for i in range(len(entrance_coms)):
+        dist_to_comk[i] = np.sqrt((entrance_coms[i][0] - entrance_comk[i][0]) ** 2 + (entrance_coms[i][1] - entrance_comk[i][1]) ** 2)
+
+    # Get reference index by finding the minimum distance to the comk
+    reference_index = np.argmin(dist_to_comk)
+
+    com_pos_on_mask_entrance = np.zeros((len(entrance_coms), 2))
+    com_pos_on_mask_exit = np.zeros((len(entrance_coms), 2))
+    for i in range(len(entrance_coms)):
+        com_pos_on_mask_entrance[i] = (entrance_coms[i][0] - entrance_comk[i][0], entrance_coms[i][1] - entrance_comk[i][1])
+        com_pos_on_mask_exit[i] = (exit_coms[i][0] - exit_comk[i][0], exit_coms[i][1] - exit_comk[i][1])
+
+
+    # Rescale values with reference index as zero
+    gauge_points_entrance = np.zeros((len(entrance_coms), 2))
+    gauge_distance_entrance = np.zeros(len(entrance_coms))
+    gauge_points_exit = np.zeros((len(entrance_coms), 2))
+    gauge_distance_exit = np.zeros(len(entrance_coms))
+    for i in range(len(entrance_coms)):
+        gauge_points_entrance[i] = (com_pos_on_mask_entrance[i][0] - com_pos_on_mask_entrance[reference_index][0], com_pos_on_mask_entrance[i][1] - com_pos_on_mask_entrance[reference_index][1])
+        gauge_points_exit[i] = (com_pos_on_mask_exit[i][0] - com_pos_on_mask_exit[reference_index][0], com_pos_on_mask_exit[i][1] - com_pos_on_mask_exit[reference_index][1])
+        gauge_distance_entrance[i] = np.sqrt(gauge_points_entrance[i][0] ** 2 + gauge_points_entrance[i][1] ** 2)
+        gauge_distance_exit[i] = np.sqrt(gauge_points_exit[i][0] ** 2 + gauge_points_exit[i][1] ** 2)
+
+    # Check for bad measurements
+    distance_avg = np.mean(gauge_distance_exit)
+    is_bad = []
+    for i in range(len(gauge_distance_exit)):
+        if gauge_distance_exit[i] > distance_avg * 2.5:
+            flag = True
+            is_bad.append(flag)
+        else:
+            flag = False
+            is_bad.append(flag)
+    print("Bad measurements:", is_bad, "Exit distances:", gauge_distance_exit)
+
+    # Remove bad measurements
+    gauge_distance_entrance = np.delete(gauge_distance_entrance, np.where(is_bad))
+    gauge_distance_exit = np.delete(gauge_distance_exit, np.where(is_bad))
+    gauge_points_entrance = np.delete(gauge_points_entrance, np.where(is_bad), axis=0)
+    gauge_points_exit = np.delete(gauge_points_exit, np.where(is_bad), axis=0)
+
+    # Move the reference index to new position
+    reference_index = np.argmin(gauge_distance_entrance)
+
+    # Calculate the scrambling gain
+    scrambling_gain = np.zeros(len(gauge_distance_entrance))
+    for i in range(len(gauge_distance_entrance)):
+        if i == reference_index:
+            continue
+
+        scrambling_gain[i] = gauge_distance_entrance[i] / gauge_distance_exit[i]
+
+    # Calculate sg_min
+    sg_min = np.max(gauge_distance_entrance)/np.max(gauge_distance_exit)
+    print(f"Scrambling gain min: {sg_min}")
+
+    # Remove reference index from the array
+    scrambling_gain = np.delete(scrambling_gain, reference_index)
+    print(scrambling_gain)
+
+    # Plot the results
+
+    plt.scatter(gauge_points_entrance[:, 1], gauge_points_entrance[:, 0], label='Entrance Gauged Points')
+    plt.scatter(0, 0, label='Reference Point', color='r')
+    plt.xlabel('X-distance [px]')
+    plt.ylabel('Y-distance [px]')
+    plt.title('Entrance Gauged Points')
+    plt.legend()
+    plt.savefig(os.path.join(main_folder, "plots/entrance_gauged_points.png"))
+    plt.close()
+
+    plt.scatter(gauge_points_exit[:, 1], gauge_points_exit[:, 0], label='Exit Gauged Points')
+    plt.scatter(0, 0, label='Reference Point', color='r')
+    plt.xlabel('X-distance [px]')
+    plt.ylabel('Y-distance [px]')
+    plt.title('Exit Gauged Points')
+    plt.legend()
+    plt.savefig(os.path.join(main_folder, "plots/exit_gauged_points.png"))
+    plt.close()
+
+    plt.scatter(gauge_distance_entrance, gauge_distance_exit, label='Gauged Distances')
+    plt.scatter(gauge_distance_entrance[reference_index], gauge_distance_exit[reference_index], label='Reference Point', color='r')
+    plt.xlabel('Entrance COM distance [px]')
+    plt.ylabel('Exit COM distance [px]')
+    plt.title('Gauged Distances')
+    plt.legend()
+    plt.savefig(os.path.join(main_folder, "plots/gauged_distances.png"))
+    plt.close()
+
+    def func(x, a, b):
+        return a * x + b
+
+    # Convert into mu
+    gauge_points_entrance = gauge_points_entrance * 0.526
+    gauge_points_exit = gauge_points_exit * 0.45
+
+    plt.figure(figsize=(10, 5), dpi=100)
+    plt.scatter(gauge_points_entrance[:,1], gauge_points_exit[:, 1], label='X movement')
+    plt.scatter(gauge_points_entrance[:,1], gauge_points_exit[:, 0], label='Y movement')
+    plt.scatter(gauge_points_entrance[:,1], gauge_distance_exit, label='Total movement')
+    plt.plot(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], 5e-4, 0), 'g--', label='SG 2000', alpha=1, linewidth=0.5)
+    plt.plot(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], -5e-4, 0), 'g--', alpha=1, linewidth=0.5)
+    plt.fill_between(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], 5e-4, 0), func(gauge_points_entrance[:,1], -5e-4, 0),
+                     color='g', alpha=0.3, hatch="//", zorder=2)
+    plt.plot(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], 2e-3, 0), 'r--', label='SG 500', alpha=1, linewidth=0.5)
+    plt.plot(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], -2e-3, 0), 'r--', alpha=1, linewidth=0.5)
+    plt.fill_between(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], 2e-3, 0), func(gauge_points_entrance[:,1], -2e-3, 0),
+                     color='r', alpha=0.2, hatch="/", zorder=1)
+    plt.legend()
+    plt.ylim(-0.08, 0.08)
+    plt.ylabel('Exit COM distance [mu]')
+    plt.xlabel('Entrance Spot displacement [mu]')
+    plt.title('Scrambling Gain')
+    plt.savefig(os.path.join(main_folder, "plots/scrambling_gain_plot.png"))
+    plt.close()
+
+
+
 if __name__ == '__main__':
 
     #image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean/exit/reduced/exit_cam_image000_reduced.png'
@@ -1533,7 +1683,8 @@ if __name__ == '__main__':
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
     main_folder = "D:/Vincent/40x120_300A/SG"
-    plot_sg_cool_like(main_folder, [40, 120])
+    sg_new(main_folder)
+    #plot_sg_cool_like(main_folder, [40, 120])
     #make_shape("rectangular", [40, 120])
 
     #angle, position, radius = match_shape(image, 96, "octagon", plot_all=False, plot_best=False)
@@ -1542,3 +1693,6 @@ if __name__ == '__main__':
     #match_shape(image, 89, "octagon", plot_all=True, plot_best=True)
 
     #plot_coms(main_folder)
+
+    #image_path = "D:/Vincent/oct_89_good/SG/exit/reduced/exit_cam_image000_reduced.png"
+    #image_to_fits(image_path)
