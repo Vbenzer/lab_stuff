@@ -195,10 +195,13 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
     # Set the stop value for the rotation depending on the shape
     if shape == "circular":
         stop_value = 0
+        num_rotations = 1
     elif shape == "rectangular":
         stop_value = 180
+        num_rotations = 50
     elif shape == "octagonal":
         stop_value = 45
+        num_rotations = 45
     else:
         raise ValueError("Invalid shape. Must be either 'circle', 'rectangle' or 'octagon")
 
@@ -694,7 +697,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
             # Write the center of the mask
             comk = [center_y, center_x]
 
-        elif fiber_shape == "octagonal" or "rectangular":
+        elif fiber_shape == "octagonal" or fiber_shape == "rectangular":
             # Save mask if save_mask is True
             if save_mask:
                 save_mask = image_path.replace(".png", "_mask.png")
@@ -753,16 +756,18 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         mask_path = os.path.join(exit_mask_folder, image_file.replace(".png", "_mask.png"))
 
         # Find center of fiber
-        if fiber_shape == "circle":
+        if fiber_shape == "circular":
+            print(fiber_px_radius_exit)
             center_y, center_x, radius = detect_circle(image, fiber_px_radius_exit)
             comk = [center_y, center_x]
 
-            mask_margin_circ = grow_mask(image, comk, radius, "circle")
+            mask_margin_circ = grow_mask(image, comk, radius, "circular")
 
             mask = create_circular_mask(image, (center_y, center_x), radius + mask_margin_circ, plot_mask=plot_mask)
 
-        elif fiber_shape == "octagonal" or "rectangular":
+            io.imsave(mask_path, mask.astype(np.uint8) * 255)
 
+        elif fiber_shape == "octagonal" or fiber_shape == "rectangular":
             if save_mask:
                 save_mask = image_path.replace(".png", "_mask.png")
             else:
@@ -1058,7 +1063,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         progress_signal.emit("Darks Done! Taking lights.")
 
     # Calculate the step size and leftmost position. Also handle rectangular case Todo: WIP
-    if fiber_shape == "rectangular":
+    if isinstance(fiber_diameter, tuple):
         min_size = min(fiber_diameter)
         step_size = min_size / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
         pos_left = 5 - min_size / 1000 * 0.8 / 2  # Leftmost position in mm
@@ -1314,7 +1319,7 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
 
     # Send progress signal
     if progress_signal:
-        progress_signal.emit("Masks plotted.")
+        progress_signal.emit("Entrance Masks plotted.")
 
     # Same for exit masks
     for i in range(len(exit_mask_files)):
@@ -1499,7 +1504,7 @@ def plot_sg_cool_like(main_folder:str, fiber_diameter:[int, tuple[int,int]], pro
     if progress_signal:
         progress_signal.emit("Scrambling gain plot done!")
 
-def grow_mask(image:np.ndarray, position:tuple[int,int], radius:[int, tuple[int,int]], shape:str, angle:int = 0):
+def grow_mask(image:np.ndarray, position:(tuple[int,int],list), radius:[int, tuple[int,int]], shape:str, angle:int = 0):
     """
     Grow the mask until the flux outside the mask is less than 10 and doesn't change for 2 iterations.
     Args:
@@ -1523,7 +1528,7 @@ def grow_mask(image:np.ndarray, position:tuple[int,int], radius:[int, tuple[int,
         if shape == "circular":
             mask = create_circular_mask(image, (center_y, center_x), radius + margin, plot_mask=False)
 
-        elif shape == "octagonal" or "rectangular":
+        elif shape == "octagonal" or shape == "rectangular":
             mask, comk = build_mask(image, radius, shape, margin, position, angle)
 
         else:
@@ -1532,7 +1537,7 @@ def grow_mask(image:np.ndarray, position:tuple[int,int], radius:[int, tuple[int,
         # Check flux outside mask
         max_flux = int(check_mask_flux_single(image, mask, plot=False, print_text=False))
 
-        if shape == "rectangular": # Handle rectangular case
+        if shape == "rectangular":  # Handle rectangular case
             radius_1 = radius[0]
         else:
             radius_1 = radius
@@ -1588,8 +1593,10 @@ def plot_coms(main_folder, progress_signal=None):
     plt.scatter(exit_coms[:, 1], exit_coms[:, 0], label="COMs")
     plt.scatter(exit_comk[:, 1], exit_comk[:, 0], label="COMKs")
     ref_com = exit_coms[reference_index]
+    # noinspection PyTypeChecker
     plt.text(ref_com[1], ref_com[0], "Ref", fontsize=8, ha='right')
     ref_comk = exit_comk[reference_index]
+    # noinspection PyTypeChecker
     plt.text(ref_comk[1], ref_comk[0], "Ref", fontsize=8, ha='right')
     plt.gca().get_yaxis().get_major_formatter().set_useOffset(False)
     plt.legend()
@@ -1683,6 +1690,11 @@ def sg_new(main_folder:str):
     sg_min = np.max(gauge_distance_entrance)/np.max(gauge_distance_exit)
     print(f"Scrambling gain min: {sg_min}")
 
+    # Write SG values to new json file
+    sg_parameters = {"scrambling_gain": scrambling_gain.tolist(), "sg_min": int(sg_min), "reference_index": int(reference_index)}
+    with open(os.path.join(main_folder, "scrambling_gain_new.json"), 'w') as f:
+        json.dump(sg_parameters, f)
+
     # Remove reference index from the array
     scrambling_gain = np.delete(scrambling_gain, reference_index)
     print(scrambling_gain)
@@ -1725,16 +1737,16 @@ def sg_new(main_folder:str):
 
     # Plot from "plot_sg_cool_like" function
     plt.figure(figsize=(10, 5), dpi=100)
-    plt.scatter(gauge_points_entrance[:,1], gauge_points_exit[:, 1], label='X movement')
-    plt.scatter(gauge_points_entrance[:,1], gauge_points_exit[:, 0], label='Y movement')
-    plt.scatter(gauge_points_entrance[:,1], gauge_distance_exit, label='Total movement')
-    plt.plot(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], 5e-4, 0), 'g--', label='SG 2000', alpha=1, linewidth=0.5)
-    plt.plot(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], -5e-4, 0), 'g--', alpha=1, linewidth=0.5)
-    plt.fill_between(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], 5e-4, 0), func(gauge_points_entrance[:,1], -5e-4, 0),
+    plt.scatter(gauge_points_entrance[:, 1], gauge_points_exit[:, 1], label='X movement')
+    plt.scatter(gauge_points_entrance[:, 1], gauge_points_exit[:, 0], label='Y movement')
+    plt.scatter(gauge_points_entrance[:, 1], gauge_distance_exit, label='Total movement')
+    plt.plot(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], 5e-4, 0), 'g--', label='SG 2000', alpha=1, linewidth=0.5)
+    plt.plot(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], -5e-4, 0), 'g--', alpha=1, linewidth=0.5)
+    plt.fill_between(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], 5e-4, 0), func(gauge_points_entrance[:,1], -5e-4, 0),
                      color='g', alpha=0.3, hatch="//", zorder=2)
-    plt.plot(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], 2e-3, 0), 'r--', label='SG 500', alpha=1, linewidth=0.5)
-    plt.plot(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], -2e-3, 0), 'r--', alpha=1, linewidth=0.5)
-    plt.fill_between(gauge_points_entrance[:,1], func(gauge_points_entrance[:,1], 2e-3, 0), func(gauge_points_entrance[:,1], -2e-3, 0),
+    plt.plot(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], 2e-3, 0), 'r--', label='SG 500', alpha=1, linewidth=0.5)
+    plt.plot(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], -2e-3, 0), 'r--', alpha=1, linewidth=0.5)
+    plt.fill_between(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], 2e-3, 0), func(gauge_points_entrance[:,1], -2e-3, 0),
                      color='r', alpha=0.2, hatch="/", zorder=1)
     plt.legend()
     plt.ylim(-0.08, 0.08)
@@ -1748,9 +1760,13 @@ def sg_new(main_folder:str):
 
 if __name__ == '__main__':
 
-    #image_path = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean/exit/reduced/exit_cam_image000_reduced.png'
+    image_path = 'D:/Vincent/FG050LGA/SG/exit/reduced/exit_cam_image000_reduced.png'
     #image = io.imread(image_path)
     #print(com_of_spot(image, plot=True))
+
+    #cy, cx, rad = detect_circle(image, 55)
+    #print(cy,cx,rad)
+    #filled_mask = create_circular_mask(image, (cy, cx), rad, plot_mask=True)
 
     #image_to_fits(image_path)
 
@@ -1759,12 +1775,12 @@ if __name__ == '__main__':
 
     #main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
-    #main_folder = "D:/Vincent/oct_89/SG"
+    main_folder = "D:/Vincent/FG050LGA/SG"
 
     # entrance_folder = "entrance_images"
     # exit_folder = "exit_images"
 
-    fiber_diameter = 89  # Value in micrometers
+    fiber_diameter = 55  # Value in micrometers
     """
     # Plot com movement for entrance images
     plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
@@ -1775,11 +1791,11 @@ if __name__ == '__main__':
     #entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
     #exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    #get_sg_params(main_folder, fiber_diameter, fiber_shape="octagon", plot_all=False, plot_result=True, plot_mask=True, save_mask=False)
+    #get_sg_params(main_folder, fiber_diameter, fiber_shape="circular", plot_all=True, plot_mask=True, save_mask=False)
 
     #calc_sg(main_folder, plot_result=True)
 
-    #plot_masks(main_folder, fiber_diameter)
+    plot_masks(main_folder, fiber_diameter)
 
     #_, _ = capture_images_and_reduce(fiber_diameter, 11)
 
@@ -1789,7 +1805,7 @@ if __name__ == '__main__':
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
     main_folder = "D:/Vincent/40x120_300A/SG"
-    sg_new(main_folder)
+    #sg_new(main_folder)
     #plot_sg_cool_like(main_folder, [40, 120])
     #make_shape("rectangular", [40, 120])
 

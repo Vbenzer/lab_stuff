@@ -532,7 +532,7 @@ class MainWindow(QMainWindow):
             return
 
         fiber_name = self.fiber_name_input.text()
-        fiber_diameter = self.fiber_diameter_input.text()
+        fiber_diameter = int(self.fiber_diameter_input.text())
         fiber_shape = self.fiber_shape_combo.currentText()
         measurement_type = self.measurement_type_combo.currentText()
         working_dir = self.working_dir_display.text()
