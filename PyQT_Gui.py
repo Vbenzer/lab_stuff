@@ -8,6 +8,23 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt6.QtCore import pyqtSignal
 import sg_pipeline
 
+def save_recent_folders(recent_folders, file_path='D:/Vincent/recent_folders.json'):
+    with open(file_path, 'w') as file:
+        json.dump(recent_folders, file)
+
+def load_recent_folders(file_path='D:/Vincent/recent_folders.json'):
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            return json.load(file)
+    return []
+
+def update_recent_folders(folder, recent_folders, max_recent=2):
+    if folder in recent_folders:
+        recent_folders.remove(folder)
+    recent_folders.insert(0, folder)
+    if len(recent_folders) > max_recent:
+        recent_folders.pop()
+    save_recent_folders(recent_folders)
 
 # Todo: Add feature to view plots in GUI
 # Todo: This would be cool: For more complex fiber shapes add a custom feature where the user can trace the fiber shape around the fiber image
@@ -31,29 +48,38 @@ class MainWindow(QMainWindow):
 
         self.layout = QVBoxLayout(self.central_widget)
 
+        self.init_ui()
+
+    def init_ui(self):
         self.fiber_name_label = QLabel("Fiber Name:")
         self.fiber_name_input = QLineEdit()
+        self.fiber_name_input.setFixedWidth(700)
         self.fiber_name_input.textChanged.connect(self.update_working_dir)
 
         self.fiber_diameter_label = QLabel("Fiber Diameter (µm):")
         self.fiber_diameter_input = QLineEdit()
+        self.fiber_diameter_input.setFixedWidth(700)
 
         self.fiber_width_label = QLabel("Fiber Width (µm):")
         self.fiber_width_input = QLineEdit()
+        self.fiber_width_input.setFixedWidth(290)
         self.fiber_width_label.hide()
         self.fiber_width_input.hide()
 
         self.fiber_height_label = QLabel("Fiber Height (µm):")
         self.fiber_height_input = QLineEdit()
+        self.fiber_height_input.setFixedWidth(290)
         self.fiber_height_label.hide()
         self.fiber_height_input.hide()
 
         self.fiber_length_label = QLabel("Fiber Length (m):")
         self.fiber_length_input = QLineEdit()
+        self.fiber_length_input.setFixedWidth(700)
 
         self.fiber_shape_label = QLabel("Fiber Shape:")
         self.fiber_shape_combo = QComboBox()
         self.fiber_shape_combo.addItems(["None", "circular", "octagonal", "rectangular"])
+        self.fiber_shape_combo.setFixedWidth(700)
         self.fiber_shape_combo.currentIndexChanged.connect(self.update_fiber_shape_inputs)
 
         self.working_dir_label = QLabel("Working Directory:")
@@ -62,46 +88,56 @@ class MainWindow(QMainWindow):
         self.choose_folder_button = QPushButton("Choose Existing Folder")
         self.choose_folder_button.clicked.connect(self.choose_folder)
 
+        self.metadata_button = QPushButton("Add Metadata")
+        self.metadata_button.clicked.connect(self.access_metadata)
+        self.metadata_button.setDisabled(True)
+
         self.lock_button = QPushButton("Lock In")
         self.lock_button.clicked.connect(self.lock_inputs)
 
         self.unlock_button = QPushButton("Unlock")
         self.unlock_button.clicked.connect(self.unlock_inputs)
+        self.unlock_button.setDisabled(True)
+
+        self.recent_folders = load_recent_folders()
+        self.recent_folders_combo = QComboBox()
+        self.update_recent_folders_combo()
+        self.recent_folders_combo.currentIndexChanged.connect(self.select_recent_folder)
 
         self.message_label = QLabel("")
         self.message_label.setStyleSheet("color: red; font-weight: bold;")
 
-        self.layout.addWidget(self.fiber_name_label)
-        self.layout.addWidget(self.fiber_name_input)
-        self.layout.addWidget(self.fiber_diameter_label)
-        self.layout.addWidget(self.fiber_diameter_input)
+        self.progress_label = QLabel("")
+        self.progress_text_edit = QTextEdit()
+        self.progress_text_edit.setReadOnly(True)
+        self.progress_text_edit.hide()  # Initially hidden
 
-        width_height_layout = QHBoxLayout()
-        width_height_layout.addWidget(self.fiber_width_label)
-        width_height_layout.addWidget(self.fiber_width_input)
-        width_height_layout.addWidget(self.fiber_height_label)
-        width_height_layout.addWidget(self.fiber_height_input)
-        self.layout.addLayout(width_height_layout)
+        self.layout.addLayout(self.create_hbox_layout(self.fiber_name_label, self.fiber_name_input))
+        self.layout.addLayout(self.create_hbox_layout(self.fiber_diameter_label, self.fiber_diameter_input))
 
-        self.layout.addWidget(self.fiber_length_label)
-        self.layout.addWidget(self.fiber_length_input)
-        self.layout.addWidget(self.fiber_shape_label)
-        self.layout.addWidget(self.fiber_shape_combo)
-        self.layout.addWidget(self.working_dir_label)
-        self.layout.addWidget(self.working_dir_display)
+        self.width_height_layout = QHBoxLayout()
+        self.width_height_layout.addWidget(self.fiber_width_label)
+        self.width_height_layout.addWidget(self.fiber_width_input)
+        self.width_height_layout.addWidget(self.fiber_height_label)
+        self.width_height_layout.addWidget(self.fiber_height_input)
+        self.layout.addLayout(self.width_height_layout)
 
-        self.metadata_button = QPushButton("Add Metadata")
-        self.metadata_button.clicked.connect(self.access_metadata)
-        self.metadata_button.setDisabled(True)
+        self.layout.addLayout(self.create_hbox_layout(self.fiber_length_label, self.fiber_length_input))
+        self.layout.addLayout(self.create_hbox_layout(self.fiber_shape_label, self.fiber_shape_combo))
+        self.layout.addLayout(self.create_hbox_layout(self.working_dir_label, self.working_dir_display))
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.choose_folder_button)
+        button_layout.addWidget(self.metadata_button)
         button_layout.addWidget(self.lock_button)
         button_layout.addWidget(self.unlock_button)
-        button_layout.addWidget(self.metadata_button)
         self.layout.addLayout(button_layout)
 
+        self.layout.addWidget(QLabel("Recent Folders:"))
+        self.layout.addWidget(self.recent_folders_combo)
         self.layout.addWidget(self.message_label)
+        self.layout.addWidget(self.progress_label)
+        self.layout.addWidget(self.progress_text_edit)
 
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
@@ -117,14 +153,25 @@ class MainWindow(QMainWindow):
 
         self.progress_signal.connect(self.update_progress)
 
-        self.progress_label = QLabel("")
-        self.layout.addWidget(self.progress_label)
+    def create_hbox_layout(self, label, widget):
+        hbox = QHBoxLayout()
+        hbox.addWidget(label)
+        hbox.addWidget(widget)
+        return hbox
 
-        self.progress_text_edit = QTextEdit()
-        self.progress_text_edit.setReadOnly(True)
-        self.progress_text_edit.hide()  # Initially hidden
+    def update_recent_folders_combo(self):
+        self.recent_folders_combo.clear()
+        self.recent_folders_combo.addItem("None Selected")
+        self.recent_folders_combo.addItems(self.recent_folders)
+        self.recent_folders_combo.setCurrentIndex(0)
 
-        self.layout.addWidget(self.progress_text_edit)
+    def select_recent_folder(self, index):
+        if 0 < index <= len(self.recent_folders):
+            folder = self.recent_folders[index - 1]
+            self.working_dir_display.setText(folder)
+            self.fiber_name_input.setText(os.path.basename(folder))
+            self.load_fiber_data(folder)
+            self.update_metadata_button()
 
     def update_fiber_shape_inputs(self):
         fiber_shape = self.fiber_shape_combo.currentText()
@@ -202,6 +249,8 @@ class MainWindow(QMainWindow):
             else:
                 self.show_message("Please enter fiber name, diameter, length, and shape before locking inputs.")
             self.update_metadata_button()
+            update_recent_folders(folder, self.recent_folders)
+            self.update_recent_folders_combo()
 
     def load_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
@@ -296,6 +345,8 @@ class MainWindow(QMainWindow):
     def unlock_inputs(self):
         self.fiber_name_input.setDisabled(False)
         self.fiber_diameter_input.setDisabled(False)
+        self.fiber_height_input.setDisabled(False)
+        self.fiber_width_input.setDisabled(False)
         self.fiber_length_input.setDisabled(False)
         self.fiber_shape_combo.setDisabled(False)
         self.inputs_locked = False
@@ -330,17 +381,20 @@ class MainWindow(QMainWindow):
         self.check2 = QCheckBox("Input spot in center and in focus. Exit camera fiber also in focus")
         self.check3 = QCheckBox("ThorCam software closed")
         self.check4 = QCheckBox("Lights Out")
+        self.check5 = QCheckBox("Check 5")
 
         self.check1.stateChanged.connect(self.update_measurement_button_state)
         self.check2.stateChanged.connect(self.update_measurement_button_state)
         self.check3.stateChanged.connect(self.update_measurement_button_state)
         self.check4.stateChanged.connect(self.update_measurement_button_state)
+        self.check5.stateChanged.connect(self.update_measurement_button_state)
 
         layout.addWidget(self.checklist_label)
         layout.addWidget(self.check1)
         layout.addWidget(self.check2)
         layout.addWidget(self.check3)
         layout.addWidget(self.check4)
+        layout.addWidget(self.check5)
 
         self.existing_measurements_label = QLabel("")
         self.existing_measurements_label.setStyleSheet("color: green; font-weight: bold;")
@@ -355,6 +409,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.run_measurement_button)
 
         self.measure_tab.setLayout(layout)
+
+        # Update the checklist based on the default selected measurement type
+        self.update_checklist()
 
     def init_analyse_tab(self):
         layout = QVBoxLayout()
@@ -497,18 +554,22 @@ class MainWindow(QMainWindow):
             self.check1.setText("Fiber in place: Output at small camera")
             self.check2.setText("Input spot in center and in focus. Exit camera fiber also in focus")
             self.check3.setText("ThorCam software closed")
-            self.check4.setText("Lights Out")
+            self.check4.setText("Motor controller plugged in")
+            self.check5.setText("Lights Out")
 
         elif measurement_type == "FRD":
             self.check1.setText("Fiber in place: Output at large camera")
             self.check2.setText("Spot on Fiber")
-            self.check3.setText("Camera Enabled and max counts in range")
-            self.check4.setText("Lights Out")
+            self.check3.setText("Camera enabled and max counts in range")
+            self.check4.setText("ThorCam/N.I.N.A closed")
+            self.check5.setText("Lights Out")
 
         elif measurement_type == "Throughput":
             self.check1.setText("Throughput Check 1")
             self.check2.setText("Throughput Check 2")
             self.check3.setText("Throughput Check 3")
+            self.check4.hide()
+            self.check5.hide()
 
         self.check1.setChecked(False)
         self.check2.setChecked(False)
@@ -608,7 +669,7 @@ class MainWindow(QMainWindow):
                 sg_pipeline.make_comparison_video(directory, fiber_diameter)
 
             if self.sg_new_checkbox.isChecked():
-                sg_pipeline.sg_new(directory)
+                sg_pipeline.sg_new(directory, progress_signal=self.progress_signal)
 
         elif analysis_type == "FRD":
             directory = os.path.join(working_dir, "FRD")

@@ -40,6 +40,8 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
             f_num[i - 2] = data["f_number"]
             f_num_err[i - 2] = data["f_number_err"]
 
+        progress_signal.emit(f"Filter {i} f-number: {f_num[i - 2]}")
+
     progress_signal.emit("All filters complete! Starting final plot.")
 
     # Input f-numbers

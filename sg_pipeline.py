@@ -137,7 +137,7 @@ def make_shape(shape:str, radius:[int, tuple[int, int]]):
         return mask
 
 def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, radius_threshold:int=5,
-                plot_all:bool=False):
+                plot_all:bool=False, best_params=None):
     """
     Match the given shape to the image using template matching.
     Args:
@@ -147,6 +147,7 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
         num_rotations: Number of rotations to try. Total angle depends on shape.
         radius_threshold: Threshold for the radius to try.
         plot_all: If True, plot all the steps.
+        best_params: If not None, use the best parameters for the template matching
 
     Returns:
         best_angle: The angle of the best match.
@@ -198,7 +199,7 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
         num_rotations = 1
     elif shape == "rectangular":
         stop_value = 180
-        num_rotations = 50
+        num_rotations = 180
     elif shape == "octagonal":
         stop_value = 45
         num_rotations = 45
@@ -212,42 +213,75 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
     """if image.dtype != np.uint8:
         edges = (edges * 255).astype(np.uint8)"""
 
-    for i in range( -radius_threshold, radius_threshold): # Iterate over different radii
+    if best_params is not None:
+        radius = best_params[0]
+        angle = best_params[1]
+
         if shape == "rectangular":
-            r = [radius[0] + i, radius[1] + i]
+            r = [radius[0], radius[1]]
         else:
-            r = radius + i
+            r = radius
 
-        # Create the octagon
-        full_oct = make_shape(shape,r)
+        # Create the shape
+        full_shape = make_shape(shape, r)
 
-        # Convert the full_oct to just the outline of the octagon
-        erode = morphology.binary_erosion(full_oct)
-        dilate = morphology.binary_dilation(full_oct)
+        # Convert the full_shape to just the outline of the shape
+        erode = morphology.binary_erosion(full_shape)
+        dilate = morphology.binary_dilation(full_shape)
 
         # Create the template
         template = np.logical_and(dilate, ~erode)
 
-        #print("Template shape:", template.shape)
+        # Rotate the template
+        rotated_template = transform.rotate(template, angle, resize=False)
+        rotated_template = (rotated_template * 255).astype(np.uint8)
 
-        for angle in np.linspace(0, stop_value, num_rotations, endpoint=False): # Iterate over different rotations
-            # Rotate the template
-            rotated_template = transform.rotate(template, angle, resize=False)
-            rotated_template = (rotated_template * 255).astype(np.uint8)
+        # Perform template matching
+        result = cv2.matchTemplate(uint8_mask, rotated_template, cv2.TM_CCOEFF_NORMED)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
 
-            #print("Rotated template shape:", rotated_template.shape)
+        best_match = rotated_template
+        best_angle = angle
+        best_location = max_loc
+        best_radius = r
 
-            # Perform template matching
-            result = cv2.matchTemplate(uint8_mask, rotated_template, cv2.TM_CCOEFF_NORMED)
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+    else:
+        for i in range( -radius_threshold, radius_threshold): # Iterate over different radii
+            if shape == "rectangular":
+                r = [radius[0] + i, radius[1] + i]
+            else:
+                r = radius + i
 
-            if max_val > best_score:
-                # Update the best match
-                best_score = max_val
-                best_match = rotated_template
-                best_angle = angle
-                best_location = max_loc
-                best_radius = r
+            # Create the shape
+            full_shape = make_shape(shape,r)
+
+            # Convert the full_shape to just the outline of the shape
+            erode = morphology.binary_erosion(full_shape)
+            dilate = morphology.binary_dilation(full_shape)
+
+            # Create the template
+            template = np.logical_and(dilate, ~erode)
+
+            #print("Template shape:", template.shape)
+
+            for angle in np.linspace(0, stop_value, num_rotations, endpoint=False): # Iterate over different rotations
+                # Rotate the template
+                rotated_template = transform.rotate(template, angle, resize=False)
+                rotated_template = (rotated_template * 255).astype(np.uint8)
+
+                #print("Rotated template shape:", rotated_template.shape)
+
+                # Perform template matching
+                result = cv2.matchTemplate(uint8_mask, rotated_template, cv2.TM_CCOEFF_NORMED)
+                min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+
+                if max_val > best_score:
+                    # Update the best match
+                    best_score = max_val
+                    best_match = rotated_template
+                    best_angle = angle
+                    best_location = max_loc
+                    best_radius = r
 
     if best_match is not None:
         # Calculate the center of mass of the best match
@@ -648,6 +682,9 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     if progress_signal:
         progress_signal.emit("Processing entrance images")
 
+    # Set best_params to None
+    best_params = None
+
     # Process entrance images
     for image_file in entrance_image_files:
         image_path = os.path.join(entrance_image_folder_reduced, image_file)
@@ -705,7 +742,10 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
                 save_mask = -1
 
             # Match the shape of the fiber
-            angle, position, radius = match_shape(image, fiber_px_radius_entrance, fiber_shape, plot_all=plot_all)
+            angle, position, radius = match_shape(image, fiber_px_radius_entrance, fiber_shape, plot_all=plot_all, best_params=best_params)
+
+            # Save best_params for next iteration to accelerate shape matching
+            best_params = [radius, angle]
 
             # Make the mask with the given parameters
             mask, comk = build_mask(image, radius, fiber_shape, 1, position, angle, plot_mask=plot_mask,
@@ -741,6 +781,9 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     if progress_signal:
         progress_signal.emit("Input images done. Processing exit images")
 
+    # Set best_params to None
+    best_params = None
+
     # Process exit images
     for image_file in exit_image_files:
         image_path = os.path.join(exit_image_folder_reduced, image_file)
@@ -773,7 +816,9 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
             else:
                 save_mask = -1
 
-            angle, position, radius = match_shape(image, fiber_px_radius_exit, fiber_shape, plot_all=plot_all)
+            angle, position, radius = match_shape(image, fiber_px_radius_exit, fiber_shape, plot_all=plot_all, best_params=best_params)
+
+            best_params = [radius, angle]
 
             # Calculate the margin to add to the radius to ensure minimal flux outside of mask
             mask_margin = grow_mask(image, position, radius, fiber_shape, angle=angle)
@@ -1608,11 +1653,12 @@ def plot_coms(main_folder, progress_signal=None):
     if progress_signal:
         progress_signal.emit("Plotting COMs done!")
 
-def sg_new(main_folder:str):
+def sg_new(main_folder:str, progress_signal=None):
     """
     Calculate the scrambling gain with the new method.
     Args:
         main_folder: Main folder of the fiber.
+        progress_signal: Progress signal to update the progress.
 
     """
     # Read parameters from json file
@@ -1689,6 +1735,9 @@ def sg_new(main_folder:str):
     # Calculate sg_min
     sg_min = np.max(gauge_distance_entrance)/np.max(gauge_distance_exit)
     print(f"Scrambling gain min: {sg_min}")
+
+    if progress_signal:
+        progress_signal.emit("Scrambling gain: " + str(sg_min))
 
     # Write SG values to new json file
     sg_parameters = {"scrambling_gain": scrambling_gain.tolist(), "sg_min": int(sg_min), "reference_index": int(reference_index)}
