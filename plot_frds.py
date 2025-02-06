@@ -35,7 +35,11 @@ def plot_measurements(filename):
     plt.figure(figsize=(10, 6))
 
     # Create a colormap to use for different measurements
-    colors = cm.plasma(np.linspace(0, .4, len(measurement_names)))
+    colors = cm.plasma(np.linspace(0, 1, len(measurement_names)))
+
+    # If exists remove "Vincent" from the measurement names
+    measurement_names = [name.replace("Vincent\\", "") for name in measurement_names]
+    measurement_names = [name.replace("\\FRD", "") for name in measurement_names]
 
     # Plot each measurement with error bars and dashed lines
     for i, measurement_name in enumerate(measurement_names):
@@ -56,6 +60,7 @@ def plot_measurements(filename):
 
     # Show the plot
     plt.grid(True)
+    plt.savefig("D:/Vincent/FRD_main_plot.png")
     plt.show()
 
 

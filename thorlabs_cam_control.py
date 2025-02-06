@@ -4,17 +4,19 @@ import time
 #from instrumental.drivers.cameras import uc480
 
 
-def take_image(cam_name:str, save_file_name:str, wait:bool=False):
+def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=None):
     cam = instrumental.instrument(cam_name, reopen_policy="new")
 
     cam.open()
-
-    if cam_name == "entrance_cam":
-        frame = cam.grab_image(exposure_time="1s")
-    elif cam_name == "exit_cam":
-        frame = cam.grab_image(exposure_time="10ms")
+    if exposure_time:
+        frame = cam.grab_image(exposure_time=exposure_time)
     else:
-        raise ValueError("Invalid camera name. Please provide a valid camera name.")
+        if cam_name == "entrance_cam":
+            frame = cam.grab_image(exposure_time="1s")
+        elif cam_name == "exit_cam":
+            frame = cam.grab_image(exposure_time="10ms")
+        else:
+            raise ValueError("Invalid camera name. Please provide a valid camera name.")
 
     if frame is not None:
         image = frame
@@ -25,7 +27,7 @@ def take_image(cam_name:str, save_file_name:str, wait:bool=False):
             cv2.imshow("Captured Image", image)
             cv2.waitKey(1)
             time.sleep(2)
-        cv2.imwrite(save_file_name, image) #Todo: Save as fits file and define save folder
+        cv2.imwrite(save_file_name, image)
     else:
         print("Failed to capture image.")
     cam.close()
@@ -58,5 +60,5 @@ cv2.destroyAllWindows()
 """
 
 if __name__ == "__main__":
-    take_image("exit_cam", "exit_image_test.png", wait=True)
-    take_image("entrance_cam", "entrance_image_test.png", wait=True)
+    take_image("entrance_cam", "image_test.png", wait=True, exposure_time="1ms")
+    #take_image("entrance_cam", "entrance_image_test.png", wait=True)

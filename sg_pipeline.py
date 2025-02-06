@@ -666,11 +666,11 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
 
     # Calculate the radius of the fiber in pixels. Also handle rectangular case
     if fiber_shape == "rectangular":
-        fiber_px_radius_entrance = (int(fiber_diameter[0] / 0.526 / 2), int(fiber_diameter[1] / 0.526 / 2))
-        fiber_px_radius_exit = (int(fiber_diameter[0] / 0.45 / 2), int(fiber_diameter[1] / 0.45 / 2))
+        fiber_px_radius_entrance = (int(fiber_diameter[0] / 0.5169363821005045 / 2), int(fiber_diameter[1] / 0.5169363821005045 / 2))
+        fiber_px_radius_exit = (int(fiber_diameter[0] / 0.439453125 / 2), int(fiber_diameter[1] / 0.439453125 / 2))
     else:
-        fiber_px_radius_entrance = int(fiber_diameter / 0.526 / 2)
-        fiber_px_radius_exit = int(fiber_diameter / 0.45 / 2)
+        fiber_px_radius_entrance = int(fiber_diameter / 0.5169363821005045 / 2)
+        fiber_px_radius_exit = int(fiber_diameter / 0.439453125 / 2)
 
     # Get values of the entrance image
     entrance_image_files = [f for f in os.listdir(entrance_image_folder_reduced) if f.endswith('reduced.png')]
@@ -1199,11 +1199,11 @@ def make_comparison_video(main_folder:str, fiber_diameter):
 
     # Calculate the radius of the fiber in pixels, also handle rectangular case
     if isinstance(fiber_diameter, (tuple,list)):
-        fiber_input_radius = (int(fiber_diameter[0] / 0.526 / 2), int(fiber_diameter[1] / 0.526 / 2))
-        fiber_exit_radius = (int(fiber_diameter[0] / 0.45 / 2), int(fiber_diameter[1] / 0.45 / 2))
+        fiber_input_radius = (int(fiber_diameter[0] / 0.5169363821005045 / 2), int(fiber_diameter[1] / 0.5169363821005045 / 2))
+        fiber_exit_radius = (int(fiber_diameter[0] / 0.439453125 / 2), int(fiber_diameter[1] / 0.439453125 / 2))
     else:
-        fiber_input_radius = int(fiber_diameter / 0.526 / 2)
-        fiber_exit_radius = int(fiber_diameter / 0.45 / 2)
+        fiber_input_radius = int(fiber_diameter / 0.5169363821005045 / 2)
+        fiber_exit_radius = int(fiber_diameter / 0.439453125 / 2)
 
     # Margin for better visuals
     margin = 50
@@ -1287,11 +1287,11 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
     """
     # Calculate the radius of the fiber in pixels, also handle rectangular case
     if isinstance(fiber_diameter, tuple):
-        fiber_input_radius = (int(fiber_diameter[0] / 0.526 / 2), int(fiber_diameter[1] / 0.526 / 2))
-        fiber_exit_radius = (int(fiber_diameter[0] / 0.45 / 2), int(fiber_diameter[1] / 0.45 / 2))
+        fiber_input_radius = (int(fiber_diameter[0] / 0.5169363821005045 / 2), int(fiber_diameter[1] / 0.5169363821005045 / 2))
+        fiber_exit_radius = (int(fiber_diameter[0] / 0.439453125 / 2), int(fiber_diameter[1] / 0.439453125 / 2))
     else:
-        fiber_input_radius = int(fiber_diameter / 0.526 / 2)
-        fiber_exit_radius = int(fiber_diameter / 0.45 / 2)
+        fiber_input_radius = int(fiber_diameter / 0.5169363821005045 / 2)
+        fiber_exit_radius = int(fiber_diameter / 0.439453125 / 2)
 
     # Define the image folders
     entrance_mask_folder = os.path.join(main_folder, "entrance/mask")
@@ -1503,10 +1503,10 @@ def plot_sg_cool_like(main_folder:str, fiber_diameter:[int, tuple[int,int]], pro
     exit_distances = np.array(exit_distances) - exit_distances[reference_index]
 
     # Change unit to mu
-    entrance_distances = np.array(entrance_distances) * 0.45
-    exit_distances = np.array(exit_distances) * 0.526
-    exit_distances_x = np.array(exit_distances_x) * 0.526
-    exit_distances_y = np.array(exit_distances_y) * 0.526
+    entrance_distances = np.array(entrance_distances) * 0.439453125
+    exit_distances = np.array(exit_distances) * 0.5169363821005045
+    exit_distances_x = np.array(exit_distances_x) * 0.5169363821005045
+    exit_distances_y = np.array(exit_distances_y) * 0.5169363821005045
 
     def func(x, a, b):
         return a * x + b
@@ -1781,8 +1781,8 @@ def sg_new(main_folder:str, progress_signal=None):
         return a * x + b
 
     # Convert into micrometers
-    gauge_points_entrance = gauge_points_entrance * 0.526
-    gauge_points_exit = gauge_points_exit * 0.45
+    gauge_points_entrance = gauge_points_entrance * 0.5169363821005045
+    gauge_points_exit = gauge_points_exit * 0.439453125
 
     # Plot from "plot_sg_cool_like" function
     plt.figure(figsize=(10, 5), dpi=100)
@@ -1805,7 +1805,100 @@ def sg_new(main_folder:str, progress_signal=None):
     plt.savefig(os.path.join(main_folder, "plots/scrambling_gain_plot.png"))
     plt.close()
 
+def calc_px_to_mu(image_folder, fiber_diameter, plot=False):
+    """
+    Calculates the px to mu ratio from images of fibers with known size.
+    Args:
 
+    Returns:
+
+    """
+    plot_folder = os.path.join(image_folder, "plots")
+    os.makedirs(plot_folder, exist_ok=True)
+
+    # Get image paths
+    images = [os.path.join(image_folder, f) for f in os.listdir(image_folder) if f.endswith('.png')]
+
+    px_to_mu_list = []
+
+    # Check if its entrance or exit by searching for the word entrance or exit in the folder path
+    if "entrance" in image_folder:
+        fiber_px_radius = fiber_diameter / 0.5169363821005045 / 2
+    elif "exit" in image_folder:
+        fiber_px_radius = fiber_diameter / 0.439453125 / 2
+    else:
+        raise ValueError("Invalid folder name. Must contain either 'entrance' or 'exit'.")
+
+    for image_path in images:
+        image = io.imread(image_path)
+
+        # Detect circle on image
+        cy, cx, rad = detect_circle(image, fiber_px_radius)
+
+        print(f"Radius: {rad}")
+
+        if plot:
+            plt.imshow(image, cmap='gray')
+            plt.scatter(cx, cy, color='r', s=0.5)
+            circle = plt.Circle((cx, cy), rad, color='r', fill=False)
+            plt.gca().add_artist(circle)
+            plt.savefig(os.path.join(plot_folder, os.path.basename(image_path).replace(".png", "_circle.png")))
+            plt.close()
+
+        # Calculate the px to mu ratio
+        px_to_mu = fiber_diameter / (2 * rad)
+
+        print(f"px_to_mu: {px_to_mu}")
+
+        px_to_mu_list.append(px_to_mu)
+
+    return px_to_mu_list
+
+def capture_px_mu_calib_images(main_folder, number_of_images):
+    import thorlabs_cam_control as tcc
+    os.makedirs(main_folder, exist_ok=False)
+    exit_folder = os.path.join(main_folder, "exit")
+    os.makedirs(exit_folder, exist_ok=True)
+    entrance_folder = os.path.join(main_folder, "entrance")
+    os.makedirs(entrance_folder, exist_ok=True)
+
+    # Capture images
+    print("Starting entrance image capture in 5s")
+    time.sleep(5)
+    for i in range(number_of_images):
+        tcc.take_image("entrance_cam", entrance_folder + f"/entrance_cam{i:03d}.png", exposure_time="1ms")
+
+    print("Starting exit image capture in 30s")
+    time.sleep(30)
+    for i in range(number_of_images):
+        tcc.take_image("exit_cam", exit_folder + f"/entrance_cam{i:03d}.png", exposure_time="1ms")
+def get_px_to_mu(main_folder, fiber_diameter):
+
+    entrance_folder = os.path.join(main_folder, "entrance")
+    exit_folder = os.path.join(main_folder, "exit")
+
+    px_to_mu_entrance = calc_px_to_mu(entrance_folder, fiber_diameter, plot=True)
+    px_to_mu_exit = calc_px_to_mu(exit_folder, fiber_diameter, plot=True)
+
+    # Convert to numpy arrays
+    px_to_mu_entrance = np.array(px_to_mu_entrance)
+    px_to_mu_exit = np.array(px_to_mu_exit)
+
+    # Calculate average px to mu ratio
+    px_to_mu_entrance_avg = np.mean(px_to_mu_entrance)
+    px_to_mu_exit_avg = np.mean(px_to_mu_exit)
+
+    print(f"Entrance px to mu ratios: {px_to_mu_entrance}")
+    print(f"Exit px to mu ratios: {px_to_mu_exit}")
+
+    print(f"Average px to mu ratio for entrance: {px_to_mu_entrance_avg}")
+    print(f"Average px to mu ratio for exit: {px_to_mu_exit_avg}")
+
+    # Write to json file
+    px_to_mu = {"px_to_mu_entrance": px_to_mu_entrance_avg, "px_to_mu_exit": px_to_mu_exit_avg}
+
+    with open(os.path.join(main_folder, "px_to_mu.json"), 'w') as f:
+        json.dump(px_to_mu, f)
 
 if __name__ == '__main__':
 
@@ -1819,8 +1912,8 @@ if __name__ == '__main__':
 
     #image_to_fits(image_path)
 
-    entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/entrance/reduced'
-    exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/exit/reduced'
+    #entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/entrance/reduced'
+    #exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/exit/reduced'
 
     #main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
@@ -1844,7 +1937,7 @@ if __name__ == '__main__':
 
     #calc_sg(main_folder, plot_result=True)
 
-    plot_masks(main_folder, fiber_diameter)
+    #plot_masks(main_folder, fiber_diameter)
 
     #_, _ = capture_images_and_reduce(fiber_diameter, 11)
 
@@ -1867,3 +1960,7 @@ if __name__ == '__main__':
 
     #image_path = "D:/Vincent/oct_89_good/SG/exit/reduced/exit_cam_image000_reduced.png"
     #image_to_fits(image_path)
+
+    """calib_folder = "D:/Vincent/fiber_size_calibration2"
+    capture_px_mu_calib_images(calib_folder, 10)
+    get_px_to_mu(calib_folder,  200)"""
