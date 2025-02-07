@@ -3,6 +3,8 @@ import os
 from skimage import io
 import json
 import matplotlib.pyplot as plt
+from astropy.io import fits
+import numpy as np
 import file_mover
 
 # Nina output folder
@@ -11,7 +13,12 @@ measurements_folder = "D:/Vincent/tip_tilt/"
 
 image_name = os.listdir(nina_output)[0]
 
-image = io.imread(nina_output + image_name)
+with fits.open(nina_output + image_name) as hdul:
+    image = hdul[0].data.astype(np.float32)  # Convert to float for precision
+
+"""# Plot image
+plt.imshow(image)
+plt.show()"""
 
 # Calculate radius
 trimmed_data = ia.cut_image(image, margin=500)  # Margin at 500 good for now
@@ -23,7 +30,7 @@ print("Calculating radius...")
 
 # Find aperture with encircled energy
 os.makedirs(measurements_folder, exist_ok=True)
-radius = ia.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=False, save_data=False)
+radius = ia.find_circle_radius(trimmed_data, com, ee_value=0.65, plot=False, save_data=False)
 
 print(f"Radius: {radius}")
 
