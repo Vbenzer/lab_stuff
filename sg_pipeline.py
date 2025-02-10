@@ -89,14 +89,16 @@ def make_shape(shape:str, radius:[int, tuple[int, int]]):
         #aspect_ratio = 3 # >1
 
         # Calculate the start and end points of the rectangle
-        start_x = width
-        end_x = width * 3
-        start_y = height
-        end_y = height * 3
+        start_x = bigger_side*2 - width
+        end_x = bigger_side*2 + width
+        start_y = bigger_side*2 - height
+        end_y = bigger_side*2 + height
 
         #print(start_x, end_x, start_y, end_y)
 
         mask[start_x:end_x, start_y:end_y] = True
+
+        #print(mask.shape)
 
         #plt.imshow(mask, cmap='gray')
         #plt.axis("off")
@@ -302,6 +304,12 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
             pad_x_1 = image.shape[0] - (com_position[1] + plot_best.shape[1] // 2)
             pad_y_0 = com_position[0] - plot_best.shape[0] // 2
             pad_y_1 = image.shape[1] - (com_position[0] + plot_best.shape[0] // 2)
+
+            # Plot best match
+            plt.figure(figsize=(12.80, 10.24))
+            plt.imshow(best_match, cmap='gray')
+            plt.title("Best Match")
+            plt.show()
 
             # Pad the best match to fit the image while getting it on position
             plot_best = np.pad(plot_best, ((int(pad_x_0), int(pad_x_1)), (int(pad_y_0), int(pad_y_1)),), mode='constant')
@@ -784,6 +792,8 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     # Set best_params to None
     best_params = None
 
+    mask = None
+
     # Process exit images
     for image_file in exit_image_files:
         image_path = os.path.join(exit_image_folder_reduced, image_file)
@@ -798,40 +808,38 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
 
         mask_path = os.path.join(exit_mask_folder, image_file.replace(".png", "_mask.png"))
 
-        # Find center of fiber
-        if fiber_shape == "circular":
-            print(fiber_px_radius_exit)
-            center_y, center_x, radius = detect_circle(image, fiber_px_radius_exit)
-            comk = [center_y, center_x]
+        if mask is None:
+            # Find center of fiber
+            if fiber_shape == "circular":
+                center_y, center_x, radius = detect_circle(image, fiber_px_radius_exit)
+                comk = [center_y, center_x]
 
-            mask_margin_circ = grow_mask(image, comk, radius, "circular")
+                mask_margin_circ = grow_mask(image, comk, radius, "circular")
 
-            mask = create_circular_mask(image, (center_y, center_x), radius + mask_margin_circ, plot_mask=plot_mask)
+                mask = create_circular_mask(image, (center_y, center_x), radius + mask_margin_circ, plot_mask=plot_mask)
 
-            io.imsave(mask_path, mask.astype(np.uint8) * 255)
+                io.imsave(mask_path, mask.astype(np.uint8) * 255)
 
-        elif fiber_shape == "octagonal" or fiber_shape == "rectangular":
-            if save_mask:
-                save_mask = image_path.replace(".png", "_mask.png")
+            elif fiber_shape == "octagonal" or fiber_shape == "rectangular":
+                if save_mask:
+                    save_mask = image_path.replace(".png", "_mask.png")
+                else:
+                    save_mask = -1
+
+                angle, position, radius = match_shape(image, fiber_px_radius_exit, fiber_shape, plot_all=plot_all)
+
+                # Calculate the margin to add to the radius to ensure minimal flux outside of mask
+                mask_margin = grow_mask(image, position, radius, fiber_shape, angle=angle)
+
+                mask, comk = build_mask(image, radius, fiber_shape, mask_margin, position, angle, plot_mask=plot_mask,
+                                        save_mask=save_mask)
+
+                radius = fiber_px_radius_exit
+
             else:
-                save_mask = -1
+                raise ValueError("Invalid fiber shape. Must be either 'circle' or 'octagon'.")
 
-            angle, position, radius = match_shape(image, fiber_px_radius_exit, fiber_shape, plot_all=plot_all, best_params=best_params)
-
-            best_params = [radius, angle]
-
-            # Calculate the margin to add to the radius to ensure minimal flux outside of mask
-            mask_margin = grow_mask(image, position, radius, fiber_shape, angle=angle)
-
-            mask, comk = build_mask(image, radius, fiber_shape, mask_margin, position, angle, plot_mask=plot_mask,
-                                    save_mask=save_mask)
-
-            radius = fiber_px_radius_exit
-
-            io.imsave(mask_path, mask.astype(np.uint8) * 255)
-
-        else:
-            raise ValueError("Invalid fiber shape. Must be either 'circle' or 'octagon'.")
+        io.imsave(mask_path, mask.astype(np.uint8) * 255)
 
         exit_comk.append(comk)
         exit_radii.append(radius)
@@ -1260,12 +1268,14 @@ def make_comparison_video(main_folder:str, fiber_diameter):
     # Create entrance video
     entrance_video_path = os.path.join(video_prep_entrance_folder, "entrance_video.mp4")
     imageio.mimsave(entrance_video_path,
-                    [io.imread(os.path.join(video_prep_entrance_folder, f)) for f in video_entrance_files], fps=5)
+                    [io.imread(os.path.join(video_prep_entrance_folder, f)) for f in video_entrance_files],
+                    fps=5, quality = 10)
 
     # Create exit video
     exit_video_path = os.path.join(video_prep_exit_folder, "exit_video.mp4")
     imageio.mimsave(exit_video_path,
-                    [io.imread(os.path.join(video_prep_exit_folder, f)) for f in video_exit_files], fps=5)
+                    [io.imread(os.path.join(video_prep_exit_folder, f)) for f in video_exit_files],
+                    fps=5, quality = 10)
 
     # Load videos
     entrance_clip = VideoFileClip(entrance_video_path)
@@ -1273,7 +1283,7 @@ def make_comparison_video(main_folder:str, fiber_diameter):
 
     # Combine videos side by side
     final_clip = clips_array([[entrance_clip, exit_clip]])
-    final_clip.write_videofile(video_name, fps=5)
+    final_clip.write_videofile(video_name, fps=5, codec='libx264', bitrate='100000k')
 
 def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
     """
@@ -1922,7 +1932,7 @@ if __name__ == '__main__':
     # entrance_folder = "entrance_images"
     # exit_folder = "exit_images"
 
-    fiber_diameter = 55  # Value in micrometers
+    fiber_diameter = [40, 120]  # Value in micrometers
     """
     # Plot com movement for entrance images
     plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
@@ -1946,7 +1956,9 @@ if __name__ == '__main__':
 
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
-    main_folder = "D:/Vincent/40x120_300A/SG"
+    main_folder = "D:/Vincent/40x120_300A_test/SG"
+    make_comparison_video(main_folder, fiber_diameter)
+    #get_sg_params(main_folder, fiber_diameter, fiber_shape="rectangular", plot_all=True, plot_mask=True, save_mask=False)
     #sg_new(main_folder)
     #plot_sg_cool_like(main_folder, [40, 120])
     #make_shape("rectangular", [40, 120])
