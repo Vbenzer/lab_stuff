@@ -793,6 +793,8 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     best_params = None
 
     mask = None
+    comk = None
+    radius = None
 
     # Process exit images
     for image_file in exit_image_files:
