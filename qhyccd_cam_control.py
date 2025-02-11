@@ -142,7 +142,8 @@ for index in range(readmodenum.value):
 
 ret = qhyccddll.SetQHYCCDReadMode(camhandle, 0)
 
-ret = qhyccddll.SetQHYCCDStreamMode(camhandle, 0)
+ret = qhyccddll.SetQHYCCDStreamMode(camhandle, 1)
+print("SetQHYCCDStreamMode() ret =", ret)
 
 ret = qhyccddll.InitQHYCCD(camhandle)
 
@@ -157,6 +158,7 @@ imageH = ctypes.c_uint32()
 pixelW = ctypes.c_double()
 pixelH = ctypes.c_double()
 imageB = ctypes.c_uint32()
+
 ret = qhyccddll.GetQHYCCDChipInfo(camhandle, byref(chipW), byref(chipH), byref(imageW), byref(imageH), byref(pixelW),
                                   byref(pixelH), byref(imageB))
 
@@ -181,35 +183,65 @@ imgdata = (ctypes.c_uint8 * length)()
 length = imageW.value * imageH.value
 imgdata_raw8 = (ctypes.c_uint8 * length)()
 
-ret = qhyccddll.ExpQHYCCDSingleFrame(camhandle)
+import time
 
-ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)
+"""count = 0
+while count < 100:
+    ret = qhyccddll.ExpQHYCCDSingleFrame(camhandle)
+    ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)
+    ret = qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
+    img = np.frombuffer(imgdata_raw8, dtype=np.uint8).reshape((h.value, w.value))
+    cv2.namedWindow("Show", 0)
+    cv2.resizeWindow("Show", w.value//10, h.value//10)  # Set the window size to 800x600
+    cv2.imshow("Show", img)
+    cv2.waitKey(1)
+    count += 1
+    print(count)
 
-ret = qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
+    # Record the end time
+    end_time = time.time()
+
+    # Calculate the time difference
+    time_diff = end_time - start_time
+
+    # Calculate FPS
+    fps = count / time_diff
+    print(f"FPS: {fps:.2f}")"""
 
 
-# type = cv2.CV_16UC1
-img = np.frombuffer(imgdata_raw8, dtype=np.uint8).reshape((h.value, w.value))
+def capture_frames():
+    count = 0
+    start_time = time.time()
+    while count < 10:
+        #qhyccddll.ExpQHYCCDSingleFrame(camhandle)
+        ret = qhyccddll.GetQHYCCDLiveFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)     # This takes long if not live
+        if ret != 0:
+            continue
 
-cv2.namedWindow("Show", 0)
-cv2.resizeWindow("Show", w.value//10, h.value//10)  # Set the window size to 800x600
-cv2.imshow("Show", img)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+        qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
+        img = np.frombuffer(imgdata_raw8, dtype=np.uint8).reshape((h.value, w.value))
+        cv2.namedWindow("Show", 0)
+        cv2.resizeWindow("Show", w.value // 10, h.value // 10)  # Set the window size to 800x600
+        cv2.imshow("Show", img)
+        cv2.waitKey(1)
+        count += 1
+        print(count)
 
+        # Record the end time
+        end_time = time.time()
 
-ret = qhyccddll.ExpQHYCCDSingleFrame(camhandle)
+        # Calculate the time difference
+        time_diff = end_time - start_time
 
-ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)
+        # Calculate FPS
+        fps = count / time_diff
+        print(f"FPS: {fps:.2f}")
 
-ret = qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
+ret = qhyccddll.BeginQHYCCDLive(camhandle)
+print("BeginQHYCCDLive() ret =", ret)
+capture_frames()
+qhyccddll.StopQHYCCDLive(camhandle)
 
-img = np.frombuffer(imgdata_raw8, dtype=np.uint8).reshape((h.value, w.value))
-
-cv2.namedWindow("Show", 0)
-cv2.resizeWindow("Show", w.value//10, h.value//10)  # Set the window size to 800x600
-cv2.imshow("Show", img)
-cv2.waitKey(0)
 cv2.destroyAllWindows()
 
 ret = qhyccddll.CloseQHYCCD(camhandle)

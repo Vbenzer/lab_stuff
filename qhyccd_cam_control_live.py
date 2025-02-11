@@ -212,6 +212,7 @@ cv2.namedWindow("Show", 0)
 count = 0
 while count < 100:
     ret = qhyccddll.GetQHYCCDLiveFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)
+    print(ret)
     if ret == 0:
         count = count + 1
         print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,
@@ -221,7 +222,7 @@ while count < 100:
             ret = qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw, w.value, h.value, 0, 65535)
             img = np.frombuffer(imgdata_raw, dtype=np.uint8).reshape((h.value, w.value))
         elif b.value == 8 and c.value == 1:
-            img = np.frombuffer(imgdata, dtype=np.uint8).reshape((h.value, w.value))
+            img = np.frombuffer(imgdata, dtype=np.uint8).reshape((h.value, w.value, 4))
         elif b.value == 8 and c.value == 3:
             img = np.frombuffer(imgdata, dtype=np.uint8).reshape((h.value, w.value, 3))
             # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
