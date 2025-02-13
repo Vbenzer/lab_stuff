@@ -180,7 +180,12 @@ def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float
             plt.savefig(save_file+"plot.png")
 
         if plot:
-            plt.show()
+            pause = True
+            if pause:
+                plt.show(block=False)
+                plt.pause(0.5)
+            else:
+                plt.show()
     plt.close()
 
     if save_data:

@@ -142,8 +142,8 @@ for index in range(readmodenum.value):
 
 ret = qhyccddll.SetQHYCCDReadMode(camhandle, 0)
 
-ret = qhyccddll.SetQHYCCDStreamMode(camhandle, 1)
-print("SetQHYCCDStreamMode() ret =", ret)
+ret = qhyccddll.SetQHYCCDStreamMode(camhandle, 0)
+#print("SetQHYCCDStreamMode() ret =", ret)
 
 ret = qhyccddll.InitQHYCCD(camhandle)
 
@@ -162,11 +162,18 @@ imageB = ctypes.c_uint32()
 ret = qhyccddll.GetQHYCCDChipInfo(camhandle, byref(chipW), byref(chipH), byref(imageW), byref(imageH), byref(pixelW),
                                   byref(pixelH), byref(imageB))
 
-ret = qhyccddll.SetQHYCCDBinMode(camhandle, 1, 1)
+bin = 4
 
-ret = qhyccddll.SetQHYCCDResolution(camhandle, 0, 0, imageW.value, imageH.value)
+ret = qhyccddll.SetQHYCCDBinMode(camhandle, bin, bin)
+#print("SetQHYCCDBinMode() ret =", ret)
+#print(imageW.value, imageH.value)
+#ret = qhyccddll.SetQHYCCDResolution(camhandle, 0, 0, imageW.value // bin, imageH.value // bin)
+width = 3000 // bin
+height = 3000 // bin
+ret = qhyccddll.SetQHYCCDResolution(camhandle, 3200 // bin, 2000 // bin, width, height)
+#print("SetQHYCCDResolution() ret =", ret)
 
-ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_EXPOSURE.value, 100000.0)
+ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_EXPOSURE.value, 4000.0)
 
 ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_GAIN.value, 50.0)
 
@@ -179,10 +186,12 @@ h = ctypes.c_uint32()
 b = ctypes.c_uint32()
 c = ctypes.c_uint32()
 length = imageW.value * imageH.value * 4
+length = width * height * 2
 imgdata = (ctypes.c_uint8 * length)()
 length = imageW.value * imageH.value
+length = width * height
 imgdata_raw8 = (ctypes.c_uint8 * length)()
-
+#print(imgdata_raw8, imgdata)
 import time
 
 """count = 0
@@ -209,23 +218,55 @@ while count < 100:
     print(f"FPS: {fps:.2f}")"""
 
 
-def capture_frames():
+def capture_frames(measure=False):
     count = 0
     start_time = time.time()
-    while count < 10:
-        #qhyccddll.ExpQHYCCDSingleFrame(camhandle)
-        ret = qhyccddll.GetQHYCCDLiveFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)     # This takes long if not live
+    while count < 1000:
+        qhyccddll.ExpQHYCCDSingleFrame(camhandle)
+        ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)     # This takes long if not live, longer if live...
+        #print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,)
         if ret != 0:
+            print("Failed to capture image.")
             continue
+        #qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
+        img = np.frombuffer(imgdata, dtype=np.uint16).reshape((h.value, w.value))
 
-        qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
-        img = np.frombuffer(imgdata_raw8, dtype=np.uint8).reshape((h.value, w.value))
-        cv2.namedWindow("Show", 0)
-        cv2.resizeWindow("Show", w.value // 10, h.value // 10)  # Set the window size to 800x600
-        cv2.imshow("Show", img)
-        cv2.waitKey(1)
+        img = img - np.median(img)
+        # Set negative values to 0
+        img[img < 0] = 0
+
+        # Print max pixel value
+        print("Max pixel value", np.max(img))
+
+        show = True
+        if show:
+            show_img = img / np.max(img) * 255
+            cv2.namedWindow("Show", 0)
+            cv2.resizeWindow("Show", w.value, h.value)  # Set the window size to 800x600
+            cv2.imshow("Show", show_img.astype(np.uint8))
+            cv2.waitKey(1)
         count += 1
         print(count)
+
+        if measure:
+            if np.max(img) < 100:
+                continue
+
+            save = False
+            if save:
+                # Save image as fits
+                import os
+                import astropy.io.fits as fits
+                fits.writeto("D:/Vincent/tip_tilt/image.fits", img, overwrite=True)
+
+            measurements_folder = "D:/Vincent/tip_tilt/"
+            import tip_tilt_adjustment as tta
+            tta.analyse_f_number(img, measurements_folder)
+
+            # Run check_tiptilt_image.bat
+            import os
+            os.system("D:/stepper_motor/check_tiptilt_image.bat")
+
 
         # Record the end time
         end_time = time.time()
@@ -237,10 +278,10 @@ def capture_frames():
         fps = count / time_diff
         print(f"FPS: {fps:.2f}")
 
-ret = qhyccddll.BeginQHYCCDLive(camhandle)
-print("BeginQHYCCDLive() ret =", ret)
-capture_frames()
-qhyccddll.StopQHYCCDLive(camhandle)
+#ret = qhyccddll.BeginQHYCCDLive(camhandle)
+#print("BeginQHYCCDLive() ret =", ret)
+capture_frames(measure=True)
+#qhyccddll.StopQHYCCDLive(camhandle)
 
 cv2.destroyAllWindows()
 
