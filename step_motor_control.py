@@ -105,7 +105,7 @@ if __name__ == "__main__":
             print("Connected to motor controller.")
             #make_reference_move()
             # Set the desired step size (modify as per your needs)
-            position = 9.9  # Change the step size to what is appropriate
+            position = 0  # Change the step size to what is appropriate
             move_motor_to_position(position)
         else:
             print("Failed to open serial connection.")

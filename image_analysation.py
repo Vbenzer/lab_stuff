@@ -301,7 +301,7 @@ def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder
 
         # Find aperture with encircled energy
         os.makedirs(measurements_folder + f"/Radius", exist_ok=True)
-        radius = find_circle_radius(trimmed_data, com, ee_value=0.98, plot=False,
+        radius = find_circle_radius(trimmed_data, com, ee_value=0.95, plot=False,
                                                       save_file=measurements_folder + f"/Radius/datapoint{n}")
         radii.append(radius)
     return radii

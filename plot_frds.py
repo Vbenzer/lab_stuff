@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 # Constant input f-number (the same for all measurements)
-input_f_num = np.array([6, 5, 4.5, 4, 3.5])
+input_f_num = np.array([6.095, 5.102, 4.571, 4.038, 3.539])
+input_f_num_err = np.array([0.036, 0.039, 0.01, 0.009, 0.023])
 
 
 # Function to read measurements from HDF5 file and plot the data
@@ -44,7 +45,7 @@ def plot_measurements(filename):
     # Plot each measurement with error bars and dashed lines
     for i, measurement_name in enumerate(measurement_names):
         color = colors[i]  # Get the color for this measurement
-        plt.errorbar(input_f_num, f_numbers[i], yerr=f_numbers_err[i], fmt='o', label=measurement_name, color=color)
+        plt.errorbar(input_f_num, f_numbers[i],xerr=input_f_num_err, yerr=f_numbers_err[i], fmt='o', label=measurement_name, color=color)
         plt.plot(input_f_num, f_numbers[i], linestyle='--', color=color)  # Dashed line with the same color
 
     # Add reference line y = x (no FRD)
