@@ -123,7 +123,7 @@ def Area_of_Interest(array, **kwargs):
 
     return aoi
 
-def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float=0.95, plot:bool=False, save_data:bool=True, save_file:str=None):
+def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float=0.98, plot:bool=False, save_data:bool=True, save_file:str=None):
     """
     Finding the radius of circle around the center of mass of input image data
     Args:
@@ -301,7 +301,7 @@ def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder
 
         # Find aperture with encircled energy
         os.makedirs(measurements_folder + f"/Radius", exist_ok=True)
-        radius = find_circle_radius(trimmed_data, com, ee_value=0.95, plot=False,
+        radius = find_circle_radius(trimmed_data, com, ee_value=0.98, plot=False,
                                                       save_file=measurements_folder + f"/Radius/datapoint{n}")
         radii.append(radius)
     return radii
@@ -322,6 +322,6 @@ if __name__ == "__main__":
     com = LocateFocus(trimmed_data) #Todo: Does com makes sense with trimmed data?
 
     #Find aperture with 95% (or other) encircled energy
-    radius = find_circle_radius(trimmed_data, com, ee_value=0.9,plot=True)
+    radius = find_circle_radius(trimmed_data, com, ee_value=0.98,plot=True)
 
     print(f"Radius at encircled energy: {radius}")

@@ -46,8 +46,8 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
     progress_signal.emit("All filters complete! Starting final plot.")
 
     # Input f-numbers
-    input_f_num = np.array([6.095, 5.102, 4.571, 4.038, 3.539])
-    input_f_num_err = np.array([0.036, 0.039, 0.01, 0.009, 0.023])
+    input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597]) # These are from the setup_F#_EE_98 file, 18.2.25
+    input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
 
     # Sort the f-numbers in descending order
     f_num = np.sort(f_num)[::-1]

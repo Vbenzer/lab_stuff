@@ -7,7 +7,8 @@ import json
 
 
 
-def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regression:bool=False, save_plot:bool=True, save_path:str=None):
+def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regression:bool=False
+                       , save_plot:bool=True, save_path:str=None):
     """
     Calculate the F-number (f/#) from the spot radii and CCD positions.
 
@@ -28,6 +29,12 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
 
     # Perform linear regression
     slope, intercept, r_value, p_value, std_err = linregress(ccd_positions, spot_radii)
+
+    # Calculate distance to chip
+    distance_to_chip = np.mean(spot_radii/slope)
+    distance_to_chip_err = np.mean(spot_radii)/slope**2*std_err + np.std(spot_radii/slope)
+
+    print(f"Distance to chip: {distance_to_chip:.2f} ± {distance_to_chip_err:.2f}")
 
     # Calculate the F-number using the formula: f/# = 1 / (2 * tan(theta_o))
     f_number = 1 / (2 * slope)
@@ -52,7 +59,8 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
             plt.show()
         plt.close()
     with open(save_path+"f_number.json","w") as f:
-        json.dump({"f_number":f_number,"f_number_err":f_number_err}, f)
+        json.dump({"f_number":f_number,"f_number_err":f_number_err, "distance_to_chip":distance_to_chip
+                   ,"distance_to_chip_err":distance_to_chip_err}, f)
 
     return f_number,f_number_err
 
