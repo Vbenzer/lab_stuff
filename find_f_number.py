@@ -30,9 +30,11 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
     # Perform linear regression
     slope, intercept, r_value, p_value, std_err = linregress(ccd_positions, spot_radii)
 
+    print("Slope: ", slope, "Std_err: ", std_err)
+
     # Calculate distance to chip
-    distance_to_chip = np.mean(spot_radii/slope)
-    distance_to_chip_err = np.mean(spot_radii)/slope**2*std_err + np.std(spot_radii/slope)
+    distance_to_chip = intercept / slope
+    distance_to_chip_err = (intercept/slope**2)*std_err
 
     print(f"Distance to chip: {distance_to_chip:.2f} ± {distance_to_chip_err:.2f}")
 
@@ -42,6 +44,7 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
 
     # Plot regression if requested
     if plot_regression or save_plot:
+        plt.figure()
         plt.scatter(ccd_positions, spot_radii, label="Data points")
         plt.plot(ccd_positions, slope * ccd_positions + intercept, color="green", label="Linear fit")
         plt.xlabel("CCD Position [mm]")
@@ -49,6 +52,10 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
         plt.title("Linear Regression of Spot Radius vs. CCD Position")
         plt.legend()
         plt.grid(True)
+
+        # Add distance_to_chip value to the plot
+        plt.text(0.05, 0.95, f"Distance to chip: {distance_to_chip:.2f} ± {distance_to_chip_err:.2f} mm",
+                 transform=plt.gca().transAxes, fontsize=10, verticalalignment='top')
 
         if save_plot:
             if save_path is None:
@@ -68,7 +75,7 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
 
 if __name__ == "__main__":
     # Example usage
-    radii = np.array([885,757,631])
+    radii = np.array([455,371,290])
     pos_values = np.array([9.9,5,0])
 
 

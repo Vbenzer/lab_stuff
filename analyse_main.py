@@ -8,7 +8,9 @@ import os
 import numpy as np
 import subprocess
 import time
-
+import json
+from scipy.stats import linregress
+import matplotlib.pyplot as plt
 
 def run_batch_file(batch_file_path:str):
     """
@@ -134,6 +136,68 @@ def run_from_existing_files(project_folder:str, progress_signal=None):
                                                               save_path=measurements_folder)
     print(f"Calculated F-number (f/#): {f_number:.3f} ± {f_number_err:.3f}")
 
+def plot_cones(project_folder:str):
+    pos_values = [9.9, 5, 0]  # Values of the stepper motor positions
+    dist_to_chip = []
+    slopes = []
+    intercepts = []
+    radii_all = []
+    for i in range(2,7):
+        # Get radii from json
+        radii = []
+        for n in range (0, 3):
+            with open(project_folder + f"/filter_{i}/Measurements/Radius/datapoint{n}radius.json") as f:
+                params = json.load(f)
+
+            radius = params["radius"]
+            radii.append(radius)
+
+        radii = np.array(radii)
+        pos_values = np.array(pos_values)
+
+        # Sort to descending order
+        radii = np.sort(radii)[::-1]
+        pos_values = np.sort(pos_values)[::-1]
+
+        radii = radii * 7.52e-3
+
+        print('radii:', radii, 'pos:', pos_values)
+
+        # Calculate slope of function
+        slope, intercept, r_value, p_value, std_err = linregress(pos_values, radii)
+
+        distance_to_chip = intercept / slope
+        print(f"Distance to chip: {distance_to_chip:.4f}")
+
+        dist_to_chip.append(distance_to_chip)
+
+        slopes.append(slope)
+        intercepts.append(intercept)
+
+        radii_all.append(radii)
+
+
+    def function(s, x, d, i):
+        return s*(x-d) + i
+
+    print(slopes)
+
+    # Plot the cones
+    plt.figure()
+    for i in range(2,7):
+        radii = radii_all[i-2]
+        plt.scatter(pos_values + dist_to_chip[i-2], radii, label=f"Filter {i}")
+        x = np.linspace(0, 30, 1000)
+        y = function(slopes[i-2], x, dist_to_chip[i-2], intercepts[i-2])
+        plt.plot(x, y, label=f"Filter {i}")
+    plt.xlabel("Distance to chip [mm]")
+    plt.ylabel("Spot radius [mm]")
+    plt.legend()
+    plt.show()
+
+
 if __name__ == "__main__":
-    project_folder = r"D:\Vincent\filter2_newcoll"
-    run_from_existing_files(project_folder)
+    project_folder = r"D:\Vincent\OptranWF_100_187_P_measurement_3\FRD"
+    #run_from_existing_files(project_folder)
+
+    plot_cones(project_folder)
