@@ -438,6 +438,7 @@ class MainWindow(QMainWindow):
         self.make_video_checkbox = QCheckBox("Make Video")
         self.sg_new_checkbox = QCheckBox("SG New")
         self.calc_frd_checkbox = QCheckBox("Calculate FRD")
+        self.plot_sutherland_checkbox = QCheckBox("Make Sutherland Plot")
 
         self.plot_sg_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
         self.calc_sg_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
@@ -447,6 +448,7 @@ class MainWindow(QMainWindow):
         self.make_video_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
         self.sg_new_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
         self.calc_frd_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
+        self.plot_sutherland_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
 
         self.calibration_file_label = QLabel("Calibration File:")
         self.calibration_file_input = QLineEdit()
@@ -462,6 +464,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.make_video_checkbox)
         layout.addWidget(self.sg_new_checkbox)
         layout.addWidget(self.calc_frd_checkbox)
+        layout.addWidget(self.plot_sutherland_checkbox)
 
         layout.addWidget(self.calibration_file_label)
         layout.addWidget(self.calibration_file_input)
@@ -495,6 +498,7 @@ class MainWindow(QMainWindow):
             self.make_video_checkbox.show()
             self.sg_new_checkbox.show()
             self.calc_frd_checkbox.hide()
+            self.plot_sutherland_checkbox.hide()
             self.calibration_file_label.hide()
             self.calibration_file_input.hide()
             self.calibration_file_button.hide()
@@ -508,6 +512,7 @@ class MainWindow(QMainWindow):
             self.make_video_checkbox.hide()
             self.sg_new_checkbox.hide()
             self.calc_frd_checkbox.show()
+            self.plot_sutherland_checkbox.show()
             self.calibration_file_label.hide()
             self.calibration_file_input.hide()
             self.calibration_file_button.hide()
@@ -520,6 +525,7 @@ class MainWindow(QMainWindow):
             self.make_video_checkbox.hide()
             self.sg_new_checkbox.hide()
             self.calc_frd_checkbox.hide()
+            self.plot_sutherland_checkbox.hide()
             self.calibration_file_label.show()
             self.calibration_file_input.show()
             self.calibration_file_button.show()
@@ -535,6 +541,7 @@ class MainWindow(QMainWindow):
                                     or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
                                     or self.plot_masks_checkbox.isChecked() or self.make_video_checkbox.isChecked()
                                     or self.sg_new_checkbox.isChecked() or self.calc_frd_checkbox.isChecked()
+                                    or self.plot_sutherland_checkbox.isChecked()
         ):
             self.run_analysis_button.setDisabled(False)
         else:

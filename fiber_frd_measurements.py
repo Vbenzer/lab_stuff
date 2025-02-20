@@ -147,7 +147,7 @@ def sutherland_plot(project_folder:str):
     popt_list = []
     p0_list = [[0.005, -3.6, 3.6],[0.02, -3.5, 3.1],[0.073, -3.5, 2.3],[0.2, -3.5,  1.6],[0.24, -3.2,  1.5]]
     for i,ee in enumerate(ee_list):
-        popt = curve_fit(practical_funct, input_f_num, ee, p0=p0_list[i], maxfev=1000000)
+        popt = curve_fit(practical_funct, input_f_num, ee, p0=p0_list[i])
         popt_list.append(popt)
         print(popt)
 
@@ -162,7 +162,7 @@ def sutherland_plot(project_folder:str):
                      label=f"Input {labels[idx % len(labels)]}", capsize=5)
         plt.plot(x_range, practical_funct(x_range, *popt_list[idx][0]), linestyle='-', color=colors[idx % len(colors)])
         dynamic_range = np.linspace(input_f_num[idx], 6.5, 1000)
-        plt.plot(dynamic_range, theoretical_funct(dynamic_range, input_f_num[idx]), linestyle='--', color=colors[idx % len(colors)], linewidth=0.5)
+        #plt.plot(dynamic_range, theoretical_funct(dynamic_range, input_f_num[idx]), linestyle='--', color=colors[idx % len(colors)], linewidth=0.5)
     plt.xlabel("Output Aperture f/#")
     plt.ylabel("Encircled Energy")
     plt.title("Encircled Energy vs. Output Aperture f/#")
