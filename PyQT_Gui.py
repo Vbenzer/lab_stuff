@@ -437,6 +437,7 @@ class MainWindow(QMainWindow):
         self.plot_masks_checkbox = QCheckBox("Plot Masks")
         self.make_video_checkbox = QCheckBox("Make Video")
         self.sg_new_checkbox = QCheckBox("SG New")
+        self.calc_frd_checkbox = QCheckBox("Calculate FRD")
 
         self.plot_sg_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
         self.calc_sg_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
@@ -445,6 +446,7 @@ class MainWindow(QMainWindow):
         self.plot_masks_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
         self.make_video_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
         self.sg_new_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
+        self.calc_frd_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
 
         self.calibration_file_label = QLabel("Calibration File:")
         self.calibration_file_input = QLineEdit()
@@ -459,6 +461,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.plot_masks_checkbox)
         layout.addWidget(self.make_video_checkbox)
         layout.addWidget(self.sg_new_checkbox)
+        layout.addWidget(self.calc_frd_checkbox)
 
         layout.addWidget(self.calibration_file_label)
         layout.addWidget(self.calibration_file_input)
@@ -491,6 +494,7 @@ class MainWindow(QMainWindow):
             self.plot_masks_checkbox.show()
             self.make_video_checkbox.show()
             self.sg_new_checkbox.show()
+            self.calc_frd_checkbox.hide()
             self.calibration_file_label.hide()
             self.calibration_file_input.hide()
             self.calibration_file_button.hide()
@@ -503,6 +507,7 @@ class MainWindow(QMainWindow):
             self.plot_masks_checkbox.hide()
             self.make_video_checkbox.hide()
             self.sg_new_checkbox.hide()
+            self.calc_frd_checkbox.show()
             self.calibration_file_label.hide()
             self.calibration_file_input.hide()
             self.calibration_file_button.hide()
@@ -514,6 +519,7 @@ class MainWindow(QMainWindow):
             self.plot_masks_checkbox.hide()
             self.make_video_checkbox.hide()
             self.sg_new_checkbox.hide()
+            self.calc_frd_checkbox.hide()
             self.calibration_file_label.show()
             self.calibration_file_input.show()
             self.calibration_file_button.show()
@@ -528,7 +534,7 @@ class MainWindow(QMainWindow):
         if self.inputs_locked and (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked()
                                     or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
                                     or self.plot_masks_checkbox.isChecked() or self.make_video_checkbox.isChecked()
-                                    or self.sg_new_checkbox.isChecked()
+                                    or self.sg_new_checkbox.isChecked() or self.calc_frd_checkbox.isChecked()
         ):
             self.run_analysis_button.setDisabled(False)
         else:
@@ -679,7 +685,10 @@ class MainWindow(QMainWindow):
         elif analysis_type == "FRD":
             directory = os.path.join(working_dir, "FRD")
             import fiber_frd_measurements as frd
-            frd.main_analyse_all_filters(directory, progress_signal=self.progress_signal)
+            if self.calc_frd_checkbox.isChecked():
+                frd.main_analyse_all_filters(directory, progress_signal=self.progress_signal)
+            if self.plot_sutherland_checkbox.isChecked():
+                frd.sutherland_plot(directory)
 
         elif analysis_type == "Throughput":
             directory = os.path.join(working_dir, "Throughput")
