@@ -702,10 +702,13 @@ class MainWindow(QMainWindow):
         self.check2.setChecked(False)
         self.check3.setChecked(False)
         self.check4.setChecked(False)
+        self.check5.setChecked(False)
         self.update_measurement_button_state()
 
     def update_measurement_button_state(self):
-        if self.inputs_locked and self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked() and self.check4.isChecked():
+        if (self.inputs_locked and self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked()
+                and self.check4.isChecked() and self.check5.isChecked()
+        ):
             self.run_measurement_button.setDisabled(False)
         else:
             self.run_measurement_button.setDisabled(True)
@@ -715,7 +718,9 @@ class MainWindow(QMainWindow):
             self.show_message("Please lock the inputs before running the measurement.")
             return
 
-        if not (self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked() and self.check4.isChecked()):
+        if not (self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked()
+                and self.check4.isChecked() and self.check5.isChecked()
+        ):
             self.show_message("Please complete all checklist items before running the measurement.")
             return
 
@@ -826,7 +831,9 @@ class MainWindow(QMainWindow):
         self.lock_button.setDisabled(not state)
         self.unlock_button.setDisabled(not state)
         self.run_measurement_button.setDisabled(not state or not (self.check1.isChecked() and self.check2.isChecked()
-                                                            and self.check3.isChecked() and self.check4.isChecked()))
+                                                and self.check3.isChecked() and self.check4.isChecked()
+                                                and self.check5.isChecked()
+        ))
         self.run_analysis_button.setDisabled(not state)
 
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
