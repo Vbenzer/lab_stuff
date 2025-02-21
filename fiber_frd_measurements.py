@@ -142,14 +142,30 @@ def sutherland_plot(project_folder:str):
     def theoretical_funct(x,t):
         return t**2/x**2
 
-    # Fit the data
+    """# Fit the data
     from scipy.optimize import curve_fit
     popt_list = []
     p0_list = [[0.005, -3.6, 3.6],[0.02, -3.5, 3.1],[0.073, -3.5, 2.3],[0.2, -3.5,  1.6],[0.24, -3.2,  1.5]]
     for i,ee in enumerate(ee_list):
         popt = curve_fit(practical_funct, input_f_num, ee, p0=p0_list[i])
         popt_list.append(popt)
-        print(popt)
+        print(popt)"""
+
+    # Make spline fit
+    from scipy.interpolate import PchipInterpolator
+
+    # Change order of ee and f-numbers
+    ee_list = np.array(ee_list)
+    ee_list = np.flip(ee_list, axis=1)
+
+    input_f_num = np.flip(input_f_num)
+    input_f_num_err = np.flip(input_f_num_err)
+
+    popt_list = []
+    for i, ee in enumerate(ee_list):
+        # Create the spline with non-monotonic data
+        spline = PchipInterpolator(input_f_num, ee)
+        popt_list.append([spline])
 
 
     # Plot the encircled energy vs input f-numbers
@@ -157,12 +173,17 @@ def sutherland_plot(project_folder:str):
     colors = ['blue', 'green', 'orange', 'purple', 'red']
     x_range = np.linspace(3.5, 6.5, 1000)
     for idx, ee in enumerate(ee_list):
-        print(ee)
+        #print(ee)
         plt.errorbar(input_f_num, ee, xerr=input_f_num_err, fmt="o", color=colors[idx % len(colors)],
                      label=f"Input {labels[idx % len(labels)]}", capsize=5)
-        plt.plot(x_range, practical_funct(x_range, *popt_list[idx][0]), linestyle='-', color=colors[idx % len(colors)])
-        dynamic_range = np.linspace(input_f_num[idx], 6.5, 1000)
-        #plt.plot(dynamic_range, theoretical_funct(dynamic_range, input_f_num[idx]), linestyle='--', color=colors[idx % len(colors)], linewidth=0.5)
+        plt.plot(x_range, popt_list[idx][0](x_range), linestyle='-', color=colors[idx % len(colors)], linewidth=1)
+        #dynamic_range = np.linspace(input_f_num[idx], 6.5, 1000)
+        #dynamic_range_below = np.linspace(3.5, input_f_num[idx], 2)
+        # Plot theoretical spline
+        #plt.plot(dynamic_range, theo_popt_list[idx][0](dynamic_range), linestyle='--', color=colors[idx % len(colors)], linewidth=0.5)
+        #plt.plot(dynamic_range_below, [1, 1], linestyle='--', color=colors[idx % len(colors)], linewidth=0.5)
+
+
     plt.xlabel("Output Aperture f/#")
     plt.ylabel("Encircled Energy")
     plt.title("Encircled Energy vs. Output Aperture f/#")
