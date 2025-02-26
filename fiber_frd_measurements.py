@@ -161,28 +161,47 @@ def sutherland_plot(project_folder:str):
     input_f_num = np.flip(input_f_num)
     input_f_num_err = np.flip(input_f_num_err)
 
+    """ee_list_theo = ee_list.copy()
+    for i in range(len(ee_list_theo)):
+        ee_list_theo[i, :len(ee_list_theo[i]) - i] = 1
+
+    ee_list_cut = [ee_list_theo[0],
+                   [ee_list_theo[1][3], ee_list_theo[1][4]],
+                   [ee_list_theo[2][2], ee_list_theo[2][3], ee_list_theo[2][4]],
+                   [ee_list_theo[3][1], ee_list_theo[3][2], ee_list_theo[3][3], ee_list_theo[3][4]],
+                   ee_list_theo[4]]
+
+    input_f_num_cut = [input_f_num, input_f_num[3:], input_f_num[2:], input_f_num[1:], input_f_num]"""
+
     popt_list = []
     for i, ee in enumerate(ee_list):
         # Create the spline with non-monotonic data
         spline = PchipInterpolator(input_f_num, ee)
         popt_list.append([spline])
 
+    """popt_list_theo = []
+    for ee, f_num in zip(ee_list_cut, input_f_num_cut):
+        # Create the spline with non-monotonic data
+        spline = PchipInterpolator(f_num, ee)
+        popt_list_theo.append([spline])"""
 
     # Plot the encircled energy vs input f-numbers
     labels = ["F/6.21", "F/5.103", "F/4.571", "F/4.063", "F/3.597"]
     colors = ['blue', 'green', 'orange', 'purple', 'red']
-    x_range = np.linspace(3.5, 6.5, 1000)
+    x_range = np.linspace(min(input_f_num), max(input_f_num), 1000)
     for idx, ee in enumerate(ee_list):
-        #print(ee)
+
         plt.errorbar(input_f_num, ee, xerr=input_f_num_err, fmt="o", color=colors[idx % len(colors)],
                      label=f"Input {labels[idx % len(labels)]}", capsize=5)
         plt.plot(x_range, popt_list[idx][0](x_range), linestyle='-', color=colors[idx % len(colors)], linewidth=1)
-        #dynamic_range = np.linspace(input_f_num[idx], 6.5, 1000)
-        #dynamic_range_below = np.linspace(3.5, input_f_num[idx], 2)
-        # Plot theoretical spline
-        #plt.plot(dynamic_range, theo_popt_list[idx][0](dynamic_range), linestyle='--', color=colors[idx % len(colors)], linewidth=0.5)
-        #plt.plot(dynamic_range_below, [1, 1], linestyle='--', color=colors[idx % len(colors)], linewidth=0.5)
+        plt.vlines(input_f_num[4-idx], ee[4-idx], 1, color=colors[idx % len(colors)], linestyle='--', linewidth=0.5)
+        alignment = 'right' if idx == 0 else 'left'
+        padding = -0.05 if idx == 0 else 0.05
+        plt.text(input_f_num[4 - idx] + padding, ee[4 - idx], f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
+                 fontsize=8,
+                 verticalalignment='center_baseline', horizontalalignment=alignment)
 
+    plt.vlines([], [], [], color='black', linestyle='--', linewidth=0.5, label='Light loss at input = output f-ratio')
 
     plt.xlabel("Output Aperture f/#")
     plt.ylabel("Encircled Energy")

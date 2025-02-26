@@ -278,13 +278,75 @@ def capture_frames(measure=False):
         fps = count / time_diff
         print(f"FPS: {fps:.2f}")
 
-#ret = qhyccddll.BeginQHYCCDLive(camhandle)
-#print("BeginQHYCCDLive() ret =", ret)
-capture_frames(measure=True)
-#qhyccddll.StopQHYCCDLive(camhandle)
+def measure_eccentricity(measure=True):
+    count = 0
+    start_time = time.time()
+    while count < 1000:
+        qhyccddll.ExpQHYCCDSingleFrame(camhandle)
+        ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c),
+                                             imgdata)  # This takes long if not live, longer if live...
+        # print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,)
+        if ret != 0:
+            print("Failed to capture image.")
+            continue
+        # qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
+        img = np.frombuffer(imgdata, dtype=np.uint16).reshape((h.value, w.value))
 
-cv2.destroyAllWindows()
+        img = img - np.median(img)
+        # Set negative values to 0
+        img[img < 0] = 0
 
-ret = qhyccddll.CloseQHYCCD(camhandle)
+        # Print max pixel value
+        print("Max pixel value", np.max(img))
 
-ret = qhyccddll.ReleaseQHYCCDResource()
+        show = True
+        if show:
+            show_img = img / np.max(img) * 255
+            cv2.namedWindow("Show", 0)
+            cv2.resizeWindow("Show", w.value, h.value)  # Set the window size to 800x600
+            cv2.imshow("Show", show_img.astype(np.uint8))
+            cv2.waitKey(1)
+        count += 1
+        print(count)
+
+        if measure:
+            if np.max(img) < 100:
+                continue
+
+            save = False
+            if save:
+                # Save image as fits
+                import os
+                import astropy.io.fits as fits
+                fits.writeto("D:/Vincent/eccentricity/image.fits", img, overwrite=True)
+
+            #measurements_folder = "D:/Vincent/eccentricity/"
+            import image_analysation as ia
+            ecc = ia.measure_eccentricity(img, plot=False)
+
+            print(f"Eccentricity: {ecc}")
+
+        # Record the end time
+        end_time = time.time()
+
+        # Calculate the time difference
+        time_diff = end_time - start_time
+
+        # Calculate FPS
+        fps = count / time_diff
+        print(f"FPS: {fps:.2f}")
+
+def use_camera(mode:str=None):
+    if mode == "tiptilt":
+        capture_frames(measure=True)
+    if mode == "eccentricity":
+        measure_eccentricity(measure=True)
+    else:
+        raise ValueError("Invalid mode. Must be either 'tiptilt' or 'eccentricity'.")
+
+    cv2.destroyAllWindows()
+    ret = qhyccddll.CloseQHYCCD(camhandle)
+    ret = qhyccddll.ReleaseQHYCCDResource()
+
+if __name__ == "__main__":
+    use_camera(mode="tiptilt")

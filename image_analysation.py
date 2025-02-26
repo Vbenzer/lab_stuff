@@ -306,11 +306,77 @@ def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder
         radii.append(radius)
     return radii
 
+def measure_eccentricity(data, plot:bool=False):
+    from skimage.filters import threshold_otsu
+    from skimage.feature import canny
+    from skimage import io, measure, color
+
+    # Trim data to area of interest (perhaps not necessary with better background reduction)
+    trimmed_data = cut_image(data, margin=500)  # Margin at 500 good for now
+
+    if plot:
+        plt.figure()
+        plt.imshow(trimmed_data, cmap='gray')
+        plt.show()
+
+
+    # Find otsu threshold
+    threshold = threshold_otsu(trimmed_data)
+
+    thresholded_image = trimmed_data > threshold
+
+    if plot:
+        plt.figure()
+        plt.imshow(thresholded_image, cmap='gray')
+        plt.show()
+
+    edges = canny(thresholded_image)
+
+    if plot:
+        # Show the image
+        plt.figure()
+        plt.imshow(edges, cmap='gray')
+        plt.show()
+
+    # Label connected regions
+    labeled_image = measure.label(edges)
+
+    # Measure properties of labeled regions
+    properties = measure.regionprops(labeled_image)
+
+    properties = [prop for prop in properties if prop.area >= 300]
+
+    #print(properties)
+
+    if plot:
+        # Plot the labeled image
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.imshow(labeled_image, cmap='nipy_spectral')
+
+        # Annotate labels on their centroid
+        for prop in properties:
+            y, x = prop.centroid  # Get centroid of the region
+            ax.text(x, y, str(prop.label), color='red', fontsize=12, ha='center', va='center')
+
+        plt.title("Labeled Regions")
+        plt.axis("off")
+        plt.show()
+
+    if len(properties) == 1:
+        return properties[0].eccentricity
+
+    else:
+        print("Multiple regions found, returning None")
+        # Iterate through properties and print eccentricity
+        for prop in properties:
+            print(f'Label: {prop.label}, Eccentricity: {prop.eccentricity}')
+
+        return None
 
 # Usage
 if __name__ == "__main__":
     #Path of fits file to analyse
-    fits_file = 'D:/stepper_motor/test_images/sequence_stepper_filter_fstop_analysis/Filter2/REDUCED/LIGHT_0000_0.00s.fits_reduced.fits'
+    fits_file = 'D:/Vincent/OptranWF_100_187_P_measurement_3/FRD/filter_2/REDUCED/LIGHT_0012_0.08s_reduced.fits'
 
     #Turn data to numpy array
     data = fits_to_arr(fits_file)
@@ -318,10 +384,55 @@ if __name__ == "__main__":
     #Trim data to area of interest (perhaps not necessary with better background reduction)
     trimmed_data = cut_image(data, margin=500) #Margin at 500 good for now
 
-    #Locate center of mass within trimmed image (array)
-    com = LocateFocus(trimmed_data) #Todo: Does com makes sense with trimmed data?
+    plt.figure()
+    plt.imshow(trimmed_data, cmap='gray')
+    plt.show()
 
-    #Find aperture with 95% (or other) encircled energy
-    radius = find_circle_radius(trimmed_data, com, ee_value=0.98,plot=True)
+    from skimage.filters import threshold_otsu
+    from skimage.feature import canny
+    from skimage import io, measure, color
+    # Find otsu threshold
+    threshold = threshold_otsu(trimmed_data)
 
-    print(f"Radius at encircled energy: {radius}")
+    thresholded_image = trimmed_data > threshold
+
+    plt.figure()
+    plt.imshow(thresholded_image, cmap='gray')
+    plt.show()
+
+    edges = canny(thresholded_image)
+
+    # Show the image
+    plt.figure()
+    plt.imshow(edges, cmap='gray')
+    plt.show()
+
+    # Label connected regions
+    labeled_image = measure.label(edges)
+
+    # Measure properties of labeled regions
+    properties = measure.regionprops(labeled_image)
+
+    properties = [prop for prop in properties if prop.area >= 300]
+
+    print(properties)
+
+    # Plot the labeled image
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.imshow(labeled_image, cmap='nipy_spectral')
+
+    # Annotate labels on their centroid
+    for prop in properties:
+        y, x = prop.centroid  # Get centroid of the region
+        ax.text(x, y, str(prop.label), color='red', fontsize=12, ha='center', va='center')
+
+    plt.title("Labeled Regions")
+    plt.axis("off")
+    plt.show()
+
+    # Iterate through properties and print eccentricity
+    for prop in properties:
+        print(f'Label: {prop.label}, Eccentricity: {prop.eccentricity}')
+
+
+

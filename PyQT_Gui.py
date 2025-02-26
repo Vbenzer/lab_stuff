@@ -4,7 +4,7 @@ import json
 import threading
 import time
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit)
+                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem, QSizePolicy)
 from PyQt6.QtCore import pyqtSignal
 import sg_pipeline
 
@@ -171,7 +171,15 @@ class MainWindow(QMainWindow):
             self.fiber_length_input.hide()
             self.fiber_shape_label.hide()
             self.fiber_shape_combo.hide()
+            if not hasattr(self, 'placeholder_spacer'):
+                self.placeholder_spacer = QSpacerItem(20, 86)
+                self.layout.insertItem(self.layout.count() - 1, self.placeholder_spacer)
         else:
+            if hasattr(self, 'placeholder_spacer'):
+                self.layout.removeItem(self.placeholder_spacer)
+                del self.placeholder_spacer
+                self.layout.update()
+
             self.folder_name_label.setText("Fiber Name:")
             self.fiber_diameter_label.show()
             self.fiber_diameter_input.show()
@@ -415,7 +423,7 @@ class MainWindow(QMainWindow):
 
         self.general_function_label = QLabel("Select Function:")
         self.general_function_combo = QComboBox()
-        self.general_function_combo.addItems(["Measure System F-ratio", "Make Throughput Calibration", "Adjust Tip/Tilt", "Motor Controller: Reference"])
+        self.general_function_combo.addItems(["Measure System F-ratio", "Make Throughput Calibration", "Adjust Tip/Tilt", "Motor Controller: Reference", "Measure Eccentricity"])
 
         # Create a widget for the function chooser and set its position
         function_widget = QWidget()
@@ -464,9 +472,13 @@ class MainWindow(QMainWindow):
             ta.measure_all_filters(working_dir, progress_signal=self.progress_signal, calibration="throughput")
         elif selected_function == "Adjust Tip/Tilt":
             import qhyccd_cam_control
+            qhyccd_cam_control.use_camera("tiptilt")
         elif selected_function == "Motor Controller: Reference":
             import step_motor_control as smc
             smc.make_reference_move()
+        elif selected_function == "Measure Eccentricity":
+            import qhyccd_cam_control
+            qhyccd_cam_control.use_camera("eccentricity")
 
         self.progress_signal.emit(f"{selected_function} complete.")
         self.experiment_running = False
