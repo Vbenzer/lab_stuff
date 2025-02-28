@@ -6,7 +6,7 @@ import time
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem, QSizePolicy)
 from PyQt6.QtCore import pyqtSignal
-import sg_pipeline
+
 
 
 def save_recent_folders(recent_folders, file_path='D:/Vincent/recent_folders.json'):
@@ -690,6 +690,16 @@ class MainWindow(QMainWindow):
 
     def update_checklist(self):
         measurement_type = self.measurement_type_combo.currentText()
+
+        self.check4.show()
+        self.check5.show()
+
+        self.check1.setChecked(False)
+        self.check2.setChecked(False)
+        self.check3.setChecked(False)
+        self.check4.setChecked(False)
+        self.check5.setChecked(False)
+
         if measurement_type == "SG":
             self.check1.setText("Fiber in place: Output at small camera")
             self.check2.setText("Input spot in center and in focus. Exit camera fiber also in focus")
@@ -704,18 +714,16 @@ class MainWindow(QMainWindow):
             self.check4.setText("ThorCam/N.I.N.A closed")
             self.check5.setText("Lights Out")
 
+
         elif measurement_type == "Throughput":
             self.check1.setText("Throughput Check 1")
             self.check2.setText("Throughput Check 2")
             self.check3.setText("Throughput Check 3")
+            self.check4.setChecked(True)
+            self.check5.setChecked(True)
             self.check4.hide()
             self.check5.hide()
 
-        self.check1.setChecked(False)
-        self.check2.setChecked(False)
-        self.check3.setChecked(False)
-        self.check4.setChecked(False)
-        self.check5.setChecked(False)
         self.update_measurement_button_state()
 
     def update_measurement_button_state(self):
