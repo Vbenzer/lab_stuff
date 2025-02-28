@@ -167,10 +167,15 @@ bin = 4
 ret = qhyccddll.SetQHYCCDBinMode(camhandle, bin, bin)
 #print("SetQHYCCDBinMode() ret =", ret)
 #print(imageW.value, imageH.value)
-#ret = qhyccddll.SetQHYCCDResolution(camhandle, 0, 0, imageW.value // bin, imageH.value // bin)
-width = 3000 // bin
-height = 3000 // bin
-ret = qhyccddll.SetQHYCCDResolution(camhandle, 3200 // bin, 2000 // bin, width, height)
+manual_size = True
+if manual_size:
+    width = 5000 // bin
+    height = 5000 // bin
+    ret = qhyccddll.SetQHYCCDResolution(camhandle, 2200 // bin, 800 // bin, width, height)
+
+else:
+    ret = qhyccddll.SetQHYCCDResolution(camhandle, 0, 0, imageW.value // bin, imageH.value // bin)
+
 #print("SetQHYCCDResolution() ret =", ret)
 
 ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_EXPOSURE.value, 4000.0)
@@ -185,11 +190,16 @@ w = ctypes.c_uint32()
 h = ctypes.c_uint32()
 b = ctypes.c_uint32()
 c = ctypes.c_uint32()
-length = imageW.value * imageH.value * 4
-length = width * height * 2
+
+#print(imageW.value, imageH.value)
+if manual_size:
+    length = width * height * 2
+
+else:
+    length = imageW.value * imageH.value // bin
+
+
 imgdata = (ctypes.c_uint8 * length)()
-length = imageW.value * imageH.value
-length = width * height
 imgdata_raw8 = (ctypes.c_uint8 * length)()
 #print(imgdata_raw8, imgdata)
 import time
@@ -285,16 +295,17 @@ def measure_eccentricity(measure=True):
         qhyccddll.ExpQHYCCDSingleFrame(camhandle)
         ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c),
                                              imgdata)  # This takes long if not live, longer if live...
-        # print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,)
+        print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,)
         if ret != 0:
             print("Failed to capture image.")
             continue
         # qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
+        print(imgdata)
         img = np.frombuffer(imgdata, dtype=np.uint16).reshape((h.value, w.value))
 
-        img = img - np.median(img)
+        #img = img - np.median(img)
         # Set negative values to 0
-        img[img < 0] = 0
+        #img[img < 0] = 0
 
         # Print max pixel value
         print("Max pixel value", np.max(img))
@@ -303,7 +314,7 @@ def measure_eccentricity(measure=True):
         if show:
             show_img = img / np.max(img) * 255
             cv2.namedWindow("Show", 0)
-            cv2.resizeWindow("Show", w.value, h.value)  # Set the window size to 800x600
+            cv2.resizeWindow("Show", w.value // 2, h.value // 2)  # Set the window size to 800x600
             cv2.imshow("Show", show_img.astype(np.uint8))
             cv2.waitKey(1)
         count += 1
@@ -313,7 +324,7 @@ def measure_eccentricity(measure=True):
             if np.max(img) < 100:
                 continue
 
-            save = False
+            save = True
             if save:
                 # Save image as fits
                 import os
@@ -349,4 +360,4 @@ def use_camera(mode:str=None):
     ret = qhyccddll.ReleaseQHYCCDResource()
 
 if __name__ == "__main__":
-    use_camera(mode="tiptilt")
+    use_camera(mode="eccentricity")

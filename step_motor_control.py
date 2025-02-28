@@ -103,7 +103,7 @@ if __name__ == "__main__":
         if ser.is_open:
             #send_command("CLR")
             print("Connected to motor controller.")
-            #make_reference_move()
+            make_reference_move()
             # Set the desired step size (modify as per your needs)
             position = 0  # Change the step size to what is appropriate
             move_motor_to_position(position)

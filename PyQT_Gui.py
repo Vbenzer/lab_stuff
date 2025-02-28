@@ -469,7 +469,8 @@ class MainWindow(QMainWindow):
             frd.main_analyse_all_filters(working_dir, progress_signal=self.progress_signal)
         elif selected_function == "Make Throughput Calibration":
             import throughput_analysis as ta
-            ta.measure_all_filters(working_dir, progress_signal=self.progress_signal, calibration="throughput")
+            calibration_file_name = os.path.basename(working_dir)
+            ta.measure_all_filters(working_dir, progress_signal=self.progress_signal, calibration=calibration_file_name)
         elif selected_function == "Adjust Tip/Tilt":
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("tiptilt")
