@@ -44,6 +44,9 @@ def measure_all_filters(main_folder, number_of_measurements=100, progress_signal
         main_folder = "D:/Vincent/Calibration/" + date + "_" + calibration + "/"
         os.makedirs(main_folder, exist_ok=False)
 
+    else:
+        os.makedirs(main_folder, exist_ok=False)
+
     # Make the measurement for all filters
     filter_list = ["400", "450", "500", "600", "700", "800"]
 
@@ -96,6 +99,11 @@ def calculate_throughput(main_folder, calibration_file):
         file_name = os.path.join(main_folder, filter_name + ".json")
         with open(file_name, 'r') as f:
             data[filter_name] = json.load(f)
+
+    print(data)
+
+    # Filter out infinities and zeros
+    data = data[np.isfinite(test) & (test != 0)]
 
     # Calculate the throughput
     throughput = {}
