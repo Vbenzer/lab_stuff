@@ -724,6 +724,7 @@ class MainWindow(QMainWindow):
             self.check4.hide()
             self.check5.hide()
 
+
         self.update_measurement_button_state()
 
     def update_measurement_button_state(self):
