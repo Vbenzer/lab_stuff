@@ -37,6 +37,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        self.stop_event = threading.Event()
+
         self.base_directory = "D:/Vincent"
         self.inputs_locked = False
         self.experiment_running = False
@@ -134,7 +136,9 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(self.unlock_button)
         self.layout.addLayout(button_layout)
 
-        self.layout.addWidget(QLabel("Recent Folders:"))
+        self.recent_folders_label = QLabel("Recent Folders:")
+        self.layout.addWidget(self.recent_folders_label)
+
         self.layout.addWidget(self.recent_folders_combo)
         self.layout.addWidget(self.message_label)
         self.layout.addWidget(self.progress_label)
@@ -178,6 +182,11 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'placeholder_spacer'):
                 self.layout.removeItem(self.placeholder_spacer)
                 del self.placeholder_spacer
+                #self.layout.update()
+
+            if hasattr(self, "placeholder_spacer_2"):
+                self.layout.removeItem(self.placeholder_spacer_2)
+                del self.placeholder_spacer_2
                 self.layout.update()
 
             self.folder_name_label.setText("Fiber Name:")
@@ -188,6 +197,17 @@ class MainWindow(QMainWindow):
             self.fiber_shape_label.show()
             self.fiber_shape_combo.show()
             self.update_fiber_shape_inputs()
+
+            # Show the buttons that were hidden for some functions in the general tab
+            self.folder_name_label.show()
+            self.folder_name_input.show()
+            self.choose_folder_button.show()
+            self.lock_button.show()
+            self.unlock_button.show()
+            self.metadata_button.show()
+            self.recent_folders_combo.show()
+            self.working_dir_label.show()
+            self.recent_folders_label.show()
 
     def create_hbox_layout(self, label, widget):
         hbox = QHBoxLayout()
@@ -437,6 +457,11 @@ class MainWindow(QMainWindow):
         # Add a spacer item to push the button to the bottom
         layout.addStretch()
 
+        self.stop_button = QPushButton("Stop")
+        self.stop_button.setDisabled(True)
+        self.stop_button.clicked.connect(self.stop_general_function)
+        layout.addWidget(self.stop_button)
+
         # Add the Run button to the General tab
         self.run_button = QPushButton("Run")
         self.run_button.setDisabled(True)  # Initially disabled
@@ -444,6 +469,57 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.run_button)
 
         self.general_tab.setLayout(layout)
+
+        # Connect the signal and update the stop button visibility
+        self.general_function_combo.currentIndexChanged.connect(self.update_stop_button_visibility)
+        self.update_stop_button_visibility()
+
+    def update_stop_button_visibility(self):
+        selected_function = self.general_function_combo.currentText()
+        if selected_function in ["Adjust Tip/Tilt", "Measure Eccentricity"]:
+            self.stop_button.show()
+        else:
+            self.stop_button.hide()
+
+        if selected_function in ["Motor Controller: Reference", "Measure Eccentricity", "Adjust Tip/Tilt"]:
+            if not hasattr(self, 'placeholder_spacer_2'):
+                self.placeholder_spacer_2 = QSpacerItem(20, 110)
+                self.layout.insertItem(0, self.placeholder_spacer_2)
+            self.folder_name_label.hide()
+            self.folder_name_input.hide()
+            self.choose_folder_button.hide()
+            self.lock_button.hide()
+            self.unlock_button.hide()
+            self.metadata_button.hide()
+            self.recent_folders_combo.hide()
+            self.working_dir_label.hide()
+            self.recent_folders_label.hide()
+
+        else:
+            if hasattr(self, 'placeholder_spacer_2'):
+                self.layout.removeItem(self.placeholder_spacer_2)
+                del self.placeholder_spacer_2
+                self.layout.update()
+            self.folder_name_label.show()
+            self.folder_name_input.show()
+            self.choose_folder_button.show()
+            self.lock_button.show()
+            self.unlock_button.show()
+            self.metadata_button.show()
+            self.recent_folders_combo.show()
+            self.working_dir_label.show()
+            self.recent_folders_label.show()
+
+        if selected_function == "Make Throughput Calibration":
+            # Change the folder name label to calibration name
+            self.folder_name_label.setText("Calibration Name:")
+        else:
+            self.folder_name_label.setText("Folder Name:")
+
+
+    def stop_general_function(self):
+        self.stop_event.set()
+        self.progress_signal.emit("Stopping function...")
 
     def run_general_function(self):
         if not self.inputs_locked:
@@ -463,23 +539,24 @@ class MainWindow(QMainWindow):
 
     def run_general_function_thread(self, selected_function, working_dir):
         self.progress_signal.emit(f"Running {selected_function} with working dir: {working_dir}")
+        self.stop_event = threading.Event()
         if selected_function == "Measure System F-ratio":
             import fiber_frd_measurements as frd
             frd.main_measure_all_filters(working_dir, progress_signal=self.progress_signal)
             frd.main_analyse_all_filters(working_dir, progress_signal=self.progress_signal)
         elif selected_function == "Make Throughput Calibration":
             import throughput_analysis as ta
-            calibration_file_name = os.path.basename(working_dir)
-            ta.measure_all_filters(working_dir, progress_signal=self.progress_signal, calibration=calibration_file_name)
+            calibration_folder_name = os.path.basename(working_dir)
+            ta.measure_all_filters(working_dir, progress_signal=self.progress_signal, calibration=calibration_folder_name)
         elif selected_function == "Adjust Tip/Tilt":
             import qhyccd_cam_control
-            qhyccd_cam_control.use_camera("tiptilt")
+            qhyccd_cam_control.use_camera("tiptilt", self.stop_event)
         elif selected_function == "Motor Controller: Reference":
             import step_motor_control as smc
             smc.make_reference_move()
         elif selected_function == "Measure Eccentricity":
             import qhyccd_cam_control
-            qhyccd_cam_control.use_camera("eccentricity")
+            qhyccd_cam_control.use_camera("eccentricity", self.stop_event)
 
         self.progress_signal.emit(f"{selected_function} complete.")
         self.experiment_running = False
@@ -548,7 +625,6 @@ class MainWindow(QMainWindow):
         self.analysis_type_combo.addItems(["SG", "FRD", "Throughput"])
         self.analysis_type_combo.currentIndexChanged.connect(self.update_analysis_tab)
 
-        # Create a widget for the analysis type chooser and set its position
         analysis_type_widget = QWidget()
         analysis_type_layout = QHBoxLayout(analysis_type_widget)
         analysis_type_layout.addWidget(self.analysis_type_label)
@@ -577,11 +653,11 @@ class MainWindow(QMainWindow):
         self.calc_frd_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
         self.plot_sutherland_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
 
-        self.calibration_file_label = QLabel("Calibration File:")
-        self.calibration_file_input = QLineEdit()
-        self.calibration_file_input.textChanged.connect(self.update_throughput_analysis_button_state)
-        self.calibration_file_button = QPushButton("Choose Calibration File")
-        self.calibration_file_button.clicked.connect(self.choose_calibration_file)
+        self.calibration_folder_label = QLabel("Calibration Folder:")
+        self.calibration_folder_input = QLineEdit()
+        self.calibration_folder_input.textChanged.connect(self.update_throughput_analysis_button_state)
+        self.calibration_folder_button = QPushButton("Choose Calibration Folder")
+        self.calibration_folder_button.clicked.connect(self.choose_calibration_folder)
 
         layout.addWidget(self.get_params_checkbox)
         layout.addWidget(self.plot_sg_checkbox)
@@ -593,11 +669,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.calc_frd_checkbox)
         layout.addWidget(self.plot_sutherland_checkbox)
 
-        layout.addWidget(self.calibration_file_label)
-        layout.addWidget(self.calibration_file_input)
-        layout.addWidget(self.calibration_file_button)
+        layout.addWidget(self.calibration_folder_label)
+        layout.addWidget(self.calibration_folder_input)
+        layout.addWidget(self.calibration_folder_button)
 
-        # Add a spacer item to push the run_analysis_button to the bottom
         layout.addStretch()
 
         self.run_analysis_button = QPushButton("Run Analysis")
@@ -609,7 +684,7 @@ class MainWindow(QMainWindow):
         self.update_analysis_tab()
 
     def update_throughput_analysis_button_state(self):
-        if self.inputs_locked and self.analysis_type_combo.currentText() == "Throughput" and self.calibration_file_input.text():
+        if self.inputs_locked and self.analysis_type_combo.currentText() == "Throughput" and self.calibration_folder_input.text():
             self.run_analysis_button.setDisabled(False)
         else:
             self.update_general_analysis_button_state()
@@ -626,9 +701,9 @@ class MainWindow(QMainWindow):
             self.sg_new_checkbox.show()
             self.calc_frd_checkbox.hide()
             self.plot_sutherland_checkbox.hide()
-            self.calibration_file_label.hide()
-            self.calibration_file_input.hide()
-            self.calibration_file_button.hide()
+            self.calibration_folder_label.hide()
+            self.calibration_folder_input.hide()
+            self.calibration_folder_button.hide()
         elif analysis_type == "FRD":
             # Add options for FRD analysis here
             self.plot_sg_checkbox.hide()
@@ -640,9 +715,9 @@ class MainWindow(QMainWindow):
             self.sg_new_checkbox.hide()
             self.calc_frd_checkbox.show()
             self.plot_sutherland_checkbox.show()
-            self.calibration_file_label.hide()
-            self.calibration_file_input.hide()
-            self.calibration_file_button.hide()
+            self.calibration_folder_label.hide()
+            self.calibration_folder_input.hide()
+            self.calibration_folder_button.hide()
         elif analysis_type == "Throughput":
             self.plot_sg_checkbox.hide()
             self.calc_sg_checkbox.hide()
@@ -653,15 +728,15 @@ class MainWindow(QMainWindow):
             self.sg_new_checkbox.hide()
             self.calc_frd_checkbox.hide()
             self.plot_sutherland_checkbox.hide()
-            self.calibration_file_label.show()
-            self.calibration_file_input.show()
-            self.calibration_file_button.show()
+            self.calibration_folder_label.show()
+            self.calibration_folder_input.show()
+            self.calibration_folder_button.show()
 
-    def choose_calibration_file(self):
-        file_path = \
-        QFileDialog.getOpenFileName(self, "Select Calibration File", self.base_directory + "/Calibration", "JSON Files (*.json)")[0]
-        if file_path:
-            self.calibration_file_input.setText(file_path)
+    def choose_calibration_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Calibration Folder",
+                                                       self.base_directory + "/Calibration")
+        if folder_path:
+            self.calibration_folder_input.setText(folder_path)
 
     def update_general_analysis_button_state(self):
         if self.inputs_locked and (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked()
@@ -715,9 +790,9 @@ class MainWindow(QMainWindow):
             self.check5.setText("Lights Out")
 
         elif measurement_type == "Throughput":
-            self.check1.setText("Throughput Check 1")
-            self.check2.setText("Throughput Check 2")
-            self.check3.setText("Throughput Check 3")
+            self.check1.setText("Fiber in place: Output on Photodetector")
+            self.check2.setText("Spot on fiber")
+            self.check3.setText("Lights Out")
             self.check4.hide()
             self.check5.hide()
             self.check4.setChecked(True)
@@ -793,15 +868,15 @@ class MainWindow(QMainWindow):
         else:
             fiber_diameter = int(self.fiber_diameter_input.text())
 
-        calibration_file = self.calibration_file_input.text() if analysis_type == "Throughput" else None
+        calibration_folder = self.calibration_folder_input.text() if analysis_type == "Throughput" else None
 
         self.experiment_running = True
         self.update_ui_state()
 
         threading.Thread(target=self.run_analysis_thread,
-                         args=(analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_file)).start()
+                         args=(analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_folder)).start()
 
-    def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_file):
+    def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_folder):
         self.progress_signal.emit("Starting analysis...")
         if analysis_type == "SG":
             directory = os.path.join(working_dir, "SG")
@@ -839,7 +914,7 @@ class MainWindow(QMainWindow):
         elif analysis_type == "Throughput":
             directory = os.path.join(working_dir, "Throughput")
             import throughput_analysis
-            throughput_analysis.main(directory, calibration_file)
+            throughput_analysis.main(directory, calibration_folder)
 
         self.progress_signal.emit("Analysis complete.")
         self.experiment_running = False

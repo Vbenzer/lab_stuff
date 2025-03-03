@@ -56,6 +56,9 @@ def measure_all_filters(main_folder, number_of_measurements=100, progress_signal
         if progress_signal:
             progress_signal.emit(f"Measurement for filter {filter_name} completed.")
 
+    # When done reset filter to none
+    move_to_filter.move("none")
+
 def plot_throughput(main_folder:str, save:bool=False):
     """
     Plot the throughput of the filters.
@@ -89,7 +92,7 @@ def calculate_throughput(main_folder, calibration_file):
 
     """
     # Get calibration quotient
-    calibration_quotient = calc_cal_quotient(calibration_file)
+    calibration_quotient_list = calc_cal_quotient(calibration_file)
 
     # Load the data
     filter_list = ["400", "450", "500", "600", "700", "800"]
@@ -103,11 +106,11 @@ def calculate_throughput(main_folder, calibration_file):
     print(data)
 
     # Filter out infinities and zeros
-    data = data[np.isfinite(test) & (test != 0)]
+    data = data[np.isfinite(data) & (data != 0)]
 
     # Calculate the throughput
     throughput = {}
-    for filter_name in filter_list:
+    for filter_name, calibration_quotient in zip(filter_list, calibration_quotient_list):
         throughput[filter_name] = np.mean(data[filter_name]["channel_1"]) / (calibration_quotient * np.mean(data[filter_name]["channel_2"]))
 
     # Write throughput to json
@@ -129,26 +132,38 @@ def calc_cal_quotient_folder(calibration_folder:str):
     with open(cal_qou_file, 'w') as f:
         json.dump(cal_qou_list, f, indent=4)
 
-def calc_cal_quotient(calibration_file:str, folder:bool=False):
+def calc_cal_quotient(calibration_file:str):
     # Load the calibration data
 
-    if folder:
-        calibration_file_list = os.listdir(calibration_file)
-        for file in calibration_file_list:
-            with open(file, 'r') as f:
-                calibration_data = json.load(f)
 
-    with open(calibration_file, 'r') as f:
-        calibration_data = json.load(f)
+    data_list = []
+    calibration_file_list = os.listdir(calibration_file)
+    for file in calibration_file_list:
+        with open(file, 'r') as f:
+            calibration_data = json.load(f)
+        data_list.append(calibration_data)
 
-    # Remove infinities from the data
-    calibration_data["channel_1"] = [x for x in calibration_data["channel_1"] if x != float("inf")]
-    calibration_data["channel_2"] = [x for x in calibration_data["channel_2"] if x != float("inf")]
 
-    # Calculate calibration quotient
-    calibration_quotient = np.mean(calibration_data["channel_1"]) / np.mean(calibration_data["channel_2"])
+    # Remove infinities and zeros from the data
+    for calibration_data in data_list:
+        calibration_data["channel_1"] = [x for x in calibration_data["channel_1"] if x != float("inf") or x != 0]
+        calibration_data["channel_2"] = [x for x in calibration_data["channel_2"] if x != float("inf") or x != 0]
 
-    return calibration_quotient
+        if len(calibration_data["channel_1"]) == 0:
+            calibration_data["channel_1"] = [1]
+            raise Warning("Channel 1 is empty")
+        if len(calibration_data["channel_2"]) == 0:
+            calibration_data["channel_2"] = [1]
+            raise Warning("Channel 2 is empty")
+
+    calibration_quotient_list = []
+    for calibration_data in data_list:
+        # Calculate calibration quotient
+        calibration_quotient = np.mean(calibration_data["channel_1"]) / np.mean(calibration_data["channel_2"])
+        calibration_quotient_list.append(calibration_quotient)
+
+    return calibration_quotient_list
+
 def create_test_data(main_folder):
     """
     Create test data for the throughput analysis.

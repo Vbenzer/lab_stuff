@@ -228,10 +228,10 @@ while count < 100:
     print(f"FPS: {fps:.2f}")"""
 
 
-def capture_frames(measure=False):
+def capture_frames(measure=False, stop_signal=False):
     count = 0
     start_time = time.time()
-    while count < 1000:
+    while count < 1000 or not stop_signal:
         qhyccddll.ExpQHYCCDSingleFrame(camhandle)
         ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)     # This takes long if not live, longer if live...
         #print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,)
@@ -288,10 +288,10 @@ def capture_frames(measure=False):
         fps = count / time_diff
         print(f"FPS: {fps:.2f}")
 
-def measure_eccentricity(measure=True):
+def measure_eccentricity(measure=True, stop_signal=False):
     count = 0
     start_time = time.time()
-    while count < 1000:
+    while count < 1000 or not stop_signal:
         qhyccddll.ExpQHYCCDSingleFrame(camhandle)
         ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c),
                                              imgdata)  # This takes long if not live, longer if live...
@@ -347,11 +347,11 @@ def measure_eccentricity(measure=True):
         fps = count / time_diff
         print(f"FPS: {fps:.2f}")
 
-def use_camera(mode:str=None):
+def use_camera(mode:str=None, stop_signal=False):
     if mode == "tiptilt":
-        capture_frames(measure=True)
+        capture_frames(measure=True, stop_signal=stop_signal)
     if mode == "eccentricity":
-        measure_eccentricity(measure=True)
+        measure_eccentricity(measure=True, stop_signal=stop_signal)
     else:
         raise ValueError("Invalid mode. Must be either 'tiptilt' or 'eccentricity'.")
 

@@ -65,7 +65,14 @@ def check_motion_status():
 
 def make_reference_move():
     # Find Reference
-    send_command("FPL")
+    ref = send_command("FPL")
+
+    if ref == "5":
+        print("Error 5, try move and reference again")
+        move_motor_to_position(5)
+        ref = send_command("FPL")
+        print("Second reference move: ", ref)
+
     check_error()
     time.sleep(0.1)
     while not check_motion_status():
