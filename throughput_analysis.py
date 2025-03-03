@@ -8,7 +8,6 @@ def main(main_folder, calibration_file):
     Args:
         main_folder: Path to the main folder.
         calibration_file: Path to the calibration file.
-        number_of_measurements: Number of data points to take.
     """
     # Calculate the throughput
     calculate_throughput(main_folder, calibration_file)
@@ -118,7 +117,7 @@ def calculate_throughput(main_folder, calibration_file):
     with open(throughput_file, 'w') as f:
         json.dump(throughput, f, indent=4)
 
-def calc_cal_quotient_folder(calibration_folder:str):
+def calc_cal_quotient_folder(calibration_folder:str): # deprecated
     calibration_file_list = os.listdir(calibration_folder)
 
     cal_qou_list = []
@@ -132,12 +131,20 @@ def calc_cal_quotient_folder(calibration_folder:str):
     with open(cal_qou_file, 'w') as f:
         json.dump(cal_qou_list, f, indent=4)
 
-def calc_cal_quotient(calibration_file:str):
+def calc_cal_quotient(calibration_folder:str):
+    """
+    Calculate the calibration quotient
+    Args:
+        calibration_folder: Path to the calibration folder.
+
+    Returns: List of calibration quotients for all filters.
+
+    """
     # Load the calibration data
 
 
     data_list = []
-    calibration_file_list = os.listdir(calibration_file)
+    calibration_file_list = os.listdir(calibration_folder)
     for file in calibration_file_list:
         with open(file, 'r') as f:
             calibration_data = json.load(f)

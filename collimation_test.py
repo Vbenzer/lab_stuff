@@ -9,7 +9,7 @@ import subprocess
 import json
 
 
-def main(project_folder:str):
+def main(project_folder:str): # Obsolete
 
 
     dark_folder = project_folder+"/DARK"

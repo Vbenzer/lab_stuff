@@ -6,6 +6,15 @@ import analyse_main
 from astropy.io import fits
 
 def main_measure_all_filters(project_folder:str, progress_signal=None):
+    """
+    Run the measuring pipeline for all filters.
+    Args:
+        project_folder: Path to the project folder.
+        progress_signal: Progress signal.
+
+    Returns:
+
+    """
     for i in range(2, 7):
         # Create project subfolder for each filter
         filter_folder = project_folder + f"/filter_{i}"
@@ -22,6 +31,15 @@ def main_measure_all_filters(project_folder:str, progress_signal=None):
     progress_signal.emit("All filters complete!")
 
 def main_analyse_all_filters(project_folder:str, progress_signal=None):
+    """
+    Run the analysis pipeline for all filters and plot the output f-numbers vs input f-numbers.
+    Args:
+        project_folder: Path to the project folder.
+        progress_signal: Progress signal.
+
+    Returns:
+
+    """
     f_num = np.zeros(5)
     f_num_err = np.zeros(5)
 
@@ -72,6 +90,14 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
     file_save_managment.save_measurement_hdf5("D:/Vincent/frd_measurements.h5", measurement_name, f_num, f_num_err)
 
 def sutherland_plot(project_folder:str):
+    """
+    Plot the encircled energy vs output aperture f/#, to visualize light loss of the fiber with different f/#.
+    Args:
+        project_folder: Path to the project folder.
+
+    Returns:
+
+    """
     # Input f-numbers
     input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597]) # These are from the setup_F#_EE_98 file, 18.2.25
     input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
@@ -97,7 +123,6 @@ def sutherland_plot(project_folder:str):
         with fits.open(reduced_image_path) as hdul:
             reduced_image = hdul[0].data.astype(np.float32)
 
-        # Find center of mass
         import image_analysation as ia
         # Trim data to area of interest (perhaps not necessary with better background reduction)
         trimmed_data = ia.cut_image(reduced_image, margin=500)  # Margin at 500 good for now
@@ -132,25 +157,6 @@ def sutherland_plot(project_folder:str):
 
         ee_list.append(ee_sublist)
 
-    # Fit function
-    def practical_funct_log(x, a, b):
-        return 1 / (1 + np.exp(a * (x - b)))
-
-    def practical_funct(x, a, b, c):
-        return 1 / (1+a*(x+b)**c)
-
-    def theoretical_funct(x,t):
-        return t**2/x**2
-
-    """# Fit the data
-    from scipy.optimize import curve_fit
-    popt_list = []
-    p0_list = [[0.005, -3.6, 3.6],[0.02, -3.5, 3.1],[0.073, -3.5, 2.3],[0.2, -3.5,  1.6],[0.24, -3.2,  1.5]]
-    for i,ee in enumerate(ee_list):
-        popt = curve_fit(practical_funct, input_f_num, ee, p0=p0_list[i])
-        popt_list.append(popt)
-        print(popt)"""
-
     # Make spline fit
     from scipy.interpolate import PchipInterpolator
 
@@ -161,46 +167,35 @@ def sutherland_plot(project_folder:str):
     input_f_num = np.flip(input_f_num)
     input_f_num_err = np.flip(input_f_num_err)
 
-    """ee_list_theo = ee_list.copy()
-    for i in range(len(ee_list_theo)):
-        ee_list_theo[i, :len(ee_list_theo[i]) - i] = 1
-
-    ee_list_cut = [ee_list_theo[0],
-                   [ee_list_theo[1][3], ee_list_theo[1][4]],
-                   [ee_list_theo[2][2], ee_list_theo[2][3], ee_list_theo[2][4]],
-                   [ee_list_theo[3][1], ee_list_theo[3][2], ee_list_theo[3][3], ee_list_theo[3][4]],
-                   ee_list_theo[4]]
-
-    input_f_num_cut = [input_f_num, input_f_num[3:], input_f_num[2:], input_f_num[1:], input_f_num]"""
-
     popt_list = []
     for i, ee in enumerate(ee_list):
-        # Create the spline with non-monotonic data
+        # Create the spline
         spline = PchipInterpolator(input_f_num, ee)
         popt_list.append([spline])
-
-    """popt_list_theo = []
-    for ee, f_num in zip(ee_list_cut, input_f_num_cut):
-        # Create the spline with non-monotonic data
-        spline = PchipInterpolator(f_num, ee)
-        popt_list_theo.append([spline])"""
 
     # Plot the encircled energy vs input f-numbers
     labels = ["F/6.21", "F/5.103", "F/4.571", "F/4.063", "F/3.597"]
     colors = ['blue', 'green', 'orange', 'purple', 'red']
     x_range = np.linspace(min(input_f_num), max(input_f_num), 1000)
     for idx, ee in enumerate(ee_list):
-
+        # Plot the data points
         plt.errorbar(input_f_num, ee, xerr=input_f_num_err, fmt="o", color=colors[idx % len(colors)],
                      label=f"Input {labels[idx % len(labels)]}", capsize=5)
+
+        # Plot the spline
         plt.plot(x_range, popt_list[idx][0](x_range), linestyle='-', color=colors[idx % len(colors)], linewidth=1)
+
+        # Visualize the light loss at the output f-ratio
         plt.vlines(input_f_num[4-idx], ee[4-idx], 1, color=colors[idx % len(colors)], linestyle='--', linewidth=0.5)
+
+        # Add text to the plot
         alignment = 'right' if idx == 0 else 'left'
         padding = -0.05 if idx == 0 else 0.05
         plt.text(input_f_num[4 - idx] + padding, ee[4 - idx], f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
                  fontsize=8,
                  verticalalignment='center_baseline', horizontalalignment=alignment)
 
+    # For the legend
     plt.vlines([], [], [], color='black', linestyle='--', linewidth=0.5, label='Light loss at input = output f-ratio')
 
     plt.xlabel("Output Aperture f/#")

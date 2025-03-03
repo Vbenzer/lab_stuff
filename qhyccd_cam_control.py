@@ -228,7 +228,16 @@ while count < 100:
     print(f"FPS: {fps:.2f}")"""
 
 
-def capture_frames(measure=False, stop_signal=False):
+def measure_ongoing_radius(measure:bool=False, stop_signal:bool=False):
+    """
+    Function to continually measure the radius of the output light cone for tiptilt adjustment.
+    Args:
+        measure: Whether to measure the radius.
+        stop_signal: Signal from Gui to stop the measurement.
+
+    Returns:
+
+    """
     count = 0
     start_time = time.time()
     while count < 1000 or not stop_signal:
@@ -288,7 +297,16 @@ def capture_frames(measure=False, stop_signal=False):
         fps = count / time_diff
         print(f"FPS: {fps:.2f}")
 
-def measure_eccentricity(measure=True, stop_signal=False):
+def measure_eccentricity(measure:bool=True, stop_signal:bool=False):
+    """
+    Function to continually measure the eccentricity of the output light cone.
+    Args:
+        measure: Whether to measure the eccentricity.
+        stop_signal: Signal from Gui to stop the measurement.
+
+    Returns:
+
+    """
     count = 0
     start_time = time.time()
     while count < 1000 or not stop_signal:
@@ -348,8 +366,17 @@ def measure_eccentricity(measure=True, stop_signal=False):
         print(f"FPS: {fps:.2f}")
 
 def use_camera(mode:str=None, stop_signal=False):
+    """
+    Function to use the camera in either tiptilt or eccentricity mode.
+    Args:
+        mode: Mode to run the camera in. Must be either 'tiptilt' or 'eccentricity'.
+        stop_signal: Signal to stop the measurement.
+
+    Returns:
+
+    """
     if mode == "tiptilt":
-        capture_frames(measure=True, stop_signal=stop_signal)
+        measure_ongoing_radius(measure=True, stop_signal=stop_signal)
     if mode == "eccentricity":
         measure_eccentricity(measure=True, stop_signal=stop_signal)
     else:

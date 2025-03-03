@@ -9,17 +9,37 @@ from PyQt6.QtCore import pyqtSignal
 import sg_pipeline
 
 
-def save_recent_folders(recent_folders, file_path='D:/Vincent/recent_folders.json'):
+def save_recent_folders(recent_folders:str, file_path='D:/Vincent/recent_folders.json'):
+    """
+    Save the recent folders to a JSON file.
+    Args:
+        recent_folders: Folder names to save.
+        file_path: Path of the JSON file to save to.
+    """
     with open(file_path, 'w') as file:
         json.dump(recent_folders, file)
 
 def load_recent_folders(file_path='D:/Vincent/recent_folders.json'):
+    """
+    Load the recent folders from a JSON file.
+    Args:
+        file_path: Path of the JSON file to load from.
+
+    Returns: List of recent folders.
+    """
     if os.path.exists(file_path):
         with open(file_path, 'r') as file:
             return json.load(file)
     return []
 
-def update_recent_folders(folder, recent_folders, max_recent=2):
+def update_recent_folders(folder:str, recent_folders:list[str], max_recent=2):
+    """
+    Update the list of recent folders.
+    Args:
+        folder: New folder to add.
+        recent_folders: List of recent folders.
+        max_recent: Maximum number of recent folders to keep.
+    """
     if folder in recent_folders:
         recent_folders.remove(folder)
     recent_folders.insert(0, folder)
@@ -27,7 +47,6 @@ def update_recent_folders(folder, recent_folders, max_recent=2):
         recent_folders.pop()
     save_recent_folders(recent_folders)
 
-# Todo: Add feature to view plots in GUI
 # Todo: This would be cool: For more complex fiber shapes add a custom feature where the user can trace the fiber shape around the fiber image
 # the mask can then be scaled and used for the calculations
 
@@ -163,6 +182,9 @@ class MainWindow(QMainWindow):
         self.progress_signal.connect(self.update_progress)
 
     def update_input_visibility(self):
+        """
+        Update the visibility of the input fields based on the selected tab.
+        """
         if self.tabs.currentWidget() == self.general_tab:
             self.folder_name_label.setText("Folder Name:")
             self.fiber_diameter_label.hide()
@@ -471,10 +493,10 @@ class MainWindow(QMainWindow):
         self.general_tab.setLayout(layout)
 
         # Connect the signal and update the stop button visibility
-        self.general_function_combo.currentIndexChanged.connect(self.update_stop_button_visibility)
-        self.update_stop_button_visibility()
+        self.general_function_combo.currentIndexChanged.connect(self.update_general_tab_buttons)
+        self.update_general_tab_buttons()
 
-    def update_stop_button_visibility(self):
+    def update_general_tab_buttons(self):
         selected_function = self.general_function_combo.currentText()
         if selected_function in ["Adjust Tip/Tilt", "Measure Eccentricity"]:
             self.stop_button.show()

@@ -13,7 +13,15 @@ ser = serial.Serial(port, baud_rate, timeout=timeout)
 
 
 # Function to send a command to the motor controller
-def send_command(command):
+def send_command(command:str):
+    """
+    Send a command to the motor controller and return the response
+    Args:
+        command: Command to send
+
+    Returns: Response from the motor controller
+
+    """
     # Ensure command ends with carriage return (\r) as required by the C-663 controller
     command = command + '\n'
     ser.write(command.encode('utf-8'))
@@ -25,6 +33,9 @@ def send_command(command):
 
 
 def check_error():
+    """
+    Check if an error has been reported by the controller
+    """
     # Send error query command
     error_response = send_command("ERR?")
     if error_response != '0':
@@ -33,6 +44,11 @@ def check_error():
 
 
 def is_motion_complete():
+    """
+    Check if all motion is complete
+    Returns: True if all motion is complete, False otherwise
+
+    """
     # Send the #5 command to check motion status
     ser.write(b'7')
     time.sleep(0.2)  # Give time for response
@@ -42,6 +58,11 @@ def is_motion_complete():
 
 
 def check_motion_status():
+    """
+    Check the motion status of the motor
+    Returns: True if the motor is ready, False otherwise
+
+    """
     # Query the status register
     response = send_command("SRG? 1 1")
     #print(f"Raw SRG? response: {response}")
@@ -64,6 +85,11 @@ def check_motion_status():
 
 
 def make_reference_move():
+    """
+    Perform a reference move to establish a known position. Also resolves error that sometimes appears when initially
+    using the controller.
+
+    """
     # Find Reference
     ref = send_command("FPL")
 
@@ -82,7 +108,14 @@ def make_reference_move():
 
 
 # Example of moving the motor by a small step
-def move_motor_to_position(position):
+def move_motor_to_position(position:float):
+    """
+    Move the motor to a specified position
+    Args:
+        position: Float value of the position to move to. Must be within 0 and 9.9 mm.
+
+
+    """
     # Enable the motor if not already enabled
     print("Enabling motor...")
     send_command(f"SVO 1 1")
