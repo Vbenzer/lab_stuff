@@ -387,4 +387,4 @@ def use_camera(mode:str=None, stop_signal=False):
     ret = qhyccddll.ReleaseQHYCCDResource()
 
 if __name__ == "__main__":
-    use_camera(mode="eccentricity")
+    use_camera(mode="tiptilt")

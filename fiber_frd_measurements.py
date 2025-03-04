@@ -125,7 +125,7 @@ def sutherland_plot(project_folder:str):
 
         import image_analysation as ia
         # Trim data to area of interest (perhaps not necessary with better background reduction)
-        trimmed_data = ia.cut_image(reduced_image, margin=500)  # Margin at 500 good for now
+        trimmed_data = ia.cut_image(reduced_image, margin=700)  # If margin too low mask won't fit in image
 
         # Locate center of mass within trimmed image (array)
         com = ia.LocateFocus(trimmed_data)
@@ -142,7 +142,7 @@ def sutherland_plot(project_folder:str):
             # Create a circle mask
             import sg_pipeline
             mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius
-                                                    , plot_mask=False)
+                                                    , plot_mask=True)
 
             # Calculate the flux within the mask
             flux = np.sum(mask * trimmed_data)
@@ -210,5 +210,5 @@ def sutherland_plot(project_folder:str):
 
 
 if __name__ == "__main__":
-    project_folder = "D:/Vincent/OptranWF_100_187_P_measurement_3/FRD"
+    project_folder = "D:/Vincent/40x120_300A_measurement_4/FRD"
     sutherland_plot(project_folder)
