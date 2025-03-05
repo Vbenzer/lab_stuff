@@ -56,7 +56,7 @@ def measure_all_filters(main_folder, number_of_measurements=100, progress_signal
             progress_signal.emit(f"Measurement for filter {filter_name} completed.")
 
     # When done reset filter to none
-    move_to_filter.move("none")
+    move_to_filter.move("0")
 
 def plot_throughput(main_folder:str, save:bool=False):
     """

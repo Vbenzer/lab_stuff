@@ -142,7 +142,7 @@ def sutherland_plot(project_folder:str):
             # Create a circle mask
             import sg_pipeline
             mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius
-                                                    , plot_mask=True)
+                                                    , plot_mask=False)
 
             # Calculate the flux within the mask
             flux = np.sum(mask * trimmed_data)
