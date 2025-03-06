@@ -114,7 +114,10 @@ def calculate_throughput(main_folder, calibration_folder):
         data[filter_name]["channel_1"] = [x for x in data[filter_name]["channel_1"] if x != np.inf and x != 0.0]
         data[filter_name]["channel_2"] = [x for x in data[filter_name]["channel_2"] if x != np.inf and x != 0.0]
     #data = data[np.isfinite(data) & (data != 0)]
-
+        if len(data[filter_name]["channel_1"]) < 20 or len(data[filter_name]["channel_2"]) < 20:
+            data[filter_name]["channel_1"] = [0]
+            data[filter_name]["channel_2"] = [1]
+            print("Warning: Data amount small, setting to 0")
     print(data)
     print(calibration_quotient_list)
 
@@ -167,12 +170,8 @@ def calc_cal_quotient(calibration_folder:str):
         calibration_data["channel_1"] = [x for x in calibration_data["channel_1"] if x != np.inf and x != 0.0]
         calibration_data["channel_2"] = [x for x in calibration_data["channel_2"] if x != np.inf and x != 0.0]
 
-        if len(calibration_data["channel_1"]) == 0:
-            calibration_data["channel_1"] = [1]
-            raise Warning("Channel 1 is empty")
-        if len(calibration_data["channel_2"]) == 0:
-            calibration_data["channel_2"] = [1]
-            raise Warning("Channel 2 is empty")
+        if len(calibration_data["channel_1"]) < 20 or len(calibration_data["channel_2"]) < 20:
+            print("Warning: Data amount small")
 
     calibration_quotient_list = []
     for calibration_data in data_list:

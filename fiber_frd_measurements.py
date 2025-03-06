@@ -125,7 +125,7 @@ def sutherland_plot(project_folder:str):
 
         import image_analysation as ia
         # Trim data to area of interest (perhaps not necessary with better background reduction)
-        trimmed_data = ia.cut_image(reduced_image, margin=700)  # If margin too low mask won't fit in image
+        trimmed_data = ia.cut_image(reduced_image, margin=1000)  # If margin too low mask won't fit in image
 
         # Locate center of mass within trimmed image (array)
         com = ia.LocateFocus(trimmed_data)

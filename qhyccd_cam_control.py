@@ -227,7 +227,6 @@ while count < 100:
     fps = count / time_diff
     print(f"FPS: {fps:.2f}")"""
 
-
 def measure_ongoing_radius(measure:bool=False, stop_signal:bool=False):
     """
     Function to continually measure the radius of the output light cone for tiptilt adjustment.
