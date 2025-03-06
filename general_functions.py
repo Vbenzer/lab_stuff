@@ -52,6 +52,7 @@ def get_ff_with_all_filters(working_directory):
 def inf_fiber_original_tp_plot(csv_file:str, show=False):
     import pandas as pd
     # Read data from csv file
+    print(csv_file)
     data = pd.read_csv(csv_file, header=None)
     list1 = data[0].tolist()
     print(list1)
@@ -71,12 +72,17 @@ def inf_fiber_original_tp_plot(csv_file:str, show=False):
     attenuation = np.array(list2) * fiber_length
     throughput = 10**(-attenuation/10)
 
+
+    plt.figure()
+    plt.plot(list1, throughput, label="Original in Throughput")
+    plt.xlabel("Wavelength (μm)")
+    plt.ylabel("Throughput")
+    plt.savefig("D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/Throughput/throughput_original.png")
     if show:
-        plt.figure()
-        plt.plot(list1, throughput, label="Original in Throughput")
-        plt.xlabel("Wavelength (μm)")
-        plt.ylabel("Throughput")
         plt.show()
+    plt.close()
+
+
 
     return list1, throughput
 
@@ -92,19 +98,20 @@ def overplot_original_and_data(data, original_data, show=False):
     wavelength = []
     throughput = []
     for filter in filters:
-        wavelength.append(int(filter))
+        wavelength.append(int(filter)*1e-3)
         throughput.append(data[filter])
 
     plt.figure()
     plt.plot(wavelength_or, tp_or, label="Original")
 
     # Column plot of measured data
-    plt.plot(wavelength, throughput, 'o', label="Data")
+    plt.bar(wavelength, throughput,width=0.05, label="Data")
 
     plt.xlabel("Wavelength (μm)")
     plt.ylabel("Throughput")
     plt.legend()
-    plt.show()
+    plt.savefig("D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/Throughput/throughput_comparison.png")
+    plt.close()
 
 
 
@@ -114,6 +121,6 @@ if __name__ == "__main__":
     #working_directory = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/FF_with_all_filters"
     #get_ff_with_all_filters(working_directory)
     csv_file = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/Throughput/Default Dataset.csv"
-    original_data = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/Throughput/throughput.json"
+    measured_data = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/Throughput/throughput.json"
     #inf_fiber_original_tp_plot(csv_file, show=True)
-    overplot_original_and_data(csv_file, original_data, show=True)
+    overplot_original_and_data(measured_data, csv_file, show=True)
