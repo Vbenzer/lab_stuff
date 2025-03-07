@@ -1,8 +1,7 @@
 Bugs: (Sorted by priority)
 - Gui bugs:
-    - Ref -> Analyse -> general
-    - Can run Tp analysis wo calibration file
-- Move_to_filter doesn't release port
+    - Checklist gets reset when locking inputs
+- Move_to_filter doesn't release port (fixed but not tested)
 
 - Gui layout doesnt stay still... but only in lab
 
@@ -14,6 +13,8 @@ Additions: (Sorted by priority)
     - a way to move motor to certain position
     - filter wheel control
     - control of f-number wheel
+
+- Add way to upload results (and maybe also rawdata) to labshare server
 
 - Make plots with visualisation of the input and output f-number
 

@@ -110,9 +110,9 @@ class MainWindow(QMainWindow):
         self.choose_folder_button = QPushButton("Choose Existing Folder")
         self.choose_folder_button.clicked.connect(self.choose_folder)
 
-        self.metadata_button = QPushButton("Add Metadata")
-        self.metadata_button.clicked.connect(self.access_metadata)
-        self.metadata_button.setDisabled(True)
+        self.comments_button = QPushButton("Add Comments")
+        self.comments_button.clicked.connect(self.access_comments_file)
+        self.comments_button.setDisabled(True)
 
         self.lock_button = QPushButton("Lock In")
         self.lock_button.clicked.connect(self.lock_inputs)
@@ -150,7 +150,7 @@ class MainWindow(QMainWindow):
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.choose_folder_button)
-        button_layout.addWidget(self.metadata_button)
+        button_layout.addWidget(self.comments_button)
         button_layout.addWidget(self.lock_button)
         button_layout.addWidget(self.unlock_button)
         self.layout.addLayout(button_layout)
@@ -200,6 +200,7 @@ class MainWindow(QMainWindow):
             if not hasattr(self, 'placeholder_spacer'):
                 self.placeholder_spacer = QSpacerItem(20, 86)
                 self.layout.insertItem(self.layout.count() - 1, self.placeholder_spacer)
+            self.update_general_tab_buttons()  # Ensure buttons are correctly updated
         else:
             if hasattr(self, 'placeholder_spacer'):
                 self.layout.removeItem(self.placeholder_spacer)
@@ -226,7 +227,7 @@ class MainWindow(QMainWindow):
             self.choose_folder_button.show()
             self.lock_button.show()
             self.unlock_button.show()
-            self.metadata_button.show()
+            self.comments_button.show()
             self.recent_folders_combo.show()
             self.working_dir_label.show()
             self.recent_folders_label.show()
@@ -249,7 +250,7 @@ class MainWindow(QMainWindow):
             self.working_dir_display.setText(folder)
             self.folder_name_input.setText(os.path.basename(folder))
             self.load_fiber_data(folder)
-            self.update_metadata_button()
+            self.update_comments_button()
 
     def update_fiber_shape_inputs(self):
         fiber_shape = self.fiber_shape_combo.currentText()
@@ -268,27 +269,27 @@ class MainWindow(QMainWindow):
             self.fiber_height_label.hide()
             self.fiber_height_input.hide()
 
-    def access_metadata(self):
+    def access_comments_file(self):
         working_dir = self.working_dir_display.text()
         if not working_dir:
             self.show_message("Please select a working directory first.")
             return
 
-        metadata_file_path = os.path.join(working_dir, "metadata.txt")
-        if not os.path.exists(metadata_file_path):
-            with open(metadata_file_path, "w") as file:
-                file.write("Metadata for the fiber measurements.\n")
-            self.metadata_button.setText("Access Metadata")
+        comments_file_path = os.path.join(working_dir, "comments.txt")
+        if not os.path.exists(comments_file_path):
+            with open(comments_file_path, "w") as file:
+                file.write("Comments:\n")
+            self.comments_button.setText("Access Comments")
         else:
-            os.startfile(metadata_file_path)
+            os.startfile(comments_file_path)
 
-    def update_metadata_button(self):
+    def update_comments_button(self):
         working_dir = self.working_dir_display.text()
-        metadata_file_path = os.path.join(working_dir, "metadata.txt")
-        if os.path.exists(metadata_file_path) and os.path.getsize(metadata_file_path) > 0:
-            self.metadata_button.setText("Access Metadata")
+        comments_file_path = os.path.join(working_dir, "comments.txt")
+        if os.path.exists(comments_file_path) and os.path.getsize(comments_file_path) > 0:
+            self.comments_button.setText("Access Comments")
         else:
-            self.metadata_button.setText("Add Metadata")
+            self.comments_button.setText("Add Comments")
 
     def update_progress(self, message):
         if not self.progress_text_edit.isVisible():
@@ -326,7 +327,7 @@ class MainWindow(QMainWindow):
                 self.lock_inputs()
             else:
                 self.show_message("Please enter fiber name, diameter, length, and shape before locking inputs.")
-            self.update_metadata_button()
+            self.update_comments_button()
             update_recent_folders(folder, self.recent_folders)
             self.update_recent_folders_combo()
 
@@ -427,11 +428,10 @@ class MainWindow(QMainWindow):
 
         # Update all run buttons
         self.update_measurement_button_state()
-        self.update_throughput_analysis_button_state()
-        self.update_general_analysis_button_state()
+        self.update_run_button_state()
 
-        self.metadata_button.setDisabled(False)
-        self.update_metadata_button()
+        self.comments_button.setDisabled(False)
+        self.update_comments_button()
 
         # Update the UI state
         self.update_ui_state()
@@ -452,13 +452,32 @@ class MainWindow(QMainWindow):
         self.run_measurement_button.setDisabled(True)
         self.run_analysis_button.setDisabled(True)
         self.existing_measurements_label.setText("")
-        self.metadata_button.setDisabled(True)
+        self.comments_button.setDisabled(True)
         self.lock_button.setDisabled(False)
         self.unlock_button.setDisabled(True)
         self.update_run_button_state()
 
     def update_run_button_state(self):
-        self.run_button.setDisabled(not self.inputs_locked)
+        if self.analysis_type_combo.currentText() == "Throughput":
+            if self.inputs_locked and self.calibration_folder_input.text() != "":
+                self.run_analysis_button.setDisabled(False)
+            else:
+                self.run_analysis_button.setDisabled(True)
+
+        elif self.analysis_type_combo.currentText() == "SG" or self.analysis_type_combo.currentText() == "FRD":
+            if (self.inputs_locked and (self.analysis_type_combo.currentText() == "SG" or self.analysis_type_combo.currentText() == "FRD")
+                    and (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked()
+                        or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
+                        or self.plot_masks_checkbox.isChecked() or self.make_video_checkbox.isChecked()
+                        or self.sg_new_checkbox.isChecked() or self.calc_frd_checkbox.isChecked()
+                        or self.plot_sutherland_checkbox.isChecked()
+            )):
+                self.run_analysis_button.setDisabled(False)
+            else:
+                self.run_analysis_button.setDisabled(True)
+
+        else:
+            self.run_analysis_button.setDisabled(True)
 
     def init_general_tab(self):
         layout = QVBoxLayout()
@@ -512,7 +531,7 @@ class MainWindow(QMainWindow):
             self.choose_folder_button.hide()
             self.lock_button.hide()
             self.unlock_button.hide()
-            self.metadata_button.hide()
+            self.comments_button.hide()
             self.recent_folders_combo.hide()
             self.working_dir_label.hide()
             self.recent_folders_label.hide()
@@ -528,7 +547,7 @@ class MainWindow(QMainWindow):
             self.choose_folder_button.show()
             self.lock_button.show()
             self.unlock_button.show()
-            self.metadata_button.show()
+            self.comments_button.show()
             self.recent_folders_combo.show()
             self.working_dir_label.show()
             self.recent_folders_label.show()
@@ -670,19 +689,19 @@ class MainWindow(QMainWindow):
         self.calc_frd_checkbox = QCheckBox("Calculate FRD")
         self.plot_sutherland_checkbox = QCheckBox("Make Sutherland Plot")
 
-        self.plot_sg_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
-        self.calc_sg_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
-        self.plot_coms_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
-        self.get_params_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
-        self.plot_masks_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
-        self.make_video_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
-        self.sg_new_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
-        self.calc_frd_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
-        self.plot_sutherland_checkbox.stateChanged.connect(self.update_general_analysis_button_state)
+        self.plot_sg_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.calc_sg_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.plot_coms_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.get_params_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.plot_masks_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.make_video_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.sg_new_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.calc_frd_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.plot_sutherland_checkbox.stateChanged.connect(self.update_run_button_state)
 
         self.calibration_folder_label = QLabel("Calibration Folder:")
         self.calibration_folder_input = QLineEdit()
-        self.calibration_folder_input.textChanged.connect(self.update_throughput_analysis_button_state)
+        self.calibration_folder_input.textChanged.connect(self.update_run_button_state)
         self.calibration_folder_button = QPushButton("Choose Calibration Folder")
         self.calibration_folder_button.clicked.connect(self.choose_calibration_folder)
 
@@ -709,12 +728,6 @@ class MainWindow(QMainWindow):
 
         self.analyse_tab.setLayout(layout)
         self.update_analysis_tab()
-
-    def update_throughput_analysis_button_state(self):
-        if self.inputs_locked and self.analysis_type_combo.currentText() == "Throughput" and self.calibration_folder_input.text():
-            self.run_analysis_button.setDisabled(False)
-        else:
-            self.update_general_analysis_button_state()
 
     def update_analysis_tab(self):
         analysis_type = self.analysis_type_combo.currentText()
@@ -764,17 +777,6 @@ class MainWindow(QMainWindow):
                                                        self.base_directory + "/Calibration")
         if folder_path:
             self.calibration_folder_input.setText(folder_path)
-
-    def update_general_analysis_button_state(self):
-        if self.inputs_locked and (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked()
-                                    or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
-                                    or self.plot_masks_checkbox.isChecked() or self.make_video_checkbox.isChecked()
-                                    or self.sg_new_checkbox.isChecked() or self.calc_frd_checkbox.isChecked()
-                                    or self.plot_sutherland_checkbox.isChecked()
-        ):
-            self.run_analysis_button.setDisabled(False)
-        else:
-            self.run_analysis_button.setDisabled(True)
 
     def check_existing_measurements(self, folder):
         measurements = []
