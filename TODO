@@ -1,0 +1,23 @@
+Bugs: (Sorted by priority)
+- Gui bugs:
+    - Ref -> Analyse -> general
+    - Can run Tp analysis wo calibration file
+- Move_to_filter doesn't release port
+
+- Gui layout doesnt stay still... but only in lab
+
+Additions: (Sorted by priority)
+- Add fiber data to the GUI: NA, Coating, Manufacturer
+
+- Add to gui:
+    - The function: FF with all filters
+    - a way to move motor to certain position
+    - filter wheel control
+    - control of f-number wheel
+
+- Make plots with visualisation of the input and output f-number
+
+- Incorporate Thorcam or way to check input output cam as live feed in Gui
+- Same with Qhyccd, also check for max value and way to easily change exposure time in GUI
+    - Problem with that: Hot pixel mask necessary
+  - Add a way to change the exposure time in the GUI
