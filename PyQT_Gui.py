@@ -516,6 +516,7 @@ class MainWindow(QMainWindow):
             self.recent_folders_combo.hide()
             self.working_dir_label.hide()
             self.recent_folders_label.hide()
+            self.run_button.setEnabled(True)
 
         else:
             if hasattr(self, 'placeholder_spacer_2'):
@@ -531,6 +532,7 @@ class MainWindow(QMainWindow):
             self.recent_folders_combo.show()
             self.working_dir_label.show()
             self.recent_folders_label.show()
+            self.run_button.setDisabled(not self.inputs_locked)
 
         if selected_function == "Make Throughput Calibration":
             # Change the folder name label to calibration name
@@ -544,23 +546,26 @@ class MainWindow(QMainWindow):
         self.progress_signal.emit("Stopping function...")
 
     def run_general_function(self):
-        if not self.inputs_locked:
+        selected_function = self.general_function_combo.currentText()
+
+        if selected_function not in ["Motor Controller: Reference", "Measure Eccentricity",
+                                     "Adjust Tip/Tilt"] and not self.inputs_locked:
             self.show_message("Please lock the inputs before running the function.")
             return
 
         working_dir = self.working_dir_display.text()
-        if not working_dir:
+        if selected_function not in ["Motor Controller: Reference", "Measure Eccentricity",
+                                     "Adjust Tip/Tilt"] and not working_dir:
             self.show_message("Please select a working directory first.")
             return
 
-        selected_function = self.general_function_combo.currentText()
         self.experiment_running = True
         self.update_ui_state()
 
         threading.Thread(target=self.run_general_function_thread, args=(selected_function, working_dir)).start()
 
     def run_general_function_thread(self, selected_function, working_dir):
-        self.progress_signal.emit(f"Running {selected_function} with working dir: {working_dir}")
+        self.progress_signal.emit(f"Running {selected_function}...")
         self.stop_event = threading.Event()
         if selected_function == "Measure System F-ratio":
             import fiber_frd_measurements as frd
@@ -936,6 +941,7 @@ class MainWindow(QMainWindow):
         elif analysis_type == "Throughput":
             directory = os.path.join(working_dir, "Throughput")
             import throughput_analysis
+            print(calibration_folder)
             throughput_analysis.main(directory, calibration_folder)
 
         self.progress_signal.emit("Analysis complete.")

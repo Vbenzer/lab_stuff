@@ -41,6 +41,7 @@ def check_error():
     if error_response != '0':
         print(f"Error reported:", error_response)
     # You can use the error code to look up specific issues in the manual.
+    return error_response
 
 
 def is_motion_complete():
@@ -91,7 +92,9 @@ def make_reference_move():
 
     """
     # Find Reference
-    ref = send_command("FPL")
+    send_command("FPL")
+    ref = check_error()
+    print(ref)
 
     if ref == "5":
         print("Error 5, try move and reference again")
@@ -143,7 +146,7 @@ if __name__ == "__main__":
         if ser.is_open:
             #send_command("CLR")
             print("Connected to motor controller.")
-            make_reference_move()
+            #make_reference_move()
             # Set the desired step size (modify as per your needs)
             position = 0  # Change the step size to what is appropriate
             move_motor_to_position(position)
