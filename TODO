@@ -7,6 +7,7 @@ Bugs: (Sorted by priority)
 
 Additions: (Sorted by priority)
 - Add fiber data to the GUI: NA, Coating, Manufacturer
+    - initial work done, change that second window opens with set params
 
 - Add to gui:
     - The function: FF with all filters
