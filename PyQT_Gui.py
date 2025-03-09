@@ -155,9 +155,11 @@ class MainWindow(QMainWindow):
 
         self.progress_signal.connect(self.update_progress)
 
-    def open_fiber_data_window(self):
         self.fiber_data_window = FiberDataWindow(self)
+
+    def open_fiber_data_window(self):
         self.fiber_data_window.fiberDataChanged.connect(self.update_fiber_data)
+        self.fiber_data_window.update_window()
         self.fiber_data_window.show()
 
     @pyqtSlot(str, object, str)
@@ -944,13 +946,26 @@ class FiberDataWindow(QDialog):
         self.fiber_shape_combo.addItems(["None", "circular", "octagonal", "rectangular"])
         self.fiber_shape_combo.setFixedWidth(300)
         self.fiber_shape_combo.currentIndexChanged.connect(self.update_fiber_shape_inputs)
-        #self.fiber_shape_combo.currentIndexChanged.connect(self.emit_fiber_data_changed)
 
-        self.save_button = QPushButton("Save")
+        self.numerical_aperature_label = QLabel("Numerical Aperature:")
+        self.numerical_aperature_input = QLineEdit()
+        self.numerical_aperature_input.setFixedWidth(300)
+
+        self.coating_type_label = QLabel("Coating Type:")
+        self.coating_type_input = QLineEdit()
+        self.coating_type_input.setFixedWidth(300)
+
+        self.manufacturer_label = QLabel("Manufacturer:")
+        self.manufacturer_input = QLineEdit()
+        self.manufacturer_input.setFixedWidth(300)
+
+        self.save_button = QPushButton("Save and close")
         self.save_button.clicked.connect(self.check_inputs_and_save)
 
         self.layout.addWidget(self.fiber_name_label)
         self.layout.addWidget(self.fiber_name_input)
+        self.layout.addWidget(self.fiber_shape_label)
+        self.layout.addWidget(self.fiber_shape_combo)
         self.layout.addWidget(self.fiber_diameter_label)
         self.layout.addWidget(self.fiber_diameter_input)
         self.layout.addWidget(self.fiber_width_label)
@@ -959,18 +974,47 @@ class FiberDataWindow(QDialog):
         self.layout.addWidget(self.fiber_height_input)
         self.layout.addWidget(self.fiber_length_label)
         self.layout.addWidget(self.fiber_length_input)
-        self.layout.addWidget(self.fiber_shape_label)
-        self.layout.addWidget(self.fiber_shape_combo)
+        self.layout.addWidget(self.numerical_aperature_label)
+        self.layout.addWidget(self.numerical_aperature_input)
+        self.layout.addWidget(self.coating_type_label)
+        self.layout.addWidget(self.coating_type_input)
+        self.layout.addWidget(self.manufacturer_label)
+        self.layout.addWidget(self.manufacturer_input)
+
         self.layout.addWidget(self.save_button)
 
         self.fiber_dimension = ""
+        self.fiber_shape = ""
+        self.fiber_length = ""
+        self.fiber_name = ""
+        self.numerical_aperature = ""
+        self.coating_type = ""
+        self.manufacturer = ""
 
-    def save_fiber_data(self, folder, fiber_dimension, fiber_shape, fiber_length):
+    def update_window(self):
+        self.fiber_name_input.setText(self.fiber_name)
+        self.fiber_length_input.setText(self.fiber_length)
+        self.fiber_shape_combo.setCurrentText(self.fiber_shape)
+        self.numerical_aperature_input.setText(self.numerical_aperature)
+        self.coating_type_input.setText(self.coating_type)
+        self.manufacturer_input.setText(self.manufacturer)
+        self.update_fiber_shape_inputs()
+        if self.fiber_shape == "rectangular":
+            self.fiber_width_input.setText(str(self.fiber_dimension[0]))
+            self.fiber_height_input.setText(str(self.fiber_dimension[1]))
+        else:
+            self.fiber_diameter_input.setText(str(self.fiber_dimension))
+
+    def save_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
+        # Create the folder if it doesn't exist
+        if not os.path.exists(folder):
+            os.makedirs(folder)
         with open(file_path, "w") as file:
             # noinspection PyTypeChecker
-            json.dump({"fiber_name": os.path.basename(folder), "fiber_dimension": fiber_dimension, "fiber_shape": fiber_shape,
-                       "fiber_length": fiber_length}, file)
+            json.dump({"fiber_name": os.path.basename(folder), "fiber_dimension": self.fiber_dimension, "fiber_shape": self.fiber_shape,
+                       "fiber_length": self.fiber_length, "numerical_aperature": self.numerical_aperature, "coating_type": self.coating_type,
+                          "manufacturer": self.manufacturer}, file)
 
     def load_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
@@ -980,24 +1024,37 @@ class FiberDataWindow(QDialog):
                 fiber_dimension = data.get("fiber_dimension", "")
                 fiber_shape = data.get("fiber_shape", "")
                 fiber_length = data.get("fiber_length", "")
+                numerical_aperature = data.get("numerical_aperature", "")
+                coating_type = data.get("coating_type", "")
+                manufacturer = data.get("manufacturer", "")
 
                 self.fiber_shape = fiber_shape if fiber_shape else ""
                 self.fiber_dimension = fiber_dimension if fiber_dimension else ""
                 self.fiber_length = fiber_length if fiber_length else ""
+                self.numerical_aperature = numerical_aperature if numerical_aperature else ""
+                self.coating_type = coating_type if coating_type else ""
+                self.manufacturer = manufacturer if manufacturer else ""
         else:
             self.show_message("No fiber data file found.")
 
         self.fiber_name_input.setText(os.path.basename(folder))
-        self.fiber_length_input.setText(self.fiber_length)
+        self.fiber_name = os.path.basename(folder)
         self.fiber_shape_combo.setCurrentText(self.fiber_shape)
         self.update_fiber_shape_inputs()
         if self.fiber_shape == "rectangular":
-            self.fiber_width_input.setText(str(self.fiber_dimension[0]))
-            self.fiber_height_input.setText(str(self.fiber_dimension[1]))
+            if self.fiber_dimension == "":
+                self.fiber_width_input.setText("")
+                self.fiber_height_input.setText("")
+            else:
+                self.fiber_width_input.setText(str(self.fiber_dimension[0]))
+                self.fiber_height_input.setText(str(self.fiber_dimension[1]))
         else:
             self.fiber_diameter_input.setText(str(self.fiber_dimension))
 
-        self.emit_fiber_data_changed()
+        self.fiber_length_input.setText(self.fiber_length)
+        self.numerical_aperature_input.setText(self.numerical_aperature)
+        self.coating_type_input.setText(self.coating_type)
+        self.manufacturer_input.setText(self.manufacturer)
 
     def check_inputs_and_save(self):
         if self.fiber_diameter_input.text() != "":
@@ -1008,15 +1065,21 @@ class FiberDataWindow(QDialog):
             self.show_message("Please enter fiber diameter or height and width.")
             return
 
-        if (self.fiber_name_input.text() and self.fiber_dimension and self.fiber_length_input != ""
+        if (self.fiber_name_input.text() != ""
                 and self.fiber_shape_combo.currentText() != "None"):
             self.emit_fiber_data_changed()
             folder = os.path.join(self.parent().base_directory, self.fiber_name_input.text())
-            self.save_fiber_data(folder, self.fiber_dimension, self.fiber_shape_combo.currentText(),
-                                    self.fiber_length_input.text())
+            self.fiber_shape = self.fiber_shape_combo.currentText()
+            self.fiber_length = self.fiber_length_input.text()
+            self.fiber_name = self.fiber_name_input.text()
+            self.numerical_aperature = self.numerical_aperature_input.text()
+            self.coating_type = self.coating_type_input.text()
+            self.manufacturer = self.manufacturer_input.text()
+
+            self.save_fiber_data(folder)
             self.close()
         else:
-            self.show_message("Please enter fiber name, length and shape.")
+            self.show_message("Please enter fiber name and shape.")
 
     def show_message(self, message):
         self.message_label.setText(message)
