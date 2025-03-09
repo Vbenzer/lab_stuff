@@ -76,6 +76,8 @@ class MainWindow(QMainWindow):
         self.fiber_width = ""
         self.fiber_height = ""
         self.fiber_shape = ""
+        self.folder_name = ""
+        self.fiber_dimension = ""
 
         self.init_ui()
 
@@ -83,11 +85,11 @@ class MainWindow(QMainWindow):
         self.folder_name_label = QLabel("Fiber Name:")
         self.folder_name_input = QLineEdit()
         self.folder_name_input.setFixedWidth(700)
+        self.folder_name_input.setReadOnly(True)
         self.folder_name_input.textChanged.connect(self.update_working_dir)
 
         self.open_fiber_data_button = QPushButton("Open Fiber Data")
         self.open_fiber_data_button.clicked.connect(self.open_fiber_data_window)
-        self.layout.addWidget(self.open_fiber_data_button)
 
         self.working_dir_label = QLabel("Working Directory:")
         self.working_dir_display = QLabel("")
@@ -99,12 +101,12 @@ class MainWindow(QMainWindow):
         self.comments_button.clicked.connect(self.access_comments_file)
         self.comments_button.setDisabled(True)
 
-        self.lock_button = QPushButton("Lock In")
+        """self.lock_button = QPushButton("Lock In")
         #self.lock_button.clicked.connect(self.lock_inputs)
 
         self.unlock_button = QPushButton("Unlock")
         self.unlock_button.clicked.connect(self.unlock_inputs)
-        self.unlock_button.setDisabled(True)
+        self.unlock_button.setDisabled(True)"""
 
         self.recent_folders = load_recent_folders()
         self.recent_folders_combo = QComboBox()
@@ -122,11 +124,13 @@ class MainWindow(QMainWindow):
         self.layout.addLayout(self.create_hbox_layout(self.folder_name_label, self.folder_name_input))
         self.layout.addLayout(self.create_hbox_layout(self.working_dir_label, self.working_dir_display))
 
+        self.layout.addWidget(self.open_fiber_data_button)
+
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.choose_folder_button)
         button_layout.addWidget(self.comments_button)
-        button_layout.addWidget(self.lock_button)
-        button_layout.addWidget(self.unlock_button)
+        #button_layout.addWidget(self.lock_button)
+        #button_layout.addWidget(self.unlock_button)
         self.layout.addLayout(button_layout)
 
         self.recent_folders_label = QLabel("Recent Folders:")
@@ -153,6 +157,8 @@ class MainWindow(QMainWindow):
         self.init_analyse_tab()
         self.init_general_tab()
 
+        self.tabs.currentChanged.connect(self.update_ui_state)
+
         self.progress_signal.connect(self.update_progress)
 
         self.fiber_data_window = FiberDataWindow(self)
@@ -175,16 +181,21 @@ class MainWindow(QMainWindow):
         Update the visibility of the input fields based on the selected tab.
         """
         if self.tabs.currentWidget() == self.general_tab:
+            self.open_fiber_data_button.hide()
+            self.folder_name_input.setReadOnly(False)
+            self.recent_folders_label.hide()
+            self.recent_folders_combo.hide()
+            self.choose_folder_button.hide()
             self.folder_name_label.setText("Folder Name:")
-            if not hasattr(self, 'placeholder_spacer'):
+            """if not hasattr(self, 'placeholder_spacer'):
                 self.placeholder_spacer = QSpacerItem(20, 86)
-                self.layout.insertItem(self.layout.count() - 1, self.placeholder_spacer)
+                self.layout.insertItem(self.layout.count() - 1, self.placeholder_spacer)"""
             self.update_general_tab_buttons()  # Ensure buttons are correctly updated
         else:
-            if hasattr(self, 'placeholder_spacer'):
+            """if hasattr(self, 'placeholder_spacer'):
                 self.layout.removeItem(self.placeholder_spacer)
                 del self.placeholder_spacer
-                #self.layout.update()
+                #self.layout.update()"""
 
             if hasattr(self, "placeholder_spacer_2"):
                 self.layout.removeItem(self.placeholder_spacer_2)
@@ -192,13 +203,15 @@ class MainWindow(QMainWindow):
                 self.layout.update()
 
             self.folder_name_label.setText("Fiber Name:")
+            self.folder_name_input.setReadOnly(True)
 
             # Show the buttons that were hidden for some functions in the general tab
             self.folder_name_label.show()
             self.folder_name_input.show()
             self.choose_folder_button.show()
-            self.lock_button.show()
-            self.unlock_button.show()
+            self.open_fiber_data_button.show()
+            #self.lock_button.show()
+            #self.unlock_button.show()
             self.comments_button.show()
             self.recent_folders_combo.show()
             self.working_dir_label.show()
@@ -386,21 +399,20 @@ class MainWindow(QMainWindow):
         self.update_run_button_state()
 
     def update_run_button_state(self):
-        if self.analysis_type_combo.currentText() == "Throughput":
-            if self.inputs_locked and self.calibration_folder_input.text() != "":
+        if self.folder_name and self.fiber_shape and self.fiber_dimension != "":
+            if self.analysis_type_combo.currentText() == "Throughput":
                 self.run_analysis_button.setDisabled(False)
-            else:
-                self.run_analysis_button.setDisabled(True)
 
-        elif self.analysis_type_combo.currentText() == "SG" or self.analysis_type_combo.currentText() == "FRD":
-            if (self.inputs_locked and (self.analysis_type_combo.currentText() == "SG" or self.analysis_type_combo.currentText() == "FRD")
-                    and (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked()
+            elif self.analysis_type_combo.currentText() == "SG" or self.analysis_type_combo.currentText() == "FRD":
+                if (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked()
                         or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
                         or self.plot_masks_checkbox.isChecked() or self.make_video_checkbox.isChecked()
                         or self.sg_new_checkbox.isChecked() or self.calc_frd_checkbox.isChecked()
                         or self.plot_sutherland_checkbox.isChecked()
-            )):
-                self.run_analysis_button.setDisabled(False)
+                ):
+                    self.run_analysis_button.setDisabled(False)
+                else:
+                    self.run_analysis_button.setDisabled(True)
             else:
                 self.run_analysis_button.setDisabled(True)
 
@@ -441,9 +453,13 @@ class MainWindow(QMainWindow):
 
         # Connect the signal and update the stop button visibility
         self.general_function_combo.currentIndexChanged.connect(self.update_general_tab_buttons)
+        self.folder_name_input.textChanged.connect(self.update_general_tab_buttons)
         self.update_general_tab_buttons()
 
     def update_general_tab_buttons(self):
+        if self.tabs.currentWidget() != self.general_tab:
+            return
+
         selected_function = self.general_function_combo.currentText()
         if selected_function in ["Adjust Tip/Tilt", "Measure Eccentricity"]:
             self.stop_button.show()
@@ -454,15 +470,13 @@ class MainWindow(QMainWindow):
             if not hasattr(self, 'placeholder_spacer_2'):
                 self.placeholder_spacer_2 = QSpacerItem(20, 110)
                 self.layout.insertItem(0, self.placeholder_spacer_2)
+
             self.folder_name_label.hide()
             self.folder_name_input.hide()
-            self.choose_folder_button.hide()
-            self.lock_button.hide()
-            self.unlock_button.hide()
+            #self.lock_button.hide()
+            #self.unlock_button.hide()
             self.comments_button.hide()
-            self.recent_folders_combo.hide()
             self.working_dir_label.hide()
-            self.recent_folders_label.hide()
             self.run_button.setEnabled(True)
 
         else:
@@ -472,14 +486,12 @@ class MainWindow(QMainWindow):
                 self.layout.update()
             self.folder_name_label.show()
             self.folder_name_input.show()
-            self.choose_folder_button.show()
-            self.lock_button.show()
-            self.unlock_button.show()
+            #self.lock_button.show()
+            #self.unlock_button.show()
             self.comments_button.show()
-            self.recent_folders_combo.show()
             self.working_dir_label.show()
-            self.recent_folders_label.show()
-            self.run_button.setDisabled(not self.inputs_locked)
+
+            self.run_button.setDisabled(self.folder_name_input.text() == "")
 
         if selected_function == "Make Throughput Calibration":
             # Change the folder name label to calibration name
@@ -659,6 +671,13 @@ class MainWindow(QMainWindow):
 
     def update_analysis_tab(self):
         analysis_type = self.analysis_type_combo.currentText()
+
+        # Reset all checkboxes
+        for checkbox in [self.plot_sg_checkbox, self.calc_sg_checkbox, self.plot_coms_checkbox,
+                         self.get_params_checkbox, self.plot_masks_checkbox, self.make_video_checkbox,
+                         self.sg_new_checkbox, self.calc_frd_checkbox, self.plot_sutherland_checkbox]:
+            checkbox.setChecked(False)
+
         if analysis_type == "SG":
             self.plot_sg_checkbox.show()
             self.calc_sg_checkbox.show()
@@ -758,7 +777,9 @@ class MainWindow(QMainWindow):
         self.update_measurement_button_state()
 
     def update_measurement_button_state(self):
-        if (self.inputs_locked and self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked()
+        if (self.folder_name and self.fiber_dimension and self.fiber_shape != ""
+                and self.check1.isChecked()
+                and self.check2.isChecked() and self.check3.isChecked()
                 and self.check4.isChecked() and self.check5.isChecked()
         ):
             self.run_measurement_button.setDisabled(False)
@@ -879,15 +900,11 @@ class MainWindow(QMainWindow):
         self.update_ui_state()
 
     def update_ui_state(self):
-        state = not self.experiment_running
-        self.choose_folder_button.setDisabled(not state)
-        self.lock_button.setDisabled(not state)
-        self.unlock_button.setDisabled(not state)
-        self.run_measurement_button.setDisabled(not state or not (self.check1.isChecked() and self.check2.isChecked()
-                                                and self.check3.isChecked() and self.check4.isChecked()
-                                                and self.check5.isChecked()
-        ))
-        self.run_analysis_button.setDisabled(not state)
+        state = self.experiment_running
+        if state:
+            self.run_analysis_button.setDisabled(True)
+            self.run_measurement_button.setDisabled(True)
+            self.choose_folder_button.setDisabled(True)
 
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
