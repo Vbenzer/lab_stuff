@@ -7,8 +7,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
                              QSizePolicy, QDialog, QVBoxLayout
                              )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot
-import sg_pipeline
+from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt
 
 
 def save_recent_folders(recent_folders:str, file_path='D:/Vincent/recent_folders.json'):
@@ -86,6 +85,7 @@ class MainWindow(QMainWindow):
         self.folder_name_input = QLineEdit()
         self.folder_name_input.setFixedWidth(700)
         self.folder_name_input.setReadOnly(True)
+        self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.folder_name_input.textChanged.connect(self.update_working_dir)
 
         self.open_fiber_data_button = QPushButton("Open Fiber Data")
@@ -183,6 +183,7 @@ class MainWindow(QMainWindow):
         if self.tabs.currentWidget() == self.general_tab:
             self.open_fiber_data_button.hide()
             self.folder_name_input.setReadOnly(False)
+            self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
             self.recent_folders_label.hide()
             self.recent_folders_combo.hide()
             self.choose_folder_button.hide()
@@ -204,6 +205,7 @@ class MainWindow(QMainWindow):
 
             self.folder_name_label.setText("Fiber Name:")
             self.folder_name_input.setReadOnly(True)
+            self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
             # Show the buttons that were hidden for some functions in the general tab
             self.folder_name_label.show()
@@ -364,8 +366,7 @@ class MainWindow(QMainWindow):
         self.update_checklist()
 
         # Save fiber data to JSON
-        if self.tabs.currentWidget() != self.general_tab:
-            self.save_fiber_data(working_dir, fiber_diameter, fiber_shape, fiber_length)
+
 
         # Update all run buttons
         self.update_measurement_button_state()
@@ -424,7 +425,10 @@ class MainWindow(QMainWindow):
 
         self.general_function_label = QLabel("Select Function:")
         self.general_function_combo = QComboBox()
-        self.general_function_combo.addItems(["Measure System F-ratio", "Make Throughput Calibration", "Adjust Tip/Tilt", "Motor Controller: Reference", "Measure Eccentricity"])
+        self.general_function_combo.addItems(
+            ["Measure System F-ratio", "Make Throughput Calibration", "Adjust Tip/Tilt",
+             "Motor Controller: Reference", "Motor Controller: Move to Position",
+             "Measure Eccentricity", "FF with each Filter", "Change Color Filter"])
 
         # Create a widget for the function chooser and set its position
         function_widget = QWidget()
@@ -434,6 +438,25 @@ class MainWindow(QMainWindow):
         function_layout.addStretch()
 
         layout.addWidget(function_widget)
+
+        # Number input for the motor controller
+        self.number_input_label = QLabel("Position to move to (0 - 9.9) in mm:")
+        self.number_input = QLineEdit()
+        self.number_input.setFixedWidth(100)
+        self.number_input.setPlaceholderText("0.0")
+        layout.addLayout(self.create_hbox_layout(self.number_input_label, self.number_input))
+        # Initially hidden
+        self.number_input_label.hide()
+        self.number_input.hide()
+
+        # Filter input for color filter wheel
+        self.filter_input_label = QLabel("Color Filter:")
+        self.filter_input_combo = QComboBox()
+        self.filter_input_combo.addItems(["Open", "Closed", "400", "450", "500", "600", "700", "800"])
+        layout.addLayout(self.create_hbox_layout(self.filter_input_label, self.filter_input_combo))
+        # Initially hidden
+        self.filter_input_label.hide()
+        self.filter_input_combo.hide()
 
         # Add a spacer item to push the button to the bottom
         layout.addStretch()
@@ -466,7 +489,22 @@ class MainWindow(QMainWindow):
         else:
             self.stop_button.hide()
 
-        if selected_function in ["Motor Controller: Reference", "Measure Eccentricity", "Adjust Tip/Tilt"]:
+        if selected_function == "Motor Controller: Move to Position":
+            self.number_input_label.show()
+            self.number_input.show()
+        else:
+            self.number_input_label.hide()
+            self.number_input.hide()
+
+        if selected_function == "Change Color Filter":
+            self.filter_input_label.show()
+            self.filter_input_combo.show()
+        else:
+            self.filter_input_label.hide()
+            self.filter_input_combo.hide()
+
+        if selected_function in ["Motor Controller: Reference", "Motor Controller: Move to Position",
+                                 "Measure Eccentricity", "Adjust Tip/Tilt", "Change Color Filter"]:
             if not hasattr(self, 'placeholder_spacer_2'):
                 self.placeholder_spacer_2 = QSpacerItem(20, 110)
                 self.layout.insertItem(0, self.placeholder_spacer_2)
@@ -508,19 +546,15 @@ class MainWindow(QMainWindow):
         selected_function = self.general_function_combo.currentText()
 
         if selected_function not in ["Motor Controller: Reference", "Measure Eccentricity",
-                                     "Adjust Tip/Tilt"] and not self.inputs_locked:
-            self.show_message("Please lock the inputs before running the function.")
+                                     "Adjust Tip/Tilt", "FF with each Filter"] and self.folder_name != "":
+            self.show_message("Please enter folder name before running the function.")
             return
 
-        working_dir = self.working_dir_display.text()
-        if selected_function not in ["Motor Controller: Reference", "Measure Eccentricity",
-                                     "Adjust Tip/Tilt"] and not working_dir:
-            self.show_message("Please select a working directory first.")
-            return
 
         self.experiment_running = True
         self.update_ui_state()
 
+        working_dir = self.working_dir_display.text()
         threading.Thread(target=self.run_general_function_thread, args=(selected_function, working_dir)).start()
 
     def run_general_function_thread(self, selected_function, working_dir):
@@ -540,9 +574,20 @@ class MainWindow(QMainWindow):
         elif selected_function == "Motor Controller: Reference":
             import step_motor_control as smc
             smc.make_reference_move()
+        elif selected_function == "Motor Controller: Move to Position":
+            import step_motor_control as smc
+            position = float(self.number_input.text())
+            smc.move_to_position(position)
         elif selected_function == "Measure Eccentricity":
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("eccentricity", self.stop_event)
+        elif selected_function == "FF with each Filter":
+            import general_functions
+            general_functions.get_ff_with_all_filters(working_dir)
+        elif selected_function == "Change Color Filter":
+            import move_to_filter
+            filter_name = self.filter_input_combo.currentText()
+            move_to_filter.move(filter_name)
 
         self.progress_signal.emit(f"{selected_function} complete.")
         self.experiment_running = False

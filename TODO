@@ -1,16 +1,17 @@
 Bugs: (Sorted by priority)
-- Gui bugs:
-    -
+
 - Move_to_filter doesn't release port (fixed but not tested)
 
-- Gui layout doesnt stay still... but only in lab
+- Gui bugs:
+    -Gui layout doesnt stay still... but only in lab
+
 
 Additions: (Sorted by priority)
 
 - Add to gui:
-    - The function: FF with all filters
-    - a way to move motor to certain position
-    - filter wheel control
+    - The function: FF with all filters (done but not tested)
+    - a way to move motor to certain position (done but not tested)
+    - filter wheel control (done but not tested)
     - control of f-number wheel
 
 - Add way to upload results (and maybe also rawdata) to labshare server

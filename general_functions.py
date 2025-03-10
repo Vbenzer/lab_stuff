@@ -6,6 +6,14 @@ import qhy_ccd_take_image
 import image_reduction as ir
 
 def get_ff_with_all_filters(working_directory):
+    """
+    Takes and reduces one far field image for each color filter
+    Args:
+        working_directory: Working directory where the images will be saved
+
+    Returns:
+
+    """
     import move_to_filter
     # Define Folders
     dark_folder = os.path.join(working_directory, "darks")
