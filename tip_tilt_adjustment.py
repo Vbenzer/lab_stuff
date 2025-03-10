@@ -10,7 +10,16 @@ import file_mover
 """# Plot image
 plt.imshow(image)
 plt.show()"""
-def analyse_f_number(image, measurements_folder):
+def analyse_f_number(image:np.ndarray, measurements_folder:str):
+    """
+    Analyse the f-number of the image and save it to a json
+    Args:
+        image: Image to analyse
+        measurements_folder: Path to the folder where the measurements are saved
+
+    Returns:
+
+    """
     # Calculate radius
     trimmed_data = ia.cut_image(image, margin=500)  # Margin at 500 good for now
 
@@ -25,10 +34,6 @@ def analyse_f_number(image, measurements_folder):
     # Find aperture with encircled energy
     os.makedirs(measurements_folder, exist_ok=True)
     radius = ia.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=True, save_data=False)
-
-    # Close external matplotlib window
-
-
 
     print(f"Radius: {radius}")
 
@@ -68,7 +73,7 @@ def analyse_f_number(image, measurements_folder):
     with open(json_file_path, 'w') as file:
         json.dump(new_data, file, indent=4)
 
-    # Plot radius vs number of measurements]
+    # Plot radius vs number of measurements
     plt.plot(radii)
     plt.xlabel("Number of measurements")
     plt.ylabel("Radius")

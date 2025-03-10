@@ -137,6 +137,14 @@ def run_from_existing_files(project_folder:str, progress_signal=None):
     print(f"Calculated F-number (f/#): {f_number:.3f} ± {f_number_err:.3f}")
 
 def plot_cones(project_folder:str):
+    """
+    Plot the light cones (upper half) of the output light rays of each f-number.
+    Args:
+        project_folder: Path of the project folder.
+
+    Returns:
+
+    """
     pos_values = [9.9, 5, 0]  # Values of the stepper motor positions
     dist_to_chip = []
     slopes = []

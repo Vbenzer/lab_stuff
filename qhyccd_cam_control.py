@@ -227,11 +227,19 @@ while count < 100:
     fps = count / time_diff
     print(f"FPS: {fps:.2f}")"""
 
+def measure_ongoing_radius(measure:bool=False, stop_signal:bool=False):
+    """
+    Function to continually measure the radius of the output light cone for tiptilt adjustment.
+    Args:
+        measure: Whether to measure the radius.
+        stop_signal: Signal from Gui to stop the measurement.
 
-def capture_frames(measure=False):
+    Returns:
+
+    """
     count = 0
     start_time = time.time()
-    while count < 1000:
+    while count < 1000 or not stop_signal:
         qhyccddll.ExpQHYCCDSingleFrame(camhandle)
         ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c), imgdata)     # This takes long if not live, longer if live...
         #print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,)
@@ -288,10 +296,19 @@ def capture_frames(measure=False):
         fps = count / time_diff
         print(f"FPS: {fps:.2f}")
 
-def measure_eccentricity(measure=True):
+def measure_eccentricity(measure:bool=True, stop_signal:bool=False):
+    """
+    Function to continually measure the eccentricity of the output light cone.
+    Args:
+        measure: Whether to measure the eccentricity.
+        stop_signal: Signal from Gui to stop the measurement.
+
+    Returns:
+
+    """
     count = 0
     start_time = time.time()
-    while count < 1000:
+    while count < 1000 or not stop_signal:
         qhyccddll.ExpQHYCCDSingleFrame(camhandle)
         ret = qhyccddll.GetQHYCCDSingleFrame(camhandle, byref(w), byref(h), byref(b), byref(c),
                                              imgdata)  # This takes long if not live, longer if live...
@@ -347,11 +364,20 @@ def measure_eccentricity(measure=True):
         fps = count / time_diff
         print(f"FPS: {fps:.2f}")
 
-def use_camera(mode:str=None):
+def use_camera(mode:str=None, stop_signal=False):
+    """
+    Function to use the camera in either tiptilt or eccentricity mode.
+    Args:
+        mode: Mode to run the camera in. Must be either 'tiptilt' or 'eccentricity'.
+        stop_signal: Signal to stop the measurement.
+
+    Returns:
+
+    """
     if mode == "tiptilt":
-        capture_frames(measure=True)
+        measure_ongoing_radius(measure=True, stop_signal=stop_signal)
     if mode == "eccentricity":
-        measure_eccentricity(measure=True)
+        measure_eccentricity(measure=True, stop_signal=stop_signal)
     else:
         raise ValueError("Invalid mode. Must be either 'tiptilt' or 'eccentricity'.")
 
@@ -360,4 +386,4 @@ def use_camera(mode:str=None):
     ret = qhyccddll.ReleaseQHYCCDResource()
 
 if __name__ == "__main__":
-    use_camera(mode="eccentricity")
+    use_camera(mode="tiptilt")
