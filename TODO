@@ -1,6 +1,6 @@
 Bugs: (Sorted by priority)
 - Gui bugs:
-    - Checklist gets reset when locking inputs
+    -
 - Move_to_filter doesn't release port (fixed but not tested)
 
 - Gui layout doesnt stay still... but only in lab
