@@ -13,7 +13,7 @@ if len(sys.argv) > 1:
         angle = filter_to_angle_dict[input]
         ro.set_angle(angle)
         sleep(2)
-        elliptec.close(controller)
+        controller.close_connection()
     except:
         print(sys.argv[1], "is not a valid input")
         print("Please provide a valid integer value of the filters wavelength.\n")
@@ -31,7 +31,7 @@ def move(filter:str):
         print(filter, "is not a valid input")
         print("Please provide a valid integer value of the filters wavelength.\n")
         print("The available filters are: 400, 450, 500, 600, 700, 800, Open for no filter or 'Closed' for no light.\n")
-    elliptec.close(controller)
+    controller.close_connection()
 
 if __name__ == "__main__":
-    move("none")
+    move("400")

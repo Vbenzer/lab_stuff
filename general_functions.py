@@ -124,7 +124,6 @@ def overplot_original_and_data(data, original_data, show=False):
 
 
 
-
 if __name__ == "__main__":
     #working_directory = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/FF_with_all_filters"
     #get_ff_with_all_filters(working_directory)

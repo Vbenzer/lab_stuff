@@ -1,7 +1,5 @@
 Bugs: (Sorted by priority)
 
-- Move_to_filter doesn't release port (fixed but not tested)
-
 - Gui bugs:
     -Gui layout doesnt stay still... but only in lab
 
@@ -9,16 +7,19 @@ Bugs: (Sorted by priority)
 Additions: (Sorted by priority)
 
 - Add to gui:
-    - The function: FF with all filters (done but not tested)
-    - a way to move motor to certain position (done but not tested)
-    - filter wheel control (done but not tested)
-    - control of f-number wheel
+    - control of f-number wheel (done but not perfect yet: change so that is only activated if you want to change it)
+    - also add: qol stuff:
+        - current f-number
 
-- Add way to upload results (and maybe also rawdata) to labshare server
+- Add way to upload results (and maybe also rawdata) to labshare server -> maybe add a way to do that in the GUI
 
-- Make plots with visualisation of the input and output f-number
+
+- Make plots with visualisation of the input and output f-number (done but not in gui yet)
 
 - Incorporate Thorcam or way to check input output cam as live feed in Gui
 - Same with Qhyccd, also check for max value and way to easily change exposure time in GUI
     - Problem with that: Hot pixel mask necessary
   - Add a way to change the exposure time in the GUI
+
+- Rethink the plot all option for all measurements... maybe add a way to select which measurements to plot
+- Think about a way to make the analysis of the raw data possible from everywhere

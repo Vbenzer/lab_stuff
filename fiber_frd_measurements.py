@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import file_save_managment
 import analyse_main
 from astropy.io import fits
+import os
 
 def main_measure_all_filters(project_folder:str, progress_signal=None):
     """
@@ -207,8 +208,67 @@ def sutherland_plot(project_folder:str):
     plt.close()
     # plt.show()
 
+def plot_f_ratio_circles_on_raw(project_folder):
+    # Input f-numbers
+    input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597])  # These are from the setup_F#_EE_98 file, 18.2.25
+    input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
 
+    filter_to_name_dict = {"2": '6.21', "3": '5.103', "4": '4.571', "5": '4.063', "6": '3.597'}
+
+    # Load the distance to chip from the JSON file
+    dist = np.zeros(5)
+    for i in range(2, 7):
+        with open(project_folder + f"/filter_{i}/Measurements/f_number.json") as f:
+            data = json.load(f)
+        dist[i - 2] = data["distance_to_chip"]
+
+    distance_to_chip = np.mean(dist)
+
+
+    for i in range(2, 7):
+        print(f"Processing filter {i}")
+        # Access project subfolder for each filter
+        filter_folder = project_folder + f"/filter_{i}"
+
+        f_ratio_images_folder = filter_folder + "/f_ratio_images"
+        os.makedirs(f_ratio_images_folder, exist_ok=True)
+
+        # Load the LIGHT_0014_0.08s_reduced.fits file for each filter
+        reduced_image_path = filter_folder + "/REDUCED/LIGHT_0014_0.08s_reduced.fits"
+        with fits.open(reduced_image_path) as hdul:
+            reduced_image = hdul[0].data.astype(np.float32)
+
+        import image_analysation as ia
+        # Trim data to area of interest (perhaps not necessary with better background reduction)
+        trimmed_data = ia.cut_image(reduced_image, margin=2000)  # If margin too low mask won't fit in image
+
+        # Locate center of mass within trimmed image (array)
+        com = ia.LocateFocus(trimmed_data)
+
+        for fnum in input_f_num:
+            # Calculate the radius of a circle with input f-ratios
+            aperture_radius = (distance_to_chip + 9.9) / (2 * fnum)  # 9.9: Distance to chip at 0 position
+
+            # Convert to pixels
+            aperture_radius = aperture_radius // 7.52e-3
+
+            # Create a circle mask
+            import sg_pipeline
+            mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius
+                                                    , plot_mask=False)
+            from skimage import measure
+            mask_outline = measure.find_contours(mask, 0.5)[0]
+
+            from matplotlib.colors import LogNorm
+            # Plot the mask on the raw image
+            plt.figure()
+            plt.title(f"Filter f/{filter_to_name_dict[str(i)]} with aperature f/{fnum}")
+            plt.imshow(trimmed_data, cmap='gray', norm=LogNorm())
+            plt.plot(mask_outline[:, 1], mask_outline[:, 0], color='red')
+            plt.axis('off')
+            plt.savefig(f_ratio_images_folder + f"/f_ratio_{fnum}.png")
+            plt.close()
 
 if __name__ == "__main__":
-    project_folder = "D:/Vincent/40x120_300A_measurement_4/FRD"
-    sutherland_plot(project_folder)
+    project_folder = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/FRD"
+    plot_f_ratio_circles_on_raw(project_folder)

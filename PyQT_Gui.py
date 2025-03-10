@@ -3,6 +3,8 @@ import os
 import json
 import threading
 import time
+import serial.tools.list_ports
+from qhycfw3_filter_wheel_control import FilterWheel
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
                              QSizePolicy, QDialog, QVBoxLayout
@@ -77,6 +79,10 @@ class MainWindow(QMainWindow):
         self.fiber_shape = ""
         self.folder_name = ""
         self.fiber_dimension = ""
+
+        self.filter_wheel_ready = False
+        # Initialize the filter wheel here so that it is only initialized once
+        threading.Thread(target=self.initialize_filter_wheel).start()
 
         self.init_ui()
 
@@ -162,6 +168,13 @@ class MainWindow(QMainWindow):
         self.progress_signal.connect(self.update_progress)
 
         self.fiber_data_window = FiberDataWindow(self)
+
+    def initialize_filter_wheel(self):
+        available_ports = [port.device for port in serial.tools.list_ports.comports()]
+        if 'COM5' in available_ports:
+            self.filter_wheel = FilterWheel('COM5')
+        else:
+            self.show_message("COM5 is not available.")
 
     def open_fiber_data_window(self):
         self.fiber_data_window.fiberDataChanged.connect(self.update_fiber_data)
@@ -428,7 +441,7 @@ class MainWindow(QMainWindow):
         self.general_function_combo.addItems(
             ["Measure System F-ratio", "Make Throughput Calibration", "Adjust Tip/Tilt",
              "Motor Controller: Reference", "Motor Controller: Move to Position",
-             "Measure Eccentricity", "FF with each Filter", "Change Color Filter"])
+             "Measure Eccentricity", "FF with each Filter", "Change Color Filter", "Change System F-ratio"])
 
         # Create a widget for the function chooser and set its position
         function_widget = QWidget()
@@ -442,8 +455,9 @@ class MainWindow(QMainWindow):
         # Number input for the motor controller
         self.number_input_label = QLabel("Position to move to (0 - 9.9) in mm:")
         self.number_input = QLineEdit()
+        self.number_input.setText("0")
         self.number_input.setFixedWidth(100)
-        self.number_input.setPlaceholderText("0.0")
+
         layout.addLayout(self.create_hbox_layout(self.number_input_label, self.number_input))
         # Initially hidden
         self.number_input_label.hide()
@@ -457,6 +471,15 @@ class MainWindow(QMainWindow):
         # Initially hidden
         self.filter_input_label.hide()
         self.filter_input_combo.hide()
+
+        # F-ratio input for the system
+        self.fratio_input_label = QLabel("F-ratio:")
+        self.fratio_input_combo = QComboBox()
+        self.fratio_input_combo.addItems(["2.5", "3.5", "4.0", "4.5", "5.0", "6.0"])
+        layout.addLayout(self.create_hbox_layout(self.fratio_input_label, self.fratio_input_combo))
+        # Initially hidden
+        self.fratio_input_label.hide()
+        self.fratio_input_combo.hide()
 
         # Add a spacer item to push the button to the bottom
         layout.addStretch()
@@ -503,8 +526,17 @@ class MainWindow(QMainWindow):
             self.filter_input_label.hide()
             self.filter_input_combo.hide()
 
+        if selected_function == "Change System F-ratio":
+            self.fratio_input_label.show()
+            self.fratio_input_combo.show()
+
+        else:
+            self.fratio_input_label.hide()
+            self.fratio_input_combo.hide()
+
         if selected_function in ["Motor Controller: Reference", "Motor Controller: Move to Position",
-                                 "Measure Eccentricity", "Adjust Tip/Tilt", "Change Color Filter"]:
+                                 "Measure Eccentricity", "Adjust Tip/Tilt", "Change Color Filter",
+                                 "Change System F-ratio"]:
             if not hasattr(self, 'placeholder_spacer_2'):
                 self.placeholder_spacer_2 = QSpacerItem(20, 110)
                 self.layout.insertItem(0, self.placeholder_spacer_2)
@@ -577,7 +609,7 @@ class MainWindow(QMainWindow):
         elif selected_function == "Motor Controller: Move to Position":
             import step_motor_control as smc
             position = float(self.number_input.text())
-            smc.move_to_position(position)
+            smc.move_motor_to_position(position)
         elif selected_function == "Measure Eccentricity":
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("eccentricity", self.stop_event)
@@ -588,6 +620,11 @@ class MainWindow(QMainWindow):
             import move_to_filter
             filter_name = self.filter_input_combo.currentText()
             move_to_filter.move(filter_name)
+        elif selected_function == "Change System F-ratio":
+            # Check if the filter wheel is available
+            if self.filter_wheel:
+                f_ratio = self.fratio_input_combo.currentText()
+                self.filter_wheel.move_to_filter(f_ratio)
 
         self.progress_signal.emit(f"{selected_function} complete.")
         self.experiment_running = False
@@ -673,6 +710,7 @@ class MainWindow(QMainWindow):
         self.sg_new_checkbox = QCheckBox("SG New")
         self.calc_frd_checkbox = QCheckBox("Calculate FRD")
         self.plot_sutherland_checkbox = QCheckBox("Make Sutherland Plot")
+        self.plot_f_ratio_circles_on_raw_checkbox = QCheckBox("Plot F-ratio Circles on Raw Image")
 
         self.plot_sg_checkbox.stateChanged.connect(self.update_run_button_state)
         self.calc_sg_checkbox.stateChanged.connect(self.update_run_button_state)
@@ -683,6 +721,7 @@ class MainWindow(QMainWindow):
         self.sg_new_checkbox.stateChanged.connect(self.update_run_button_state)
         self.calc_frd_checkbox.stateChanged.connect(self.update_run_button_state)
         self.plot_sutherland_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.plot_f_ratio_circles_on_raw_checkbox.stateChanged.connect(self.update_run_button_state)
 
         self.calibration_folder_label = QLabel("Calibration Folder:")
         self.calibration_folder_input = QLineEdit()
@@ -699,6 +738,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.sg_new_checkbox)
         layout.addWidget(self.calc_frd_checkbox)
         layout.addWidget(self.plot_sutherland_checkbox)
+        layout.addWidget(self.plot_f_ratio_circles_on_raw_checkbox)
 
         layout.addWidget(self.calibration_folder_label)
         layout.addWidget(self.calibration_folder_input)
@@ -720,7 +760,8 @@ class MainWindow(QMainWindow):
         # Reset all checkboxes
         for checkbox in [self.plot_sg_checkbox, self.calc_sg_checkbox, self.plot_coms_checkbox,
                          self.get_params_checkbox, self.plot_masks_checkbox, self.make_video_checkbox,
-                         self.sg_new_checkbox, self.calc_frd_checkbox, self.plot_sutherland_checkbox]:
+                         self.sg_new_checkbox, self.calc_frd_checkbox, self.plot_sutherland_checkbox,
+                         self.plot_f_ratio_circles_on_raw_checkbox]:
             checkbox.setChecked(False)
 
         if analysis_type == "SG":
@@ -733,6 +774,7 @@ class MainWindow(QMainWindow):
             self.sg_new_checkbox.show()
             self.calc_frd_checkbox.hide()
             self.plot_sutherland_checkbox.hide()
+            self.plot_f_ratio_circles_on_raw_checkbox.hide()
             self.calibration_folder_label.hide()
             self.calibration_folder_input.hide()
             self.calibration_folder_button.hide()
@@ -747,6 +789,7 @@ class MainWindow(QMainWindow):
             self.sg_new_checkbox.hide()
             self.calc_frd_checkbox.show()
             self.plot_sutherland_checkbox.show()
+            self.plot_f_ratio_circles_on_raw_checkbox.show()
             self.calibration_folder_label.hide()
             self.calibration_folder_input.hide()
             self.calibration_folder_button.hide()
@@ -760,6 +803,7 @@ class MainWindow(QMainWindow):
             self.sg_new_checkbox.hide()
             self.calc_frd_checkbox.hide()
             self.plot_sutherland_checkbox.hide()
+            self.plot_f_ratio_circles_on_raw_checkbox.hide()
             self.calibration_folder_label.show()
             self.calibration_folder_input.show()
             self.calibration_folder_button.show()
@@ -878,18 +922,18 @@ class MainWindow(QMainWindow):
         self.update_ui_state()
 
     def run_analysis(self):
-        if not self.inputs_locked:
+        if not self.folder_name and self.fiber_dimension and self.fiber_shape != "":
             self.show_message("Please lock the inputs before running the analysis.")
             return
 
         analysis_type = self.analysis_type_combo.currentText()
         working_dir = self.working_dir_display.text()
-        fiber_shape = self.fiber_shape_combo.currentText()
+        fiber_shape = self.fiber_shape
 
         if fiber_shape == "rectangular":
-            fiber_diameter = (int(self.fiber_width_input.text()), int(self.fiber_height_input.text()))
+            fiber_diameter = (int(self.fiber_dimension[0]), int(self.fiber_dimension[1]))
         else:
-            fiber_diameter = int(self.fiber_diameter_input.text())
+            fiber_diameter = int(self.fiber_dimension)
 
         calibration_folder = self.calibration_folder_input.text() if analysis_type == "Throughput" else None
 
@@ -933,6 +977,8 @@ class MainWindow(QMainWindow):
                 frd.main_analyse_all_filters(directory, progress_signal=self.progress_signal)
             if self.plot_sutherland_checkbox.isChecked():
                 frd.sutherland_plot(directory)
+            if self.plot_f_ratio_circles_on_raw_checkbox.isChecked():
+                frd.plot_f_ratio_circles_on_raw(directory)
 
         elif analysis_type == "Throughput":
             directory = os.path.join(working_dir, "Throughput")
