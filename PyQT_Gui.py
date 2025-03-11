@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt
 
 
-def save_recent_folders(recent_folders:str, file_path='D:/Vincent/recent_folders.json'):
+def save_recent_folders(recent_folders:str, file_path=r'\\srv4\labshare\raw_data\fibers\Measurements\recent_folders.json'):
     """
     Save the recent folders to a JSON file.
     Args:
@@ -23,7 +23,7 @@ def save_recent_folders(recent_folders:str, file_path='D:/Vincent/recent_folders
     with open(file_path, 'w') as file:
         json.dump(recent_folders, file)
 
-def load_recent_folders(file_path='D:/Vincent/recent_folders.json'):
+def load_recent_folders(file_path=r'\\srv4\labshare\raw_data\fibers\Measurements\recent_folders.json'):
     """
     Load the recent folders from a JSON file.
     Args:
@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
 
         self.stop_event = threading.Event()
 
-        self.base_directory = "D:/Vincent"
+        self.base_directory = r"\\srv4\labshare\raw_data\fibers\Measurements"
         self.inputs_locked = False
         self.experiment_running = False
 
@@ -85,8 +85,7 @@ class MainWindow(QMainWindow):
         self.message_label.setStyleSheet("color: red; font-weight: bold;")
 
         self.filter_wheel_ready = False
-        # Initialize the filter wheel here so that it is only initialized once
-        threading.Thread(target=self.initialize_filter_wheel).start()
+        self.filter_wheel_initiated = False
 
         self.init_ui()
 
@@ -173,7 +172,10 @@ class MainWindow(QMainWindow):
     def initialize_filter_wheel(self):
         available_ports = [port.device for port in serial.tools.list_ports.comports()]
         if 'COM5' in available_ports:
+            self.filter_wheel_initiated = True
             self.filter_wheel = FilterWheel('COM5')
+            self.filter_wheel_ready = True
+            self.update_general_tab_buttons()
         else:
             self.show_message("COM5 is not available.")
 
@@ -528,8 +530,18 @@ class MainWindow(QMainWindow):
             self.filter_input_combo.hide()
 
         if selected_function == "Change System F-ratio":
+            # Initialize the filter wheel here so that it is only initialized once
+            if not self.filter_wheel_initiated:
+                threading.Thread(target=self.initialize_filter_wheel).start()
             self.fratio_input_label.show()
             self.fratio_input_combo.show()
+
+            if self.filter_wheel_ready:
+                self.fratio_input_combo.setDisabled(False)
+                self.run_button.setDisabled(False)
+            else:
+                self.fratio_input_combo.setDisabled(True)
+                self.run_button.setDisabled(True)
 
         else:
             self.fratio_input_label.hide()
@@ -548,7 +560,8 @@ class MainWindow(QMainWindow):
             #self.unlock_button.hide()
             self.comments_button.hide()
             self.working_dir_label.hide()
-            self.run_button.setEnabled(True)
+            if not selected_function == "Change System F-ratio":
+                self.run_button.setEnabled(True)
 
         else:
             if hasattr(self, 'placeholder_spacer_2'):
@@ -578,8 +591,8 @@ class MainWindow(QMainWindow):
     def run_general_function(self):
         selected_function = self.general_function_combo.currentText()
 
-        if selected_function not in ["Motor Controller: Reference", "Measure Eccentricity",
-                                     "Adjust Tip/Tilt", "FF with each Filter"] and self.folder_name != "":
+        if (selected_function in ["Measure Eccentricity", "Adjust Tip/Tilt", "FF with each Filter"]
+                and self.folder_name != ""):
             self.show_message("Please enter folder name before running the function.")
             return
 
@@ -620,6 +633,7 @@ class MainWindow(QMainWindow):
         elif selected_function == "Change Color Filter":
             import move_to_filter
             filter_name = self.filter_input_combo.currentText()
+            print(filter_name)
             move_to_filter.move(filter_name)
         elif selected_function == "Change System F-ratio":
             # Check if the filter wheel is available
@@ -877,9 +891,8 @@ class MainWindow(QMainWindow):
             self.run_measurement_button.setDisabled(True)
 
     def run_measurement(self):
-        if not self.inputs_locked:
-            self.show_message("Please lock the inputs before running the measurement.")
-            return
+        if self.folder_name and self.fiber_shape and self.fiber_dimension == "":
+            self.show_message("Please enter fiber data before running the measurement.")
 
         if not (self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked()
                 and self.check4.isChecked() and self.check5.isChecked()
@@ -887,13 +900,13 @@ class MainWindow(QMainWindow):
             self.show_message("Please complete all checklist items before running the measurement.")
             return
 
-        fiber_name = self.folder_name_input.text()
-        fiber_shape = self.fiber_shape_combo.currentText()
+        fiber_name = self.folder_name
+        fiber_shape = self.fiber_shape
 
         if fiber_shape == "rectangular":
-            fiber_diameter = (int(self.fiber_width_input.text()), int(self.fiber_height_input.text()))
+            fiber_diameter = (int(self.fiber_dimension[0]), int(self.fiber_dimension[1]))
         else:
-            fiber_diameter = int(self.fiber_diameter_input.text())
+            fiber_diameter = int(self.fiber_dimension)
 
         measurement_type = self.measurement_type_combo.currentText()
         working_dir = self.working_dir_display.text()

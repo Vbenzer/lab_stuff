@@ -8,11 +8,11 @@
       <excludeFolder url="file://$MODULE_DIR$/exit_images" />
       <excludeFolder url="file://$MODULE_DIR$/other_fits" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.10 (ImageAnalyzer)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.12 (fiber_analyzer)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">
-    <option name="removeUnused" value="true" />
+    <option name="modifyBaseFiles" value="true" />
   </component>
   <component name="PyDocumentationSettings">
     <option name="format" value="GOOGLE" />

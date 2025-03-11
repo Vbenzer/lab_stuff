@@ -40,7 +40,7 @@ def measure_all_filters(main_folder, number_of_measurements=100, progress_signal
 
     if calibration:
         date = datetime.datetime.now().strftime("%Y-%m-%d")
-        main_folder = "D:/Vincent/Calibration/" + date + "_" + calibration + "/"
+        main_folder = r"\\srv4\labshare\raw_data\fibers\Measurements\Calibration/" + date + "_" + calibration + "/"
         os.makedirs(main_folder, exist_ok=False)
 
     else:

@@ -61,10 +61,10 @@ def main_measure(project_folder:str, progress_signal=None, batch_file_path:str="
     os.remove(flag_file)
 
     # Move files to project folder, files are initially saved to the default Nina output folder
-    file_mover.move_files_and_folders("D:/Vincent/nina_output", project_folder)
+    file_mover.move_files_and_folders(r"\\srv4\labshare\raw_data\fibers\Measurements\nina_output", project_folder)
 
     time.sleep(1)
-    file_mover.clear_folder("D:/Vincent/nina_output")
+    file_mover.clear_folder(r"\\srv4\labshare\raw_data\fibers\Measurements\nina_output")
 
     # Close Nina
     run_batch_file("D:\stepper_motor\close_nina.bat")
