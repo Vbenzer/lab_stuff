@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import os
 import json
@@ -80,6 +81,9 @@ class MainWindow(QMainWindow):
         self.folder_name = ""
         self.fiber_dimension = ""
 
+        self.message_label = QLabel("")
+        self.message_label.setStyleSheet("color: red; font-weight: bold;")
+
         self.filter_wheel_ready = False
         # Initialize the filter wheel here so that it is only initialized once
         threading.Thread(target=self.initialize_filter_wheel).start()
@@ -118,9 +122,6 @@ class MainWindow(QMainWindow):
         self.recent_folders_combo = QComboBox()
         self.update_recent_folders_combo()
         self.recent_folders_combo.currentIndexChanged.connect(self.select_recent_folder)
-
-        self.message_label = QLabel("")
-        self.message_label.setStyleSheet("color: red; font-weight: bold;")
 
         self.progress_label = QLabel("")
         self.progress_text_edit = QTextEdit()
