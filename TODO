@@ -19,3 +19,5 @@ Additions: (Sorted by priority)
 - Rethink the plot all option for all measurements... maybe add a way to select which measurements to plot
 - Think about a way to make the analysis of the raw data possible from everywhere
         (basically done program in gitlab and files on labshare)
+
+- Change base path depending on os
