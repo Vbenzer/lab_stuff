@@ -2,6 +2,9 @@ import numpy as np
 import os
 import json
 
+from main import base_directory
+
+
 def main(main_folder, calibration_folder):
     """
     Main function for the throughput analysis.
@@ -28,19 +31,22 @@ def measure_single_filter(main_folder, filter_name, number_of_measurements):
     # Make the measurement
     pmc.make_measurement(main_folder, number_of_measurements, filter_name + ".json")
 
-def measure_all_filters(main_folder, number_of_measurements=100, progress_signal=None, calibration:str=None):
+def measure_all_filters(main_folder, number_of_measurements=100, progress_signal=None, calibration:str=None, base_directory:str=None):
     """
     Measure the transmission of all filters.
     Args:
         main_folder: Path to the main folder.
         number_of_measurements: Number of data points to take.
+        progress_signal: Signal to emit progress.
+        calibration: Name of the calibration file.
+        base_directory: Base directory of the project.
     """
     import datetime
     import move_to_filter
 
     if calibration:
         date = datetime.datetime.now().strftime("%Y-%m-%d")
-        main_folder = r"\\srv4\labshare\raw_data\fibers\Measurements\Calibration/" + date + "_" + calibration + "/"
+        main_folder = base_directory + r"/Calibration/" + date + "_" + calibration + "/"
         os.makedirs(main_folder, exist_ok=False)
 
     else:

@@ -25,13 +25,15 @@ def run_batch_file(batch_file_path:str):
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while running the batch file: {e}")
 
-def main_measure(project_folder:str, progress_signal=None, batch_file_path:str="D:\stepper_motor\start_nina_with_fstop.bat"):
+def main_measure(project_folder:str, progress_signal=None, batch_file_path:str="D:\stepper_motor\start_nina_with_fstop.bat",
+                 base_directory:str=None):
     """
-    Main function to run the analysis pipeline
+    Main function to run the measuring pipeline
     Args:
         project_folder: Path of the project folder.
-        measurement_name: Name of the measurement folder.
+        progress_signal: Signal to emit progress.
         batch_file_path: Path of the batch file to start N.I.N.A.
+        base_directory: Base directory of the project.
 
     """
     # Start N.I.N.A. with F-stop analysis sequence
@@ -61,19 +63,16 @@ def main_measure(project_folder:str, progress_signal=None, batch_file_path:str="
     os.remove(flag_file)
 
     # Move files to project folder, files are initially saved to the default Nina output folder
-    file_mover.move_files_and_folders(r"\\srv4\labshare\raw_data\fibers\Measurements\nina_output", project_folder)
+    file_mover.move_files_and_folders(base_directory + r"\nina_output", project_folder)
 
     time.sleep(1)
-    file_mover.clear_folder(r"\\srv4\labshare\raw_data\fibers\Measurements\nina_output")
+    file_mover.clear_folder(base_directory + r"\nina_output")
 
     # Close Nina
     run_batch_file("D:\stepper_motor\close_nina.bat")
 
     # Write progress to file
     file_save_managment.write_progress("N.I.N.A. closed, starting analysis pipeline")
-
-    """# Run analysis pipeline
-    run_from_existing_files(project_folder, measurement_name)"""
 
 def run_from_existing_files(project_folder:str, progress_signal=None):
     """

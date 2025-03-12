@@ -10,10 +10,19 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
                              QSizePolicy, QDialog, QVBoxLayout
                              )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt
+from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl
 
 
-def save_recent_folders(recent_folders:str, file_path=r'\\srv4\labshare\raw_data\fibers\Measurements\recent_folders.json'):
+if sys.platform.startswith("linux"):
+    print("Linux")
+    BASE_PATH = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements"
+elif sys.platform.startswith("win"):
+    print("Windows")
+    BASE_PATH = r"\\srv4\labshare\raw_data\fibers\Measurements"
+else:
+    raise OSError("Unsupported OS")
+
+def save_recent_folders(recent_folders:str, file_path:str):
     """
     Save the recent folders to a JSON file.
     Args:
@@ -23,7 +32,7 @@ def save_recent_folders(recent_folders:str, file_path=r'\\srv4\labshare\raw_data
     with open(file_path, 'w') as file:
         json.dump(recent_folders, file)
 
-def load_recent_folders(file_path=r'\\srv4\labshare\raw_data\fibers\Measurements\recent_folders.json'):
+def load_recent_folders(file_path:str):
     """
     Load the recent folders from a JSON file.
     Args:
@@ -36,7 +45,7 @@ def load_recent_folders(file_path=r'\\srv4\labshare\raw_data\fibers\Measurements
             return json.load(file)
     return []
 
-def update_recent_folders(folder:str, recent_folders:list[str], max_recent=2):
+def update_recent_folders(folder:str, recent_folders:list[str], max_recent=2, base_directory:str=None):
     """
     Update the list of recent folders.
     Args:
@@ -49,7 +58,7 @@ def update_recent_folders(folder:str, recent_folders:list[str], max_recent=2):
     recent_folders.insert(0, folder)
     if len(recent_folders) > max_recent:
         recent_folders.pop()
-    save_recent_folders(recent_folders)
+    save_recent_folders(recent_folders, file_path=base_directory + r'\recent_folders.json')
 
 # Todo: This would be cool: For more complex fiber shapes add a custom feature where the user can trace the fiber shape around the fiber image
 # the mask can then be scaled and used for the calculations
@@ -62,7 +71,8 @@ class MainWindow(QMainWindow):
 
         self.stop_event = threading.Event()
 
-        self.base_directory = r"\\srv4\labshare\raw_data\fibers\Measurements"
+        self.base_directory = BASE_PATH
+        print(self.base_directory)
         self.inputs_locked = False
         self.experiment_running = False
 
@@ -117,7 +127,7 @@ class MainWindow(QMainWindow):
         self.unlock_button.clicked.connect(self.unlock_inputs)
         self.unlock_button.setDisabled(True)"""
 
-        self.recent_folders = load_recent_folders()
+        self.recent_folders = load_recent_folders(file_path=self.base_directory + r'\recent_folders.json')
         self.recent_folders_combo = QComboBox()
         self.update_recent_folders_combo()
         self.recent_folders_combo.currentIndexChanged.connect(self.select_recent_folder)
@@ -337,7 +347,7 @@ class MainWindow(QMainWindow):
                 self.show_message("Please enter fiber name, diameter, length, and shape before locking inputs.")"""
 
             self.update_comments_button()
-            update_recent_folders(folder, self.recent_folders)
+            update_recent_folders(folder, self.recent_folders, base_directory=self.base_directory)
             self.update_recent_folders_combo()
 
     def save_fiber_data(self, folder, fiber_diameter, fiber_shape, fiber_length):
@@ -608,12 +618,13 @@ class MainWindow(QMainWindow):
         self.stop_event = threading.Event()
         if selected_function == "Measure System F-ratio":
             import fiber_frd_measurements as frd
-            frd.main_measure_all_filters(working_dir, progress_signal=self.progress_signal)
+            frd.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
             frd.main_analyse_all_filters(working_dir, progress_signal=self.progress_signal)
         elif selected_function == "Make Throughput Calibration":
             import throughput_analysis as ta
             calibration_folder_name = os.path.basename(working_dir)
-            ta.measure_all_filters(working_dir, progress_signal=self.progress_signal, calibration=calibration_folder_name)
+            ta.measure_all_filters(working_dir, progress_signal=self.progress_signal, calibration=calibration_folder_name,
+                                   base_directory=self.base_directory)
         elif selected_function == "Adjust Tip/Tilt":
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("tiptilt", self.stop_event)
@@ -1018,13 +1029,13 @@ class MainWindow(QMainWindow):
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
         import fiber_frd_measurements
-        self.show_message(f"Running FRD measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
-        fiber_frd_measurements.main_measure_all_filters(working_dir, progress_signal=self.progress_signal)
+        self.show_message(f"Running FRD measurement with working dir: {working_dir}")
+        fiber_frd_measurements.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
-        self.show_message(f"Running Throughput measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
+        self.show_message(f"Running Throughput measurement with working dir: {working_dir}")
         import throughput_analysis
-        throughput_analysis.measure_all_filters(working_dir, progress_signal=self.progress_signal)
+        throughput_analysis.measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
 
 class FiberDataWindow(QDialog):
     fiberDataChanged = pyqtSignal(str, object, str)  # Define a signal

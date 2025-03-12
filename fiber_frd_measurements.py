@@ -6,12 +6,13 @@ import analyse_main
 from astropy.io import fits
 import os
 
-def main_measure_all_filters(project_folder:str, progress_signal=None):
+def main_measure_all_filters(project_folder:str, progress_signal=None, base_directory=None):
     """
     Run the measuring pipeline for all filters.
     Args:
         project_folder: Path to the project folder.
         progress_signal: Progress signal.
+        base_directory: Base directory of the project.
 
     Returns:
 
@@ -24,7 +25,8 @@ def main_measure_all_filters(project_folder:str, progress_signal=None):
 
         # Run the main measuring pipeline for each filter
         analyse_main.main_measure(filter_folder, progress_signal,
-                                  batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat")
+                                  batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat",
+                                  base_directory=base_directory)
 
         progress_signal.emit(f"Measurement for filter {i} complete!")
 
