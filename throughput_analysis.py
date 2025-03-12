@@ -2,8 +2,6 @@ import numpy as np
 import os
 import json
 
-from main import base_directory
-
 
 def main(main_folder, calibration_folder):
     """
