@@ -3,9 +3,39 @@ import numpy as np
 import ctypes
 from ctypes import *
 from enum import Enum
+import time
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+import re
+
+
+def convert_to_us(time_str):
+    """
+    Convert a time string to microseconds.
+    Args:
+        time_str: Time string in format "<value><unit>", where unit is one of "ms", "s", "us".
+            e.g. "10ms", "1s", "100us", "0.5s"
+
+    Returns: Time in microseconds.
+
+    """
+    match = re.match(r"(\d+(\.\d+)?)(ms|s|us)", time_str)
+    if not match:
+        raise ValueError("Invalid time format")
+
+    value, _, unit = match.groups()
+    value = float(value)
+
+    if unit == "s":
+        return value * 1e6
+    elif unit == "ms":
+        return value * 1e3
+    elif unit == "us":
+        return value
+    else:
+        raise ValueError("Unsupported time unit")
 
 class Camera:
     def __init__(self, exp_time):
@@ -208,7 +238,10 @@ class Camera:
         self.imgdata = (ctypes.c_uint8 * length)()
         self.imgdata_raw8 = (ctypes.c_uint8 * length)()
         #print(imgdata_raw8, imgdata)
-        import time
+
+    def change_exposure_time(self, exp_time):
+        ret = self.qhyccddll.SetQHYCCDParam(self.camhandle, CONTROL_ID.CONTROL_EXPOSURE.value, exp_time)
+        print("SetQHYCCDParam() ret =", ret)
 
     def close(self):
         ret = self.qhyccddll.CloseQHYCCD(self.camhandle)
@@ -226,7 +259,7 @@ class Camera:
         img = np.frombuffer(self.imgdata, dtype=np.uint16).reshape((self.h.value, self.w.value))
 
         # Print max pixel value
-        print("Max pixel value:", np.max(img), "Mean pixel value: ",np.mean(img))
+        print("Max pixel value:", np.max(img), "Mean pixel value: ", np.mean(img))
 
         if show:
             show_img = img / np.max(img) * 255
@@ -251,6 +284,6 @@ class Camera:
 if __name__ == "__main__":
     working_dir = "D:/Vincent/test"
     image_name = "test.fits"
-    camera = Camera(exp_time=2000000)
+    """camera = Camera(exp_time=2000000)
     #camera.take_multiple_frames(working_dir, image_name, 5)
-    camera.take_single_frame(working_dir, image_name, show=False)
+    camera.take_single_frame(working_dir, image_name, show=False)"""

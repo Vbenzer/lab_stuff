@@ -144,7 +144,7 @@ def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float
     if com:
         center_x, center_y = com
     else:
-        center_y, center_x = int(com[0]), int(com[1]) #Todo: potentially change to float, pixel grid to center of pixel
+        center_y, center_x = int(com[0]), int(com[1])
 
     # Create a radial profile centered on the center of mass
     y, x = np.indices(image_data.shape)

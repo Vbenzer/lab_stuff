@@ -3,8 +3,7 @@ import threading
 import tkinter as tk
 import time
 
-# Todo: Change it so that folder or fiber diameter input are only required when a experiment is selected that
-#  actually needs it.
+# Very deprecated code but afraid to delete it
 def check_folder_exists(*args):
     """
     Check if the folder already exists in the base directory.

@@ -1117,7 +1117,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
     if progress_signal:
         progress_signal.emit("Darks Done! Taking lights.")
 
-    # Calculate the step size and leftmost position. Also handle rectangular case Todo: WIP
+    # Calculate the step size and leftmost position. Also handle rectangular case Todo: WIP?
     if isinstance(fiber_diameter, tuple):
         min_size = min(fiber_diameter)
         step_size = min_size / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm

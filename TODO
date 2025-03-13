@@ -1,26 +1,35 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
-    - cant add comments sometimes when i should be able to
-    - choose folder button deactivated after being on general tab...
-    -test
-    - Gui layout doesnt stay still... but only in lab
+    - choose folder button deactivated after being on general tab... (cant reproduce- maybe fixed?)
+    - Gui layout doesnt stay still... but only in lab (minor bug)
 
 
 Additions: (Sorted by priority)
 
 - Add to gui:
-    - also add: qol stuff: make sure no folder is overwritten
+    - qol stuff: make sure no folder is overwritten
+        - make sure that analysis dependencies are enforced
 
-- Make plots with visualisation of the input and output f-number (done but not in gui yet)
+- Incorporate Thorcam or way to check input output cam as live feed in Gui (partly done)
 
-- Incorporate Thorcam or way to check input output cam as live feed in Gui
 - Same with Qhyccd, also check for max value and way to easily change exposure time in GUI
     - Problem with that: Hot pixel mask necessary
-  - Add a way to change the exposure time in the GUI
+    - Add a way to change the exposure time in the GUI
+
+- Rewrite everything that uses nina to work directly with python:
+    - Then add way to easily check and change exposure time in GUI
 
 - Rethink the plot all option for all measurements... maybe add a way to select which measurements to plot
-- Think about a way to make the analysis of the raw data possible from everywhere
-        (basically done program in gitlab and files on labshare)
 
-- Change base path depending on os
+Ideas:
+- Potentially test faster fps with qhyccd for tiptilt with https://github.com/JiangXL/qhyccd-python/blob/master/QHYCCD_Demo.ipynb
+
+- For more complex fiber shapes add a custom feature where the user can trace the fiber shape around the fiber image
+    the mask can then be scaled and used for the calculations
+- Potentially change position handling on images for pixels to float, pixel grid to center of pixel
+- Add number of positions as input for the measurements in the GUI for sg
+
+
+
+

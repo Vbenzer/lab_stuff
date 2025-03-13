@@ -24,7 +24,7 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
     """
 
     # Convert spot radii to millimeters
-    spot_radii = radii*7.52e-3 #Todo: Get this value from image header
+    spot_radii = radii*7.52e-3  #mm/px value from camera
     spot_radii = np.sort(spot_radii)[::-1]  #Sort in descending order because motor is reversed when measuring fiber frd
 
     # Perform linear regression

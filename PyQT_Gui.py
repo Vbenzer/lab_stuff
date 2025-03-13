@@ -4,13 +4,13 @@ import os
 import json
 import threading
 import time
-import serial.tools.list_ports
 from qhycfw3_filter_wheel_control import FilterWheel
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
                              QSizePolicy, QDialog, QVBoxLayout
                              )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl
+from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
+from PyQt6.QtGui import QRegularExpressionValidator
 
 
 if sys.platform.startswith("linux"):
@@ -19,6 +19,7 @@ if sys.platform.startswith("linux"):
 elif sys.platform.startswith("win"):
     print("Windows")
     BASE_PATH = r"\\srv4\labshare\raw_data\fibers\Measurements"
+    BASE_PATH = r"D:\Vincent"
 else:
     raise OSError("Unsupported OS")
 
@@ -59,9 +60,6 @@ def update_recent_folders(folder:str, recent_folders:list[str], max_recent=2, ba
     if len(recent_folders) > max_recent:
         recent_folders.pop()
     save_recent_folders(recent_folders, file_path=base_directory + r'\recent_folders.json')
-
-# Todo: This would be cool: For more complex fiber shapes add a custom feature where the user can trace the fiber shape around the fiber image
-# the mask can then be scaled and used for the calculations
 
 class MainWindow(QMainWindow):
     progress_signal = pyqtSignal(str)
@@ -164,14 +162,17 @@ class MainWindow(QMainWindow):
         self.measure_tab = QWidget()
         self.analyse_tab = QWidget()
         self.general_tab = QWidget()
+        self.camera_tab = QWidget()
 
         self.tabs.addTab(self.measure_tab, "Measure")
         self.tabs.addTab(self.analyse_tab, "Analyse")
         self.tabs.addTab(self.general_tab, "General")
+        self.tabs.addTab(self.camera_tab, "Cameras")
 
         self.init_measure_tab()
         self.init_analyse_tab()
         self.init_general_tab()
+        self.init_camera_tab()
 
         self.tabs.currentChanged.connect(self.update_ui_state)
 
@@ -179,7 +180,121 @@ class MainWindow(QMainWindow):
 
         self.fiber_data_window = FiberDataWindow(self)
 
+    def update_camera_tab_buttons(self):
+        if self.tabs.currentWidget() != self.camera_tab:
+            return
+
+        selected_function = self.camera_function_combo.currentText()
+
+        if selected_function in ["Thorlabs Camera Live", "Thorlabs Camera Single"]:
+            self.camera_chooser_label.show()
+            self.camera_chooser_combo.show()
+        else:
+            self.camera_chooser_label.hide()
+            self.camera_chooser_combo.hide()
+
+    def init_camera_tab(self):
+        self.update_input_visibility()
+
+        layout = QVBoxLayout()
+
+        self.camera_function_label = QLabel("Select Function:")
+        self.camera_function_combo = QComboBox()
+        self.camera_function_combo.addItems(["Thorlabs Camera Live", "Thorlabs Camera Single", "Qhyccd Camera Single"])
+        self.camera_function_combo.currentIndexChanged.connect(self.update_camera_tab_buttons)
+
+        # Create a widget for the function chooser and set its position
+        function_widget = QWidget()
+        function_layout = QHBoxLayout(function_widget)
+        function_layout.addWidget(self.camera_function_label)
+        function_layout.addWidget(self.camera_function_combo)
+        function_layout.addStretch()
+
+        layout.addWidget(function_widget)
+
+        self.camera_chooser_label = QLabel("Camera:")
+        self.camera_chooser_combo = QComboBox()
+        self.camera_chooser_combo.addItems(["Entrance Cam", "Exit Cam"])
+        layout.addLayout(self.create_hbox_layout(self.camera_chooser_label, self.camera_chooser_combo))
+
+        self.exposure_time_label = QLabel("Exposure Time:")
+        self.exposure_time_input = QLineEdit()
+        self.exposure_time_input.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"^\d+(\.\d+)?(ms|s|us)$")))
+        self.exposure_time_input.setFixedWidth(100)
+        self.exposure_time_input.setText("1ms")
+        self.exposure_time_input.textChanged.connect(self.check_valid_exp_input)
+        layout.addLayout(self.create_hbox_layout(self.exposure_time_label, self.exposure_time_input))
+
+        # Add a spacer item to push the button to the bottom
+        layout.addStretch()
+
+        # Add the Run button to the Camera tab
+        self.run_button = QPushButton("Run")
+        self.run_button.setDisabled(True)  # Initially disabled
+        self.run_button.clicked.connect(self.run_camera_function)
+        layout.addWidget(self.run_button)
+
+        self.camera_tab.setLayout(layout)
+
+    def check_valid_exp_input(self):
+        if not self.exposure_time_input.hasAcceptableInput():
+            self.show_message("Invalid exposure time input. Please enter a valid exposure time. E.g.: 1ms, 1s, 1us")
+        else:
+            self.show_message("")
+
+    def run_camera_function(self):
+        selected_function = self.camera_function_combo.currentText()
+        folder_name = self.folder_name_input.text()
+
+        if selected_function in ["Thorlabs Camera", "Qhyccd Camera"] and folder_name != "":
+            self.show_message("Please enter folder name before running the function.")
+            return
+
+        if not self.exposure_time_input.hasAcceptableInput():
+            return
+
+        self.experiment_running = True
+        self.update_ui_state()
+
+        working_dir = self.working_dir_display.text()
+        threading.Thread(target=self.run_camera_function_thread, args=(selected_function, working_dir)).start()
+
+    def run_camera_function_thread(self, selected_function, working_dir):
+        self.progress_signal.emit(f"Running {selected_function}...")
+        if selected_function == "Thorlabs Camera Live":
+            import thorlabs_cam_control
+            thorlabs_cam_control.open_thorcam()
+        elif selected_function == "Thorlabs Camera Single":
+            import thorlabs_cam_control
+            if self.camera_chooser_combo.currentText() == "Entrance Cam":
+                cam_type = "entrance_cam"
+                exp_time = self.exposure_time_input.text()
+                image_name_path = os.path.join(working_dir, "entrance_image.png")
+                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True)
+            elif self.camera_chooser_combo.currentText() == "Exit Cam":
+                cam_type = "exit_cam"
+                exp_time = self.exposure_time_input.text()
+                image_name_path = os.path.join(working_dir, "exit_image.png")
+                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True)
+
+        elif selected_function == "Qhyccd Camera Single":
+            import qhy_ccd_take_image
+
+            if not self.qhyccd_cam:
+                self.qhyccd_cam = qhy_ccd_take_image.Camera(1000)
+
+            exposure_time_us = qhy_ccd_take_image.convert_to_us(self.exposure_time_input.text())
+            self.qhyccd_cam.change_exposure_time(exposure_time_us)
+            image_name = "qhyccd_image"
+            self.qhyccd_cam.take_single_frame(working_dir, image_name, show=True)
+
+        self.progress_signal.emit(f"{selected_function} complete.")
+        self.experiment_running = False
+        self.update_ui_state()
+
     def initialize_filter_wheel(self):
+        import serial.tools.list_ports
         available_ports = [port.device for port in serial.tools.list_ports.comports()]
         if 'COM5' in available_ports:
             self.filter_wheel_initiated = True
@@ -201,11 +316,22 @@ class MainWindow(QMainWindow):
         self.fiber_shape = shape
 
         self.folder_name_input.setText(name)
+        self.update_input_visibility()
+
+    def insert_spacer(self, height):
+        self.placeholder_spacer = QSpacerItem(20, height)
+        self.layout.insertItem(self.layout.count() - 1, self.placeholder_spacer)
+        self.layout.update()
 
     def update_input_visibility(self):
         """
         Update the visibility of the input fields based on the selected tab.
         """
+        if self.folder_name != "":
+            self.comments_button.setDisabled(False)
+        else:
+            self.comments_button.setDisabled(True)
+
         if self.tabs.currentWidget() == self.general_tab:
             self.open_fiber_data_button.hide()
             self.folder_name_input.setReadOnly(False)
@@ -214,19 +340,34 @@ class MainWindow(QMainWindow):
             self.recent_folders_combo.hide()
             self.choose_folder_button.hide()
             self.folder_name_label.setText("Folder Name:")
-            """if not hasattr(self, 'placeholder_spacer'):
-                self.placeholder_spacer = QSpacerItem(20, 86)
-                self.layout.insertItem(self.layout.count() - 1, self.placeholder_spacer)"""
-            self.update_general_tab_buttons()  # Ensure buttons are correctly updated
-        else:
-            """if hasattr(self, 'placeholder_spacer'):
+            if hasattr(self, 'placeholder_spacer'):
                 self.layout.removeItem(self.placeholder_spacer)
                 del self.placeholder_spacer
-                #self.layout.update()"""
+                self.insert_spacer(82)
+            else:
+                self.insert_spacer(82)
+            self.update_general_tab_buttons()  # Ensure buttons are correctly updated
 
-            if hasattr(self, "placeholder_spacer_2"):
-                self.layout.removeItem(self.placeholder_spacer_2)
-                del self.placeholder_spacer_2
+        elif self.tabs.currentWidget() == self.camera_tab:
+            self.open_fiber_data_button.hide()
+            self.folder_name_input.setReadOnly(False)
+            self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            self.recent_folders_label.hide()
+            self.recent_folders_combo.hide()
+            self.choose_folder_button.hide()
+            self.folder_name_label.setText("Folder Name:")
+
+            if hasattr(self, 'placeholder_spacer'):
+                self.layout.removeItem(self.placeholder_spacer)
+                del self.placeholder_spacer
+                self.insert_spacer(82)
+            else:
+                self.insert_spacer(82)
+
+        else:
+            if hasattr(self, 'placeholder_spacer'):
+                self.layout.removeItem(self.placeholder_spacer)
+                del self.placeholder_spacer
                 self.layout.update()
 
             self.folder_name_label.setText("Fiber Name:")
@@ -435,7 +576,7 @@ class MainWindow(QMainWindow):
                         or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
                         or self.plot_masks_checkbox.isChecked() or self.make_video_checkbox.isChecked()
                         or self.sg_new_checkbox.isChecked() or self.calc_frd_checkbox.isChecked()
-                        or self.plot_sutherland_checkbox.isChecked()
+                        or self.plot_sutherland_checkbox.isChecked() or self.plot_f_ratio_circles_on_raw_checkbox.isChecked()
                 ):
                     self.run_analysis_button.setDisabled(False)
                 else:
@@ -560,9 +701,12 @@ class MainWindow(QMainWindow):
         if selected_function in ["Motor Controller: Reference", "Motor Controller: Move to Position",
                                  "Measure Eccentricity", "Adjust Tip/Tilt", "Change Color Filter",
                                  "Change System F-ratio"]:
-            if not hasattr(self, 'placeholder_spacer_2'):
-                self.placeholder_spacer_2 = QSpacerItem(20, 110)
-                self.layout.insertItem(0, self.placeholder_spacer_2)
+            if hasattr(self, 'placeholder_spacer'):
+                self.layout.removeItem(self.placeholder_spacer)
+                del self.placeholder_spacer
+                self.insert_spacer(140)
+            else:
+                self.insert_spacer(140)
 
             self.folder_name_label.hide()
             self.folder_name_input.hide()
@@ -574,10 +718,13 @@ class MainWindow(QMainWindow):
                 self.run_button.setEnabled(True)
 
         else:
-            if hasattr(self, 'placeholder_spacer_2'):
-                self.layout.removeItem(self.placeholder_spacer_2)
-                del self.placeholder_spacer_2
-                self.layout.update()
+            if hasattr(self, 'placeholder_spacer'):
+                self.layout.removeItem(self.placeholder_spacer)
+                del self.placeholder_spacer
+                self.insert_spacer(82)
+            else:
+                self.insert_spacer(82)
+
             self.folder_name_label.show()
             self.folder_name_input.show()
             #self.lock_button.show()
@@ -735,8 +882,8 @@ class MainWindow(QMainWindow):
         self.make_video_checkbox = QCheckBox("Make Video")
         self.sg_new_checkbox = QCheckBox("SG New")
         self.calc_frd_checkbox = QCheckBox("Calculate FRD")
-        self.plot_sutherland_checkbox = QCheckBox("Make Sutherland Plot")
-        self.plot_f_ratio_circles_on_raw_checkbox = QCheckBox("Plot F-ratio Circles on Raw Image")
+        self.plot_sutherland_checkbox = QCheckBox("Make Sutherland Plot (FRD calculation must have been performed previously. This is indicated by the presence of a REDUCED folder).")
+        self.plot_f_ratio_circles_on_raw_checkbox = QCheckBox("Plot F-ratio Circles on Raw Image (FRD calculation must have been performed previously)")
 
         self.plot_sg_checkbox.stateChanged.connect(self.update_run_button_state)
         self.calc_sg_checkbox.stateChanged.connect(self.update_run_button_state)
@@ -1025,7 +1172,7 @@ class MainWindow(QMainWindow):
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
         import sg_pipeline
-        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.progress_signal)  # Todo: Add number of positions as input
+        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.progress_signal)
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
         import fiber_frd_measurements

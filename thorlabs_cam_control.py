@@ -4,7 +4,7 @@ import time
 #from instrumental.drivers.cameras import uc480
 
 
-def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=None):
+def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=None, info:bool=False):
     cam = instrumental.instrument(cam_name, reopen_policy="new")
 
     cam.open()
@@ -28,36 +28,29 @@ def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=
             cv2.waitKey(1)
             time.sleep(2)
         cv2.imwrite(save_file_name, image)
+        if info:
+            # Get max, min and mean pixel values
+            max_pixel = image.max()
+            min_pixel = image.min()
+            mean_pixel = image.mean()
+            print(f"Max pixel value: {max_pixel}")
+            print(f"Min pixel value: {min_pixel}")
+            print(f"Mean pixel value: {mean_pixel}")
     else:
         print("Failed to capture image.")
     cam.close()
     cv2.destroyAllWindows()
-"""
-# Open the camera
-entrance_cam.open()
 
-# Capture an image (frame will be a numpy array)
-frame = entrance_cam.grab_image(exposure_time="1s")
+def open_thorcam():
+    """
+    Opens the ThorCam software.
+    Returns:
 
-# Check if the frame is successfully captured
-if frame is not None:
-    image = frame  # Extract the image from the frame (numpy array)
+    """
+    from analyse_main import run_batch_file
 
-    # Display the captured image (optional)
-    cv2.imshow("Captured Image", image)
-    cv2.waitKey(0)  # Wait for a key press to close the window
+    run_batch_file("D:\stepper_motor\open_thorcam.bat") # Doesnt exist yet
 
-    # Save the image
-    cv2.imwrite('exit_image.png', image)
-else:
-    print("Failed to capture image.")
-
-# Close the camera after use
-entrance_cam.close()
-
-# Close OpenCV windows
-cv2.destroyAllWindows()
-"""
 
 if __name__ == "__main__":
     take_image("entrance_cam", "image_test.png", wait=True, exposure_time="1ms")
