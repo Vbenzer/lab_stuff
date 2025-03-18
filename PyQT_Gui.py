@@ -270,24 +270,25 @@ class MainWindow(QMainWindow):
             if self.camera_chooser_combo.currentText() == "Entrance Cam":
                 cam_type = "entrance_cam"
                 exp_time = self.exposure_time_input.text()
-                image_name_path = os.path.join(working_dir, "entrance_image.png")
-                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True)
+                image_name_path = os.path.join(working_dir, "entrance_image.fits")
+                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True, save_fits=True)
             elif self.camera_chooser_combo.currentText() == "Exit Cam":
                 cam_type = "exit_cam"
                 exp_time = self.exposure_time_input.text()
-                image_name_path = os.path.join(working_dir, "exit_image.png")
-                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True)
+                image_name_path = os.path.join(working_dir, "exit_image.fits")
+                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True, save_fits=True)
 
         elif selected_function == "Qhyccd Camera Single":
             import qhy_ccd_take_image
 
-            if not self.qhyccd_cam:
-                self.qhyccd_cam = qhy_ccd_take_image.Camera(1000)
+
+            self.qhyccd_cam = qhy_ccd_take_image.Camera(1000)
 
             exposure_time_us = qhy_ccd_take_image.convert_to_us(self.exposure_time_input.text())
             self.qhyccd_cam.change_exposure_time(exposure_time_us)
             image_name = "qhyccd_image"
             self.qhyccd_cam.take_single_frame(working_dir, image_name, show=True)
+            self.qhyccd_cam.close()
 
         self.progress_signal.emit(f"{selected_function} complete.")
         self.experiment_running = False
@@ -783,10 +784,12 @@ class MainWindow(QMainWindow):
         elif selected_function == "Motor Controller: Reference":
             import step_motor_control as smc
             smc.make_reference_move()
+            smc.close_connection()
         elif selected_function == "Motor Controller: Move to Position":
             import step_motor_control as smc
             position = float(self.number_input.text())
             smc.move_motor_to_position(position)
+            smc.close_connection()
         elif selected_function == "Measure Eccentricity":
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("eccentricity", self.stop_event)

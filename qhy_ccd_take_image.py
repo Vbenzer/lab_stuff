@@ -143,6 +143,7 @@ class Camera:
             CAM_LIVEVIDEOMODE = 58
             CAM_IS_COLOR = 59
 
+        self.CONTROL_ID = CONTROL_ID
 
         camhandle = 0
 
@@ -183,7 +184,7 @@ class Camera:
 
         ret = qhyccddll.InitQHYCCD(camhandle)
 
-        ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_TRANSFERBIT.value, 16.0)
+        ret = qhyccddll.SetQHYCCDParam(camhandle, self.CONTROL_ID.CONTROL_TRANSFERBIT.value, 16.0)
 
         ret = qhyccddll.SetQHYCCDDebayerOnOff(camhandle, False)
 
@@ -214,13 +215,13 @@ class Camera:
 
         #print("SetQHYCCDResolution() ret =", ret)
 
-        ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_EXPOSURE.value, exp_time)
+        ret = qhyccddll.SetQHYCCDParam(camhandle, self.CONTROL_ID.CONTROL_EXPOSURE.value, exp_time)
 
-        ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_GAIN.value, 50.0)
+        ret = qhyccddll.SetQHYCCDParam(camhandle, self.CONTROL_ID.CONTROL_GAIN.value, 50.0)
 
-        ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_OFFSET.value, 80.0)
+        ret = qhyccddll.SetQHYCCDParam(camhandle, self.CONTROL_ID.CONTROL_OFFSET.value, 80.0)
 
-        ret = qhyccddll.SetQHYCCDParam(camhandle, CONTROL_ID.CONTROL_USBTRAFFIC.value, 0.0)
+        ret = qhyccddll.SetQHYCCDParam(camhandle, self.CONTROL_ID.CONTROL_USBTRAFFIC.value, 0.0)
 
         self.w = ctypes.c_uint32()
         self.h = ctypes.c_uint32()
@@ -240,7 +241,8 @@ class Camera:
         #print(imgdata_raw8, imgdata)
 
     def change_exposure_time(self, exp_time):
-        ret = self.qhyccddll.SetQHYCCDParam(self.camhandle, CONTROL_ID.CONTROL_EXPOSURE.value, exp_time)
+        print(exp_time)
+        ret = self.qhyccddll.SetQHYCCDParam(self.camhandle, self.CONTROL_ID.CONTROL_EXPOSURE.value, exp_time)
         print("SetQHYCCDParam() ret =", ret)
 
     def close(self):
@@ -284,6 +286,6 @@ class Camera:
 if __name__ == "__main__":
     working_dir = "D:/Vincent/test"
     image_name = "test.fits"
-    """camera = Camera(exp_time=2000000)
+    camera = Camera(exp_time=2000000)
     #camera.take_multiple_frames(working_dir, image_name, 5)
-    camera.take_single_frame(working_dir, image_name, show=False)"""
+    camera.take_single_frame(working_dir, image_name, show=False)

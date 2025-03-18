@@ -1,12 +1,16 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
-    - cant run functions??? (fixed i believe)
+    - run button disable sometimes on camera tab
     - choose folder button deactivated after being on general tab... (cant reproduce- maybe fixed?)
     - Gui layout doesnt stay still... but only in lab (minor bug)
 
 
 Additions: (Sorted by priority)
+
+- Redo step motor scripts, update to class
+
+- Add way to insert orientation in GUI for sg analysis
 
 - Sort out sg analysis functions
 

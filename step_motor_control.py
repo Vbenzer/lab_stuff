@@ -139,6 +139,11 @@ def move_motor_to_position(position:float):
     check_error()
     print(f"New position: {position_new}")
 
+def close_connection():
+    """
+    Close the serial connection to the motor controller
+    """
+    ser.close()
 
 # Main routine to move the motor
 if __name__ == "__main__":

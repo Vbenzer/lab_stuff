@@ -1,10 +1,11 @@
 import instrumental
 import cv2
 import time
+from astropy.io import fits
 #from instrumental.drivers.cameras import uc480
 
 
-def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=None, info:bool=False):
+def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=None, info:bool=False, save_fits:bool=False):
     cam = instrumental.instrument(cam_name, reopen_policy="new")
 
     cam.open()
@@ -27,7 +28,13 @@ def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=
             cv2.imshow("Captured Image", image)
             cv2.waitKey(1)
             time.sleep(2)
-        cv2.imwrite(save_file_name, image)
+
+        if save_fits:
+            # Save as fits file
+            hdul = fits.HDUList([fits.PrimaryHDU(image)])
+            hdul.writeto(save_file_name, overwrite=True)
+        else:
+            cv2.imwrite(save_file_name, image)
         if info:
             # Get max, min and mean pixel values
             max_pixel = image.max()
