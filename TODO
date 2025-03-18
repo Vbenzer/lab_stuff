@@ -26,6 +26,8 @@ Additions: (Sorted by priority)
         - make sure that analysis dependencies are enforced
 
 Ideas:
+- Darks in frd are dependant on the position
+
 - Potentially test faster fps with qhyccd for tiptilt with https://github.com/JiangXL/qhyccd-python/blob/master/QHYCCD_Demo.ipynb
 
 - For more complex fiber shapes add a custom feature where the user can trace the fiber shape around the fiber image

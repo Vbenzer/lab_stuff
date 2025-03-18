@@ -1020,7 +1020,7 @@ class MainWindow(QMainWindow):
 
         if measurement_type == "SG":
             self.check1.setText("Fiber in place: Output at small camera")
-            self.check2.setText("Input spot in center and in focus. Exit camera fiber also in focus")
+            self.check2.setText("Input spot in center and in focus and oriented horizontally. Exit camera fiber also in focus")
             self.check3.setText("ThorCam software closed")
             self.check4.setText("Motor controller plugged in")
             self.check5.setText("Lights Out")
