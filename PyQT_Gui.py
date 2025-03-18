@@ -4,6 +4,7 @@ import os
 import json
 import threading
 import time
+import subprocess
 from qhycfw3_filter_wheel_control import FilterWheel
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
@@ -437,7 +438,10 @@ class MainWindow(QMainWindow):
                 file.write("Comments:\n")
             self.comments_button.setText("Access Comments")
         else:
-            os.startfile(comments_file_path)
+            if sys.platform.startswith("win"):
+                os.startfile(comments_file_path)
+            elif sys.platform.startswith("linux"):
+                subprocess.call(["xdg-open", comments_file_path])
 
     def update_comments_button(self):
         working_dir = self.working_dir_display.text()

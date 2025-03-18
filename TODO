@@ -7,9 +7,6 @@ Bugs: (Sorted by priority)
 
 
 Additions: (Sorted by priority)
-
-- Redo step motor scripts, update to class
-
 - Add way to insert orientation in GUI for sg analysis
 
 - Sort out sg analysis functions
