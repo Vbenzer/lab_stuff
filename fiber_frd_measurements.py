@@ -90,7 +90,7 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
     # Set measurement name to last folder name of project folder
     measurement_name = project_folder.split("/")[-1]
 
-    file_save_managment.save_measurement_hdf5("D:/Vincent/frd_measurements.h5", measurement_name, f_num, f_num_err)
+    #file_save_managment.save_measurement_hdf5("D:/Vincent/frd_measurements.h5", measurement_name, f_num, f_num_err)
 
 def sutherland_plot(project_folder:str):
     """
