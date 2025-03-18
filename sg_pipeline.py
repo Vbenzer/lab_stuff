@@ -616,6 +616,7 @@ def plot_circle_movement(image_folder:str, fiber_px_radius:int): # Todo: This fu
 
     """
     image_files = [f for f in os.listdir(image_folder) if f.endswith('.png')]
+    image_files = sorted(image_files)
 
     cpos = []
     for image_file in image_files:
@@ -681,7 +682,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         fiber_px_radius_exit = int(fiber_diameter / 0.439453125 / 2)
 
     # Get values of the entrance image
-    entrance_image_files = [f for f in os.listdir(entrance_image_folder_reduced) if f.endswith('reduced.png')]
+    entrance_image_files = sorted([f for f in os.listdir(entrance_image_folder_reduced) if f.endswith('reduced.png')])
     entrance_coms = [] # Center of mass of spot in the entrance image
     entrance_comk = [] # Center of mask and with that the center of the fiber
     entrance_radii = []
@@ -775,7 +776,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     entrance_radii = np.array(entrance_radii)
 
     # Get values of the exit image
-    exit_image_files = [f for f in os.listdir(exit_image_folder_reduced) if f.endswith('reduced.png')]
+    exit_image_files = sorted([f for f in os.listdir(exit_image_folder_reduced) if f.endswith('reduced.png')])
     exit_comk = []
     exit_coms = []
     exit_radii = []
@@ -1117,11 +1118,11 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
     if progress_signal:
         progress_signal.emit("Darks Done! Taking lights.")
 
-    # Calculate the step size and leftmost position. Also handle rectangular case Todo: WIP?
+    # Calculate the step size and leftmost position. Also handle rectangular case
     if isinstance(fiber_diameter, tuple):
-        min_size = min(fiber_diameter)
-        step_size = min_size / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
-        pos_left = 5 - min_size / 1000 * 0.8 / 2  # Leftmost position in mm
+        max_size = max(fiber_diameter)
+        step_size = max_size / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
+        pos_left = 5 - max_size / 1000 * 0.8 / 2  # Leftmost position in mm
     else:
         step_size = fiber_diameter / 1000 * 0.8 / (number_of_positions-1)  # Step size in mm
         pos_left = 5 - fiber_diameter / 1000 * 0.8 / 2  # Leftmost position in mm
@@ -1205,7 +1206,9 @@ def make_comparison_video(main_folder:str, fiber_diameter):
 
     # Get the image files
     entrance_image_files = [f for f in os.listdir(entrance_image_folder) if f.endswith('reduced.png')]
+    entrance_image_files = sorted(entrance_image_files)
     exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('reduced.png')]
+    exit_image_files = sorted(exit_image_files)
 
     # Calculate the radius of the fiber in pixels, also handle rectangular case
     if isinstance(fiber_diameter, (tuple,list)):
@@ -1265,7 +1268,9 @@ def make_comparison_video(main_folder:str, fiber_diameter):
     video_name = os.path.join(main_folder, "comparison_video.mp4")
 
     video_entrance_files = [f for f in os.listdir(video_prep_entrance_folder) if f.endswith('cut.png')]
+    video_entrance_files = sorted(video_entrance_files)
     video_exit_files = [f for f in os.listdir(video_prep_exit_folder) if f.endswith('cut.png')]
+    video_exit_files = sorted(video_exit_files)
 
     # Create entrance video
     entrance_video_path = os.path.join(video_prep_entrance_folder, "entrance_video.mp4")
@@ -1319,7 +1324,9 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
 
     # Get the mask files
     entrance_mask_files = [f for f in os.listdir(entrance_mask_folder) if f.endswith('mask.png')]
+    entrance_mask_files = sorted(entrance_mask_files)
     exit_mask_files = [f for f in os.listdir(exit_mask_folder) if f.endswith('mask.png')]
+    exit_mask_files = sorted(exit_mask_files)
 
     # Read entrance coms from json file
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
@@ -1417,7 +1424,9 @@ def check_mask_flux_all(main_folder:str):
 
     # Get the mask and image files
     exit_mask_files = [f for f in os.listdir(exit_mask_folder) if f.endswith('mask.png')]
+    exit_mask_files = sorted(exit_mask_files)
     exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('reduced.png')]
+    exit_image_files = sorted(exit_image_files)
 
     # Check the flux of the mask in all images
     for i in range(len(exit_mask_files)):
@@ -1829,7 +1838,7 @@ def calc_px_to_mu(image_folder, fiber_diameter, plot=False):
     os.makedirs(plot_folder, exist_ok=True)
 
     # Get image paths
-    images = [os.path.join(image_folder, f) for f in os.listdir(image_folder) if f.endswith('.png')]
+    images = [os.path.join(image_folder, f) for f in sorted(os.listdir(image_folder)) if f.endswith('.png')]
 
     px_to_mu_list = []
 
