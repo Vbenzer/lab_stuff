@@ -19,7 +19,7 @@ if sys.platform.startswith("linux"):
 elif sys.platform.startswith("win"):
     print("Windows")
     BASE_PATH = r"\\srv4\labshare\raw_data\fibers\Measurements"
-    BASE_PATH = r"D:\Vincent"
+    #BASE_PATH = r"D:\Vincent"
 else:
     raise OSError("Unsupported OS")
 
@@ -567,6 +567,9 @@ class MainWindow(QMainWindow):
         self.update_run_button_state()
 
     def update_run_button_state(self):
+        if self.tabs.currentWidget() == self.general_tab:
+            return
+
         if self.folder_name and self.fiber_shape and self.fiber_dimension != "":
             if self.analysis_type_combo.currentText() == "Throughput":
                 self.run_analysis_button.setDisabled(False)
@@ -645,7 +648,7 @@ class MainWindow(QMainWindow):
 
         # Add the Run button to the General tab
         self.run_button = QPushButton("Run")
-        self.run_button.setDisabled(True)  # Initially disabled
+        self.run_button.setDisabled(False)  # Initially disabled
         self.run_button.clicked.connect(self.run_general_function)
         layout.addWidget(self.run_button)
 
@@ -714,8 +717,8 @@ class MainWindow(QMainWindow):
             #self.unlock_button.hide()
             self.comments_button.hide()
             self.working_dir_label.hide()
-            if not selected_function == "Change System F-ratio":
-                self.run_button.setEnabled(True)
+            if selected_function != "Change System F-ratio":
+                self.run_button.setDisabled(False)
 
         else:
             if hasattr(self, 'placeholder_spacer'):
@@ -739,6 +742,8 @@ class MainWindow(QMainWindow):
             self.folder_name_label.setText("Calibration Name:")
         else:
             self.folder_name_label.setText("Folder Name:")
+
+        self.run_button.setEnabled(True)
 
 
     def stop_general_function(self):

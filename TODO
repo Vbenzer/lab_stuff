@@ -1,11 +1,14 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
+    - cant run functions??? (fixed i believe)
     - choose folder button deactivated after being on general tab... (cant reproduce- maybe fixed?)
     - Gui layout doesnt stay still... but only in lab (minor bug)
 
 
 Additions: (Sorted by priority)
+
+- Sort out sg analysis functions
 
 - Incorporate Thorcam or way to check input output cam as live feed in Gui (basically done, not tested)
 

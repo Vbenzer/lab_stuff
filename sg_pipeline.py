@@ -1089,7 +1089,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
     os.makedirs(exit_light_folder, exist_ok=True)
 
     # Move to filter "none" for no light
-    move_to_filter.move("none")
+    move_to_filter.move("Closed")
     print("Taking darks")
 
     # Send progress signal
@@ -1107,7 +1107,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
     exit_master_dark = image_reduction.create_master_dark(exit_dark_image_folder, plot=False)
 
     # Move to filter "0" for light
-    move_to_filter.move("0")
+    move_to_filter.move("Open")
 
     # Make reference move
     smc.make_reference_move()
