@@ -29,7 +29,3 @@ Ideas:
     the mask can then be scaled and used for the calculations
 - Potentially change position handling on images for pixels to float, pixel grid to center of pixel
 - Add number of positions as input for the measurements in the GUI for sg
-
-
-
-
