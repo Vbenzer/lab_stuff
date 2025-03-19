@@ -8,7 +8,7 @@ import subprocess
 from qhycfw3_filter_wheel_control import FilterWheel
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
-                             QSizePolicy, QDialog, QVBoxLayout
+                             QSizePolicy, QDialog, QVBoxLayout, QMessageBox
                              )
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
@@ -645,6 +645,18 @@ class MainWindow(QMainWindow):
         self.filter_input_label.hide()
         self.filter_input_combo.hide()
 
+        # Exposure time input for the camera
+        self.exposure_time_label_gt = QLabel("Exposure Time:") # gt = General Tab
+        self.exposure_time_input_gt = QLineEdit()
+        self.exposure_time_input_gt.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"^\d+(\.\d+)?(ms|s|us)$")))
+        self.exposure_time_input_gt.setFixedWidth(100)
+        self.exposure_time_input_gt.setText("70ms")
+        layout.addLayout(self.create_hbox_layout(self.exposure_time_label_gt, self.exposure_time_input_gt))
+        # Initially hidden
+        self.exposure_time_label_gt.hide()
+        self.exposure_time_input_gt.hide()
+
         # F-ratio input for the system
         self.fratio_input_label = QLabel("F-ratio:")
         self.fratio_input_combo = QComboBox()
@@ -680,6 +692,14 @@ class MainWindow(QMainWindow):
             return
 
         selected_function = self.general_function_combo.currentText()
+
+        if selected_function == "Measure System F-ratio":
+            self.exposure_time_label_gt.show()
+            self.exposure_time_input_gt.show()
+        else:
+            self.exposure_time_label_gt.hide()
+            self.exposure_time_input_gt.hide()
+
         if selected_function in ["Adjust Tip/Tilt", "Measure Eccentricity"]:
             self.stop_button.show()
         else:
@@ -786,8 +806,10 @@ class MainWindow(QMainWindow):
         self.stop_event = threading.Event()
         if selected_function == "Measure System F-ratio":
             import fiber_frd_measurements as frd
+            #import qhy_ccd_take_image as qhy
+            #exposure_time = qhy.convert_to_us(self.exposure_time_input_gt.text())
             #import analyse_main as am
-            #am.main_measure_new(working_dir, progress_signal=self.progress_signal, self.exposure_time_input.text())
+            #am.main_measure_new(working_dir, progress_signal=self.progress_signal, exposure_time)
             frd.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
             frd.main_analyse_all_filters(working_dir, progress_signal=self.progress_signal)
         elif selected_function == "Make Throughput Calibration":
@@ -836,12 +858,21 @@ class MainWindow(QMainWindow):
         self.measurement_type_combo.addItems(["SG", "FRD", "Throughput"])
         self.measurement_type_combo.currentIndexChanged.connect(self.update_checklist)
 
+        self.exposure_time_label_mt = QLabel("Exposure Time:") # mt = measurement tab
+        self.exposure_time_input_mt = QLineEdit()
+        self.exposure_time_input_mt.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"^\d+(\.\d+)?(ms|s|us)$")))
+        self.exposure_time_input_mt.setFixedWidth(100)
+        self.exposure_time_input_mt.setText("70ms")
+
         # Create a widget for the measurement type chooser and set its position
         measurement_type_widget = QWidget()
         measurement_type_layout = QHBoxLayout(measurement_type_widget)
         measurement_type_layout.addWidget(self.measurement_type_label)
         measurement_type_layout.addWidget(self.measurement_type_combo)
         measurement_type_layout.addStretch()
+        measurement_type_layout.addWidget(self.exposure_time_label_mt)
+        measurement_type_layout.addWidget(self.exposure_time_input_mt)
 
         layout.addWidget(measurement_type_widget)
 
@@ -1045,12 +1076,18 @@ class MainWindow(QMainWindow):
             self.check4.setText("Motor controller plugged in")
             self.check5.setText("Lights Out")
 
+            self.exposure_time_label_mt.hide()
+            self.exposure_time_input_mt.hide()
+
         elif measurement_type == "FRD":
             self.check1.setText("Fiber in place: Output at large camera")
             self.check2.setText("Spot on Fiber")
             self.check3.setText("Camera enabled and max counts in range")
             self.check4.setText("ThorCam/N.I.N.A closed")
             self.check5.setText("Lights Out")
+
+            self.exposure_time_label_mt.show()
+            self.exposure_time_input_mt.show()
 
         elif measurement_type == "Throughput":
             self.check1.setText("Fiber in place: Output on Photodetector")
@@ -1060,6 +1097,9 @@ class MainWindow(QMainWindow):
             self.check5.hide()
             self.check4.setChecked(True)
             self.check5.setChecked(True)
+
+            self.exposure_time_label_mt.hide()
+            self.exposure_time_input_mt.hide()
 
         self.update_measurement_button_state()
 
@@ -1203,7 +1243,9 @@ class MainWindow(QMainWindow):
         import fiber_frd_measurements
         self.show_message(f"Running FRD measurement with working dir: {working_dir}")
         # import analyse_main as am
-        # am.main_measure_new(working_dir, progress_signal=self.progress_signal, self.exposure_time_input.text())
+        import qhy_ccd_take_image as qhy
+        # exposure_time = qhy.convert_to_us(self.exposure_time_input_mt.text())
+        # am.main_measure_new(working_dir, progress_signal=self.progress_signal, exposure_time)
         fiber_frd_measurements.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
@@ -1260,12 +1302,16 @@ class FiberDataWindow(QDialog):
         self.numerical_aperature_input.setFixedWidth(300)
 
         self.coating_type_label = QLabel("Coating Type:")
-        self.coating_type_input = QLineEdit()
-        self.coating_type_input.setFixedWidth(300)
+        self.coating_type_combo = QComboBox()
+        self.coating_type_combo.setEditable(True)
+        self.coating_type_combo.addItems(["Polyimide", "Acrylate"])  # Add your predefined options here
+        self.coating_type_combo.setFixedWidth(300)
 
         self.manufacturer_label = QLabel("Manufacturer:")
-        self.manufacturer_input = QLineEdit()
-        self.manufacturer_input.setFixedWidth(300)
+        self.manufacturer_combo = QComboBox()
+        self.manufacturer_combo.setEditable(True)
+        self.manufacturer_combo.addItems(["Thorlabs", "Option 2", "Option 3", "Option 4"])  # Add your predefined options here
+        self.manufacturer_combo.setFixedWidth(300)
 
         self.save_button = QPushButton("Save and close")
         self.save_button.clicked.connect(self.check_inputs_and_save)
@@ -1285,9 +1331,9 @@ class FiberDataWindow(QDialog):
         self.layout.addWidget(self.numerical_aperature_label)
         self.layout.addWidget(self.numerical_aperature_input)
         self.layout.addWidget(self.coating_type_label)
-        self.layout.addWidget(self.coating_type_input)
+        self.layout.addWidget(self.coating_type_combo)
         self.layout.addWidget(self.manufacturer_label)
-        self.layout.addWidget(self.manufacturer_input)
+        self.layout.addWidget(self.manufacturer_combo)
 
         self.layout.addWidget(self.save_button)
 
@@ -1299,24 +1345,29 @@ class FiberDataWindow(QDialog):
         self.coating_type = ""
         self.manufacturer = ""
 
+        self.update_from_load_token = False
+
     def update_window(self):
+        self.show_message("")
         self.fiber_name_input.setText(self.fiber_name)
         self.fiber_length_input.setText(self.fiber_length)
         self.fiber_shape_combo.setCurrentText(self.fiber_shape)
         self.numerical_aperature_input.setText(self.numerical_aperature)
-        self.coating_type_input.setText(self.coating_type)
-        self.manufacturer_input.setText(self.manufacturer)
+        self.coating_type_combo.setCurrentText(self.coating_type)
+        self.manufacturer_combo.setCurrentText(self.manufacturer)
         self.update_fiber_shape_inputs()
         if self.fiber_shape == "rectangular":
             self.fiber_width_input.setText(str(self.fiber_dimension[0]))
             self.fiber_height_input.setText(str(self.fiber_dimension[1]))
         else:
             self.fiber_diameter_input.setText(str(self.fiber_dimension))
+        self.check_folder_exists()
 
     def save_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
-        # Create the folder
-        os.makedirs(folder)
+        # Create the folder if it doesn't exist
+        if not os.path.exists(folder):
+            os.makedirs(folder)
         with open(file_path, "w") as file:
             # noinspection PyTypeChecker
             json.dump({"fiber_name": os.path.basename(folder), "fiber_dimension": self.fiber_dimension, "fiber_shape": self.fiber_shape,
@@ -1325,6 +1376,7 @@ class FiberDataWindow(QDialog):
 
     def load_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
+        self.update_from_load_token = True
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 data = json.load(file)
@@ -1360,17 +1412,18 @@ class FiberDataWindow(QDialog):
 
         self.fiber_length_input.setText(self.fiber_length)
         self.numerical_aperature_input.setText(self.numerical_aperature)
-        self.coating_type_input.setText(self.coating_type)
-        self.manufacturer_input.setText(self.manufacturer)
+        self.coating_type_combo.setCurrentText(self.coating_type)
+        self.manufacturer_combo.setCurrentText(self.manufacturer)
 
     def check_folder_exists(self, folder=None):
         if folder is None:
             folder = os.path.join(self.parent().base_directory, self.fiber_name_input.text())
-        if os.path.exists(folder):
-            self.show_message("Folder already exists.")
+        if os.path.exists(folder) and not self.update_from_load_token:
+            self.show_message("Folder already exists, contents may be overwritten.")
             return True
         else:
             self.show_message("")
+            return False
 
     def check_inputs_and_save(self):
         if self.fiber_diameter_input.text() != "":
@@ -1385,15 +1438,20 @@ class FiberDataWindow(QDialog):
                 and self.fiber_shape_combo.currentText() != "None"):
             folder = os.path.join(self.parent().base_directory, self.fiber_name_input.text())
 
-            if self.check_folder_exists(folder):
-                return
-
+            if self.check_folder_exists(folder): #and not self.update_from_load_token:
+                reply = QMessageBox.question(self, 'Folder Exists',
+                                             'Folder already exists. Do you want to overwrite the contents?',
+                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                             QMessageBox.StandardButton.No)
+                if reply == QMessageBox.StandardButton.No:
+                    return
+            self.update_from_load_token = False
             self.fiber_shape = self.fiber_shape_combo.currentText()
             self.fiber_length = self.fiber_length_input.text()
             self.fiber_name = self.fiber_name_input.text()
             self.numerical_aperature = self.numerical_aperature_input.text()
-            self.coating_type = self.coating_type_input.text()
-            self.manufacturer = self.manufacturer_input.text()
+            self.coating_type = self.coating_type_combo.currentText()
+            self.manufacturer = self.manufacturer_combo.currentText()
 
             self.emit_fiber_data_changed()
 

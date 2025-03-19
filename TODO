@@ -8,24 +8,22 @@ Additions: (Sorted by priority)
 - Incorporate Thorcam or way to check input output cam as live feed in Gui (all done except live)
 
 - Rewrite everything that uses nina to work directly with python: (rewrite done new fct)
-    - Then add way to easily check and change exposure time in GUI (not done)
 
 - Rethink the plot all option for all measurements... maybe add a way to select which measurements to plot
 
 - Add to gui:
     - qol stuff:
-        - make selection tools for coating type and manufacturer
-
         - make sure that analysis dependencies are enforced
 
 
 Ideas:
+- Option to set expo time to recommended value for the measurement
 
 - Automatically assist with some of the checks, E.g. for frd: Opens thorcam then asks is there the fiber is it oriented horizontally and so on...
 
 - Darks in frd are dependant on the position
 
-- Potentially test faster fps with qhyccd for tiptilt with https://github.com/JiangXL/qhyccd-python/blob/master/QHYCCD_Demo.ipynb
+- Potentially test faster fps with qhyccd for tip tilt with https://github.com/JiangXL/qhyccd-python/blob/master/QHYCCD_Demo.ipynb
 
 - For more complex fiber shapes add a custom feature where the user can trace the fiber shape around the fiber image
     the mask can then be scaled and used for the calculations
