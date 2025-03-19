@@ -1,32 +1,28 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
-    - run button disable sometimes on camera tab
-    - choose folder button deactivated after being on general tab... (cant reproduce- maybe fixed?)
     - Gui layout doesnt stay still... but only in lab (minor bug)
 
 
 Additions: (Sorted by priority)
-- Add way to insert orientation in GUI for sg analysis
+- Incorporate Thorcam or way to check input output cam as live feed in Gui (all done except live)
 
-- Sort out sg analysis functions
-
-- Incorporate Thorcam or way to check input output cam as live feed in Gui (basically done, not tested)
-
-- Same with Qhyccd, also check for max value and way to easily change exposure time in GUI (basically done, not tested)
-    - Problem with that: Hot pixel mask necessary (still need to do)
-    - Add a way to change the exposure time in the GUI
-
-- Rewrite everything that uses nina to work directly with python:
-    - Then add way to easily check and change exposure time in GUI
+- Rewrite everything that uses nina to work directly with python: (rewrite done new fct)
+    - Then add way to easily check and change exposure time in GUI (not done)
 
 - Rethink the plot all option for all measurements... maybe add a way to select which measurements to plot
 
 - Add to gui:
-    - qol stuff: make sure no folder is overwritten
+    - qol stuff:
+        - make selection tools for coating type and manufacturer
+
         - make sure that analysis dependencies are enforced
 
+
 Ideas:
+
+- Automatically assist with some of the checks, E.g. for frd: Opens thorcam then asks is there the fiber is it oriented horizontally and so on...
+
 - Darks in frd are dependant on the position
 
 - Potentially test faster fps with qhyccd for tiptilt with https://github.com/JiangXL/qhyccd-python/blob/master/QHYCCD_Demo.ipynb

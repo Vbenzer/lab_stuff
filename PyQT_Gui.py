@@ -20,7 +20,7 @@ if sys.platform.startswith("linux"):
 elif sys.platform.startswith("win"):
     print("Windows")
     BASE_PATH = r"\\srv4\labshare\raw_data\fibers\Measurements"
-    #BASE_PATH = r"D:\Vincent"
+    BASE_PATH = r"D:\Vincent"
 else:
     raise OSError("Unsupported OS")
 
@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
         self.folder_name_input.setReadOnly(True)
         self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.folder_name_input.textChanged.connect(self.update_working_dir)
+        self.folder_name_input.textChanged.connect(self.update_run_button_state)
 
         self.open_fiber_data_button = QPushButton("Open Fiber Data")
         self.open_fiber_data_button.clicked.connect(self.open_fiber_data_window)
@@ -176,6 +177,7 @@ class MainWindow(QMainWindow):
         self.init_camera_tab()
 
         self.tabs.currentChanged.connect(self.update_ui_state)
+        self.tabs.currentChanged.connect(self.update_run_button_state)
 
         self.progress_signal.connect(self.update_progress)
 
@@ -184,6 +186,8 @@ class MainWindow(QMainWindow):
     def update_camera_tab_buttons(self):
         if self.tabs.currentWidget() != self.camera_tab:
             return
+
+        self.update_run_button_state()
 
         selected_function = self.camera_function_combo.currentText()
 
@@ -575,6 +579,13 @@ class MainWindow(QMainWindow):
         if self.tabs.currentWidget() == self.general_tab:
             return
 
+        if self.tabs.currentWidget() == self.camera_tab:
+            if self.folder_name_input.text() == "":
+                self.run_button.setDisabled(True)
+            else:
+                self.run_button.setDisabled(False)
+            return
+
         if self.folder_name and self.fiber_shape and self.fiber_dimension != "":
             if self.analysis_type_combo.currentText() == "Throughput":
                 self.run_analysis_button.setDisabled(False)
@@ -775,6 +786,8 @@ class MainWindow(QMainWindow):
         self.stop_event = threading.Event()
         if selected_function == "Measure System F-ratio":
             import fiber_frd_measurements as frd
+            #import analyse_main as am
+            #am.main_measure_new(working_dir, progress_signal=self.progress_signal, self.exposure_time_input.text())
             frd.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
             frd.main_analyse_all_filters(working_dir, progress_signal=self.progress_signal)
         elif selected_function == "Make Throughput Calibration":
@@ -886,16 +899,16 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(analysis_type_widget)
 
-        self.plot_sg_checkbox = QCheckBox("Plot SG")
-        self.calc_sg_checkbox = QCheckBox("Calc SG")
+        self.plot_sg_checkbox = QCheckBox("Plot SG (Deprecated)")
+        self.calc_sg_checkbox = QCheckBox("Calc SG (Deprecated)")
         self.plot_coms_checkbox = QCheckBox("Plot COMs")
-        self.get_params_checkbox = QCheckBox("Get Parameters")
+        self.get_params_checkbox = QCheckBox("Get Parameters (Must have been run for everything else to work)")
         self.plot_masks_checkbox = QCheckBox("Plot Masks")
         self.make_video_checkbox = QCheckBox("Make Video")
-        self.sg_new_checkbox = QCheckBox("SG New")
-        self.calc_frd_checkbox = QCheckBox("Calculate FRD")
-        self.plot_sutherland_checkbox = QCheckBox("Make Sutherland Plot (FRD calculation must have been performed previously. This is indicated by the presence of a REDUCED folder).")
-        self.plot_f_ratio_circles_on_raw_checkbox = QCheckBox("Plot F-ratio Circles on Raw Image (FRD calculation must have been performed previously)")
+        self.sg_new_checkbox = QCheckBox("Plot and Calculate SG")
+        self.calc_frd_checkbox = QCheckBox("Calculate FRD (Must have been run for everything else to work)")
+        self.plot_sutherland_checkbox = QCheckBox("Make Sutherland Plot")
+        self.plot_f_ratio_circles_on_raw_checkbox = QCheckBox("Plot F-ratio Circles on Raw Image")
 
         self.plot_sg_checkbox.stateChanged.connect(self.update_run_button_state)
         self.calc_sg_checkbox.stateChanged.connect(self.update_run_button_state)
@@ -1189,6 +1202,8 @@ class MainWindow(QMainWindow):
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
         import fiber_frd_measurements
         self.show_message(f"Running FRD measurement with working dir: {working_dir}")
+        # import analyse_main as am
+        # am.main_measure_new(working_dir, progress_signal=self.progress_signal, self.exposure_time_input.text())
         fiber_frd_measurements.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
@@ -1211,6 +1226,7 @@ class FiberDataWindow(QDialog):
 
         self.fiber_name_label = QLabel("Fiber Name:")
         self.fiber_name_input = QLineEdit()
+        self.fiber_name_input.textChanged.connect(lambda: self.check_folder_exists())
         self.fiber_name_input.setFixedWidth(300)
 
         self.fiber_diameter_label = QLabel("Fiber Diameter (µm):")
@@ -1299,9 +1315,8 @@ class FiberDataWindow(QDialog):
 
     def save_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
-        # Create the folder if it doesn't exist
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        # Create the folder
+        os.makedirs(folder)
         with open(file_path, "w") as file:
             # noinspection PyTypeChecker
             json.dump({"fiber_name": os.path.basename(folder), "fiber_dimension": self.fiber_dimension, "fiber_shape": self.fiber_shape,
@@ -1348,6 +1363,15 @@ class FiberDataWindow(QDialog):
         self.coating_type_input.setText(self.coating_type)
         self.manufacturer_input.setText(self.manufacturer)
 
+    def check_folder_exists(self, folder=None):
+        if folder is None:
+            folder = os.path.join(self.parent().base_directory, self.fiber_name_input.text())
+        if os.path.exists(folder):
+            self.show_message("Folder already exists.")
+            return True
+        else:
+            self.show_message("")
+
     def check_inputs_and_save(self):
         if self.fiber_diameter_input.text() != "":
             self.fiber_dimension = self.fiber_diameter_input.text()
@@ -1359,14 +1383,19 @@ class FiberDataWindow(QDialog):
 
         if (self.fiber_name_input.text() != ""
                 and self.fiber_shape_combo.currentText() != "None"):
-            self.emit_fiber_data_changed()
             folder = os.path.join(self.parent().base_directory, self.fiber_name_input.text())
+
+            if self.check_folder_exists(folder):
+                return
+
             self.fiber_shape = self.fiber_shape_combo.currentText()
             self.fiber_length = self.fiber_length_input.text()
             self.fiber_name = self.fiber_name_input.text()
             self.numerical_aperature = self.numerical_aperature_input.text()
             self.coating_type = self.coating_type_input.text()
             self.manufacturer = self.manufacturer_input.text()
+
+            self.emit_fiber_data_changed()
 
             self.save_fiber_data(folder)
             self.close()

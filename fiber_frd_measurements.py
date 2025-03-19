@@ -46,23 +46,24 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
     f_num = np.zeros(5)
     f_num_err = np.zeros(5)
 
-    for i in range(2, 7):
-        # Create project subfolder for each filter
-        filter_folder = project_folder + f"/filter_{i}"
+    folder_list = [folder for folder in os.listdir(project_folder) if "filter" in folder]
+    for i, folder in enumerate(folder_list):
+        # Define project subfolder for each filter
+        filter_folder = os.path.join(project_folder, folder)
 
-        progress_signal.emit(f"Starting analysis for filter {i}")
+        progress_signal.emit(f"Starting analysis for: {folder}")
 
         analyse_main.run_from_existing_files(filter_folder, progress_signal)
 
-        progress_signal.emit(f"Analysis for filter {i} complete!")
+        progress_signal.emit(f"Analysis for {folder} complete!")
 
         # Load the f-number and its error from the JSON file
         with open(filter_folder + "/Measurements/f_number.json") as f:
             data = json.load(f)
-            f_num[i - 2] = data["f_number"]
-            f_num_err[i - 2] = data["f_number_err"]
+            f_num[i] = data["f_number"]
+            f_num_err[i] = data["f_number_err"]
 
-        progress_signal.emit(f"Filter {i} f-number: {f_num[i - 2]}")
+        progress_signal.emit(f"Result: {folder} with f-number: {f_num[i]}")
 
     progress_signal.emit("All filters complete! Starting final plot.")
 

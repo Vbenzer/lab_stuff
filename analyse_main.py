@@ -12,6 +12,13 @@ import json
 from scipy.stats import linregress
 import matplotlib.pyplot as plt
 
+import threading
+import step_motor_control as smc
+import qhycfw3_filter_wheel_control
+import qhy_ccd_take_image
+fw = None
+cam = None
+
 def run_batch_file(batch_file_path:str):
     """
     Runs a batch file using subprocess
@@ -24,6 +31,71 @@ def run_batch_file(batch_file_path:str):
         print(f"Batch file executed successfully with return code {result.returncode}")
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while running the batch file: {e}")
+
+def main_measure_new(project_folder:str, progress_signal=None, exp_time:int=70000):
+    import move_to_filter as mtf
+
+    if progress_signal:
+        progress_signal.emit("Starting measurement pipeline, initializing devices...")
+
+    # Connect filter wheel and camera in thread, also reference motor
+    fw_thread = threading.Thread(target=init_filter_wheel).start()
+    cam_thread = threading.Thread(target=init_camera, args=exp_time).start()
+    smc_thread = threading.Thread(target=smc.make_reference_move()).start()
+
+    # Make sure everything is ready
+    fw_thread.join()
+    cam_thread.join()
+    smc_thread.join()
+
+    # Define lists
+    f_ratios = ["3.5", "4.0", "4.5", "5.0", "6.0"] # Skipping 2.5 bc it's too wide
+    pos_values = [9.9, 5, 0]  # Values of the stepper motor positions
+
+    # Iterate over f-ratios and positions
+    for f_ratio in f_ratios:
+        if progress_signal:
+            progress_signal.emit(f"Measuring f-ratio {f_ratio}...")
+
+        # Create folders for each f-ratio
+        current_dark_folder = project_folder + f"/filter_{f_ratio}/DARK"
+        current_light_folder = project_folder + f"/filter_{f_ratio}/LIGHT"
+
+        os.makedirs(current_dark_folder)
+        os.makedirs(current_light_folder)
+
+        # Move filter wheel
+        fw.move_to_filter(f_ratio)
+
+        for pos in pos_values:
+            # Move stepper motor
+            smc.move_to_position(pos) # Idea for minmax: start at 0, move to 5, move to 9.9, move to 5, move to 0 etc.
+
+            # Close shutter
+            mtf.move("Closed")
+            time.sleep(0.5) # Just to make sure it's not moving
+
+            # Take dark
+            cam.take_single_frame(current_dark_folder, f"filter_{f_ratio}_pos_{pos}_dark.fits")
+
+            # Open shutter
+            mtf.move("Open")
+            time.sleep(0.5)
+
+            # Take image
+            cam.take_single_frame(current_light_folder, f"filter_{f_ratio}_pos_{pos}_light.fits")
+
+    if progress_signal:
+        progress_signal.emit("All measurements completed!")
+
+
+def init_camera(exp_time:int):
+    global cam
+    cam = qhy_ccd_take_image.Camera(exp_time=exp_time)
+
+def init_filter_wheel():
+    global fw
+    fw = qhycfw3_filter_wheel_control.FilterWheel('COM5')
 
 def main_measure(project_folder:str, progress_signal=None, batch_file_path:str="D:\stepper_motor\start_nina_with_fstop.bat",
                  base_directory:str=None):

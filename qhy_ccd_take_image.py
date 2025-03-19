@@ -274,7 +274,9 @@ class Camera:
             # Save image as fits
             import os
             import astropy.io.fits as fits
-            fits.writeto(os.path.join(working_dir, image_name + ".fits"), img, overwrite=True)
+            if not image_name.endswith(".fits"):
+                image_name += ".fits"
+            fits.writeto(os.path.join(working_dir, image_name), img, overwrite=True)
 
     def take_single_frame(self, working_dir:str, image_name:str, show:bool=False):
         self.take_frame(working_dir, image_name, show=show)
