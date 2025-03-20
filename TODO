@@ -1,7 +1,11 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
+    - Cam image folder wont get created, also add standard folder for cam images
+    - Qhyccd cam not working in gui
+
     - Gui layout doesnt stay still... but only in lab (minor bug)
+
 
 
 Additions: (Sorted by priority)
