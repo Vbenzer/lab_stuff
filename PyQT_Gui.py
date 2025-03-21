@@ -1240,13 +1240,13 @@ class MainWindow(QMainWindow):
         sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.progress_signal)
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
-        import fiber_frd_measurements
+        #import fiber_frd_measurements
         self.show_message(f"Running FRD measurement with working dir: {working_dir}")
-        # import analyse_main as am
+        import analyse_main as am
         import qhy_ccd_take_image as qhy
-        # exposure_time = qhy.convert_to_us(self.exposure_time_input_mt.text())
-        # am.main_measure_new(working_dir, progress_signal=self.progress_signal, exposure_time)
-        fiber_frd_measurements.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
+        exposure_time = qhy.convert_to_us(self.exposure_time_input_mt.text())
+        am.main_measure_new(working_dir, progress_signal=self.progress_signal, exp_time=exposure_time)
+        #fiber_frd_measurements.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running Throughput measurement with working dir: {working_dir}")

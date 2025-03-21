@@ -40,7 +40,7 @@ def main_measure_new(project_folder:str, progress_signal=None, exp_time:int=7000
 
     # Connect filter wheel and camera in thread, also reference motor
     fw_thread = threading.Thread(target=init_filter_wheel).start()
-    cam_thread = threading.Thread(target=init_camera, args=exp_time).start()
+    cam_thread = threading.Thread(target=init_camera, args=([exp_time])).start()
     smc_thread = threading.Thread(target=smc.make_reference_move()).start()
 
     # Make sure everything is ready

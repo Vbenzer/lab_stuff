@@ -1,11 +1,15 @@
 Bugs: (Sorted by priority)
 
+- Test new frd
+
 - Gui bugs:
     - Cam image folder wont get created, also add standard folder for cam images
     - cant choose folder after function has been run
     - remove folder exp time and cam name from thorcam live
 
-    - Gui layout doesnt stay still... but only in lab (minor bug)
+    - minor bugs:
+        - Gui layout doesnt stay still... but only in lab
+        - cant run frd if first checks and then fiber params
 
 
 
