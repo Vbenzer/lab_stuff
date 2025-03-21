@@ -3,6 +3,7 @@ Bugs: (Sorted by priority)
 - Gui bugs:
     - Cam image folder wont get created, also add standard folder for cam images
     - Qhyccd cam not working in gui
+    - cant choose folder after function has been run
 
     - Gui layout doesnt stay still... but only in lab (minor bug)
 
@@ -14,6 +15,8 @@ Additions: (Sorted by priority)
     - include images, FRD report, …
     - can also just use markdown if it’s simpler
     - Need to fix code to read fits files as float!!!
+    - try log scale for sg input images
+    - avila 3. april
     - Look for polishing sheet that is self-adhesive
 
 
