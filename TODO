@@ -2,8 +2,8 @@ Bugs: (Sorted by priority)
 
 - Gui bugs:
     - Cam image folder wont get created, also add standard folder for cam images
-    - Qhyccd cam not working in gui
     - cant choose folder after function has been run
+    - remove folder exp time and cam name from thorcam live
 
     - Gui layout doesnt stay still... but only in lab (minor bug)
 
@@ -14,13 +14,11 @@ Additions: (Sorted by priority)
     Can use Quarto for auto-generation of reports on fibers
     - include images, FRD report, …
     - can also just use markdown if it’s simpler
-    - Need to fix code to read fits files as float!!!
+
+
     - try log scale for sg input images
     - avila 3. april
-    - Look for polishing sheet that is self-adhesive
 
-
-- Incorporate Thorcam or way to check input output cam as live feed in Gui (all done except live)
 
 - Rewrite everything that uses nina to work directly with python: (rewrite done new fct)
 
@@ -32,6 +30,8 @@ Additions: (Sorted by priority)
 
 
 Ideas:
+- Add numbering system for fibers
+
 - Option to set expo time to recommended value for the measurement
 
 - Automatically assist with some of the checks, E.g. for frd: Opens thorcam then asks is there the fiber is it oriented horizontally and so on...

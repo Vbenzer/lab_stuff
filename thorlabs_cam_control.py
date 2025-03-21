@@ -56,7 +56,7 @@ def open_thorcam():
     """
     from analyse_main import run_batch_file
 
-    run_batch_file("D:\stepper_motor\open_thorcam.bat") # Doesnt exist yet
+    run_batch_file("D:\stepper_motor\open_thorcam.bat")
 
 
 if __name__ == "__main__":
