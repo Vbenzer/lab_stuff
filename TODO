@@ -23,6 +23,7 @@ Additions: (Sorted by priority)
     - try log scale for sg input images
     - avila 3. april
 
+- Rework plots, especially frd sutherland plot numbers are hardly readable change so the float atop
 
 - Rewrite everything that uses nina to work directly with python: (rewrite done new fct)
 
