@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
         self.stop_event = threading.Event()
 
         self.base_directory = BASE_PATH
-        print(self.base_directory)
+        #print(self.base_directory)
         self.inputs_locked = False
         self.experiment_running = False
 

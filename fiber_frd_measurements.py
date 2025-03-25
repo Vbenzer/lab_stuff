@@ -233,6 +233,15 @@ def plot_f_ratio_circles_on_raw(project_folder):
 
     folder_list = [folder for folder in sorted(os.listdir(project_folder)[::-1]) if "filter" in folder]
 
+    # Ensure filters are correctly ordered
+    if "filter_2" in folder_list:
+        print("Realigning filter list")
+        #folder_list = folder_list[::-1]
+        bad_names = True
+    else:
+        folder_list = folder_list[::-1]
+        bad_names = False
+
     # Load the distance to chip from the JSON file
     dist = np.zeros(5)
     for i, folder in enumerate(folder_list):
@@ -289,11 +298,11 @@ def plot_f_ratio_circles_on_raw(project_folder):
             from matplotlib.colors import LogNorm
             # Plot the mask on the raw image
             plt.figure()
-            plt.title(f"Filter {folder} with aperature f/{fnum}")
+            plt.title(f"Input f/{filter_to_name_dict[str(i+2)]} with artificial aperature f/{fnum}")
             plt.imshow(trimmed_data, cmap='gray', norm=LogNorm())
             plt.plot(mask_outline[:, 1], mask_outline[:, 0], color='red')
             plt.axis('off')
-            plt.savefig(f_ratio_images_folder + f"/f_ratio_{fnum}.png")
+            plt.savefig(f_ratio_images_folder + f"/input_{filter_to_name_dict[str(i+2)]}_with_{fnum}.png")
             plt.close()
 
 if __name__ == "__main__":
