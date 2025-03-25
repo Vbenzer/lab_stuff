@@ -478,7 +478,16 @@ class MainWindow(QMainWindow):
             self.working_dir_display.setText("")
 
     def choose_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select Folder", self.base_directory)
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle("Select Folder")
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+        dialog.setDirectory(self.base_directory)
+        if dialog.exec():
+            folder = dialog.selectedFiles()[0]
+        else:
+            return
+
         if folder:
             self.working_dir_display.setText(folder)
             self.folder_name_input.setText(os.path.basename(folder))

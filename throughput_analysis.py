@@ -78,8 +78,8 @@ def plot_throughput(main_folder:str, save:bool=False):
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
     ax.bar(data.keys(), data.values())
-    ax.set_xlabel("Filter")
-    ax.set_ylabel("Throughput")
+    ax.set_xlabel("Filter [nm]")
+    ax.set_ylabel("Throughput [%]")
     ax.set_title("Filter Throughput")
     if save:
         plt.savefig(os.path.join(main_folder, "throughput.png"))

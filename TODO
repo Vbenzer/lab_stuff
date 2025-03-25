@@ -10,7 +10,7 @@ Bugs: (Sorted by priority)
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
-        - cant run frd if first checks and then fiber params
+        - cant run frd if first checks and then fiber params (also same on other tabs)
 
 
 
@@ -23,6 +23,8 @@ Additions: (Sorted by priority)
 
     - try log scale for sg input images
     - avila 3. april
+
+- Add index system for fibers
 
 - Rework plots, especially frd sutherland plot numbers are hardly readable change so the float atop
 

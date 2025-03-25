@@ -13,7 +13,6 @@ from scipy.stats import linregress
 import matplotlib.pyplot as plt
 
 import threading
-import step_motor_control as smc
 import qhycfw3_filter_wheel_control
 import qhy_ccd_take_image
 fw = None
@@ -34,6 +33,7 @@ def run_batch_file(batch_file_path:str):
 
 def main_measure_new(project_folder:str, progress_signal=None, exp_time:int=70000):
     import move_to_filter as mtf
+    import step_motor_control as smc
 
     if progress_signal:
         progress_signal.emit("Starting measurement pipeline, initializing devices...")
@@ -181,7 +181,7 @@ def run_from_existing_files(project_folder:str, progress_signal=None):
 
     # Light frame reduction loop
     reduced_data = []
-    for file_name in os.listdir(light_folder):
+    for file_name in sorted(os.listdir(light_folder)):
         if file_name.endswith(".fits"):  # Only process FITS files
             file_path = os.path.join(light_folder, file_name)
             with fits.open(file_path) as hdul:

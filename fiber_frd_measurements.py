@@ -46,7 +46,7 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
     f_num = np.zeros(5)
     f_num_err = np.zeros(5)
 
-    folder_list = [folder for folder in os.listdir(project_folder) if "filter" in folder]
+    folder_list = [folder for folder in sorted(os.listdir(project_folder)) if "filter" in folder]
     for i, folder in enumerate(folder_list):
         # Define project subfolder for each filter
         filter_folder = os.path.join(project_folder, folder)
@@ -108,27 +108,40 @@ def sutherland_plot(project_folder:str):
 
     # Load the distance to chip from the JSON file
     dist = np.zeros(5)
-    for i in range(2, 7):
-        with open(project_folder + f"/filter_{i}/Measurements/f_number.json") as f:
+    folder_list = [folder for folder in sorted(os.listdir(project_folder))[::-1] if "filter" in folder]
+
+    # Ensure filters are correctly ordered
+    if "filter_2" in folder_list:
+        print("Realigning filter list")
+        folder_list = folder_list[::-1]
+
+    for i, folder in enumerate(folder_list):
+        with open(project_folder + f"/{folder}/Measurements/f_number.json") as f:
             data = json.load(f)
-        dist[i-2] = data["distance_to_chip"]
+        dist[i] = data["distance_to_chip"]
 
     distance_to_chip = np.mean(dist)
 
     ee_list = []
 
-    for i in range(2, 7):
-        print(f"Processing filter {i}")
+    for i, folder in enumerate(folder_list):
+        print(f"Processing: {folder}")
         # Access project subfolder for each filter
-        filter_folder = project_folder + f"/filter_{i}"
+        filter_folder = project_folder + f"/{folder}"
+
+        image_list = os.listdir(filter_folder+ "/REDUCED")
+        if "LIGHT_0014_0.08s_reduced.fits" in image_list:
+            image_name = "/REDUCED/LIGHT_0014_0.08s_reduced.fits"
+        else:
+            image_name = f"/REDUCED/{folder}_pos_0_light_reduced.fits"
 
         # Load the LIGHT_0014_0.08s_reduced.fits file for each filter
-        reduced_image_path = filter_folder + "/REDUCED/LIGHT_0014_0.08s_reduced.fits"
+        reduced_image_path = filter_folder + image_name
         with fits.open(reduced_image_path) as hdul:
             reduced_image = hdul[0].data.astype(np.float32)
 
         import image_analysation as ia
-        # Trim data to area of interest (perhaps not necessary with better background reduction)
+        # Trim data to area of interest
         trimmed_data = ia.cut_image(reduced_image, margin=1000)  # If margin too low mask won't fit in image
 
         # Locate center of mass within trimmed image (array)
@@ -193,11 +206,11 @@ def sutherland_plot(project_folder:str):
         plt.vlines(input_f_num[4-idx], ee[4-idx], 1, color=colors[idx % len(colors)], linestyle='--', linewidth=0.5)
 
         # Add text to the plot
-        alignment = 'right' if idx == 0 else 'left'
-        padding = -0.05 if idx == 0 else 0.05
-        plt.text(input_f_num[4 - idx] + padding, ee[4 - idx], f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
+        alignment = "center" #'right' if idx == 0 else 'left'
+        padding = 0 #-0.05 if idx == 0 else 0.05
+        plt.text(input_f_num[4 - idx] + padding, 1, f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
                  fontsize=8,
-                 verticalalignment='center_baseline', horizontalalignment=alignment)
+                 verticalalignment='bottom', horizontalalignment=alignment)
 
     # For the legend
     plt.vlines([], [], [], color='black', linestyle='--', linewidth=0.5, label='Light loss at input = output f-ratio')
@@ -218,26 +231,34 @@ def plot_f_ratio_circles_on_raw(project_folder):
 
     filter_to_name_dict = {"2": '6.21', "3": '5.103', "4": '4.571', "5": '4.063', "6": '3.597'}
 
+    folder_list = [folder for folder in sorted(os.listdir(project_folder)[::-1]) if "filter" in folder]
+
     # Load the distance to chip from the JSON file
     dist = np.zeros(5)
-    for i in range(2, 7):
-        with open(project_folder + f"/filter_{i}/Measurements/f_number.json") as f:
+    for i, folder in enumerate(folder_list):
+        with open(project_folder + f"/{folder}/Measurements/f_number.json") as f:
             data = json.load(f)
-        dist[i - 2] = data["distance_to_chip"]
+        dist[i] = data["distance_to_chip"]
 
     distance_to_chip = np.mean(dist)
 
 
-    for i in range(2, 7):
-        print(f"Processing filter {i}")
+    for i, folder in enumerate(folder_list):
+        print(f"Processing {folder}")
         # Access project subfolder for each filter
-        filter_folder = project_folder + f"/filter_{i}"
+        filter_folder = project_folder + f"/{folder}"
 
         f_ratio_images_folder = filter_folder + "/f_ratio_images"
         os.makedirs(f_ratio_images_folder, exist_ok=True)
 
+        image_list = os.listdir(filter_folder + "/REDUCED")
+        if "LIGHT_0014_0.08s_reduced.fits" in image_list:
+            image_name = "/REDUCED/LIGHT_0014_0.08s_reduced.fits"
+        else:
+            image_name = f"/REDUCED/{folder}_pos_0_light_reduced.fits"
+
         # Load the LIGHT_0014_0.08s_reduced.fits file for each filter
-        reduced_image_path = filter_folder + "/REDUCED/LIGHT_0014_0.08s_reduced.fits"
+        reduced_image_path = filter_folder + image_name
         with fits.open(reduced_image_path) as hdul:
             reduced_image = hdul[0].data.astype(np.float32)
 
@@ -262,10 +283,13 @@ def plot_f_ratio_circles_on_raw(project_folder):
             from skimage import measure
             mask_outline = measure.find_contours(mask, 0.5)[0]
 
+            # Only for this make negative values zero bc of log scale
+            trimmed_data = np.where(trimmed_data < 0, 0, trimmed_data)
+
             from matplotlib.colors import LogNorm
             # Plot the mask on the raw image
             plt.figure()
-            plt.title(f"Filter f/{filter_to_name_dict[str(i)]} with aperature f/{fnum}")
+            plt.title(f"Filter {folder} with aperature f/{fnum}")
             plt.imshow(trimmed_data, cmap='gray', norm=LogNorm())
             plt.plot(mask_outline[:, 1], mask_outline[:, 0], color='red')
             plt.axis('off')
