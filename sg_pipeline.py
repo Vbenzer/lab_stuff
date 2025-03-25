@@ -1111,7 +1111,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
     move_to_filter.move("Open")
 
     # Make reference move
-    smc.make_reference_move()
+    #smc.make_reference_move()
 
     print("Taking images")
 
