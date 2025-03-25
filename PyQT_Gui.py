@@ -822,10 +822,12 @@ class MainWindow(QMainWindow):
             qhyccd_cam_control.use_camera("tiptilt", self.stop_event)
         elif selected_function == "Motor Controller: Reference":
             import step_motor_control as smc
+            smc.open_connection()
             smc.make_reference_move()
             smc.close_connection()
         elif selected_function == "Motor Controller: Move to Position":
             import step_motor_control as smc
+            smc.open_connection()
             position = float(self.number_input.text())
             smc.move_motor_to_position(position)
             smc.close_connection()

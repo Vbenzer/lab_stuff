@@ -39,9 +39,13 @@ def main_measure_new(project_folder:str, progress_signal=None, exp_time:int=7000
         progress_signal.emit("Starting measurement pipeline, initializing devices...")
 
     # Connect filter wheel and camera in thread, also reference motor
-    fw_thread = threading.Thread(target=init_filter_wheel).start()
-    cam_thread = threading.Thread(target=init_camera, args=([exp_time])).start()
-    smc_thread = threading.Thread(target=smc.make_reference_move()).start()
+    fw_thread = threading.Thread(target=init_filter_wheel)
+    cam_thread = threading.Thread(target=init_camera, args=([exp_time]))
+    smc_thread = threading.Thread(target=smc.make_reference_move)
+
+    fw_thread.start()
+    cam_thread.start()
+    smc_thread.start()
 
     # Make sure everything is ready
     fw_thread.join()
@@ -69,7 +73,7 @@ def main_measure_new(project_folder:str, progress_signal=None, exp_time:int=7000
 
         for pos in pos_values:
             # Move stepper motor
-            smc.move_to_position(pos) # Idea for minmax: start at 0, move to 5, move to 9.9, move to 5, move to 0 etc.
+            smc.move_motor_to_position(pos) # Idea for minmax: start at 0, move to 5, move to 9.9, move to 5, move to 0 etc.
 
             # Close shutter
             mtf.move("Closed")
@@ -277,6 +281,6 @@ def plot_cones(project_folder:str):
 
 if __name__ == "__main__":
     project_folder = r"D:\Vincent\OptranWF_100_187_P_measurement_3\FRD"
-    #run_from_existing_files(project_folder)
+    run_from_existing_files(project_folder)
 
     plot_cones(project_folder)

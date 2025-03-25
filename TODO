@@ -6,6 +6,7 @@ Bugs: (Sorted by priority)
     - Cam image folder wont get created, also add standard folder for cam images
     - cant choose folder after function has been run
     - remove folder exp time and cam name from thorcam live
+    - no option to give folder name if from general to camera
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab

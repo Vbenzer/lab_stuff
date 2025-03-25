@@ -10,7 +10,15 @@ timeout = 1  # 1 second timeout for responses
 
 # Initialize the serial connection
 ser = serial.Serial(port, baud_rate, timeout=timeout)
+print("Port opened:", ser.name)
 
+
+def open_connection():
+    if ser.is_open:
+        print("Port already open.")
+    else:
+        ser.open()
+        print("Port opened:", ser.name)
 
 # Function to send a command to the motor controller
 def send_command(command:str):
@@ -91,6 +99,8 @@ def make_reference_move():
     using the controller.
 
     """
+    open_connection()
+
     # Find Reference
     send_command("FPL")
     ref = check_error()
