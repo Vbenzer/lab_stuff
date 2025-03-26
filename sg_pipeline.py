@@ -1056,7 +1056,6 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         number_of_positions: Number of positions to take images at.
 
     """
-    import image_reduction
     import thorlabs_cam_control as tcc
     import file_mover
     import time
@@ -1102,10 +1101,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png")
         tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png")
 
-    # Create master darks
-    entrance_master_dark = (image_reduction
-                            .create_master_dark(entrance_dark_image_folder, plot=False))
-    exit_master_dark = image_reduction.create_master_dark(exit_dark_image_folder, plot=False)
+
 
     # Move to filter "0" for light
     move_to_filter.move("Open")
@@ -1151,6 +1147,48 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         progress_signal.emit("Images taken! Reducing images.")
 
     # Reduce images
+    reduce_images(main_image_folder, number_of_positions)
+
+    if progress_signal:
+        progress_signal.emit("Images reduced!")
+
+def reduce_images(main_image_folder, number_of_positions:int):
+    import image_reduction
+    from astropy.io import fits
+
+    os.makedirs(main_image_folder, exist_ok=True)
+    entrance_image_folder = os.path.join(main_image_folder, "entrance")
+    exit_image_folder = os.path.join(main_image_folder, "exit")
+    entrance_dark_image_folder = os.path.join(entrance_image_folder, "dark")
+    exit_dark_image_folder = os.path.join(exit_image_folder, "dark")
+    reduced_entrance_image_folder = os.path.join(entrance_image_folder, "reduced")
+    reduced_exit_image_folder = os.path.join(exit_image_folder, "reduced")
+    entrance_light_folder = os.path.join(entrance_image_folder, "light")
+    exit_light_folder = os.path.join(exit_image_folder, "light")
+
+    # Clear folders before adding new images
+    #file_mover.clear_folder(main_image_folder)
+
+    # Create folders if they don't exist
+    os.makedirs(entrance_image_folder, exist_ok=True)
+    os.makedirs(exit_image_folder, exist_ok=True)
+    os.makedirs(entrance_dark_image_folder, exist_ok=True)
+    os.makedirs(exit_dark_image_folder, exist_ok=True)
+    os.makedirs(reduced_entrance_image_folder, exist_ok=True)
+    os.makedirs(reduced_exit_image_folder, exist_ok=True)
+    os.makedirs(entrance_light_folder, exist_ok=True)
+    os.makedirs(exit_light_folder, exist_ok=True)
+
+    # Create master darks
+    entrance_master_dark = (image_reduction
+                            .create_master_dark(entrance_dark_image_folder, plot=False))
+    exit_master_dark = image_reduction.create_master_dark(exit_dark_image_folder, plot=False)
+
+    # Save the master darks as fits
+    fits.writeto(os.path.join(entrance_dark_image_folder, "entrance_master_dark.fits"), entrance_master_dark, overwrite=True)
+    fits.writeto(os.path.join(exit_dark_image_folder, "exit_master_dark.fits"), exit_master_dark, overwrite=True)
+
+    # Reduce images
     for i in range(number_of_positions):
         image = png_to_numpy(entrance_light_folder + f"/entrance_cam_image{i:03d}.png")
         image_reduction.reduce_image_with_dark(image, entrance_master_dark,
@@ -1162,9 +1200,6 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
                                                save=True)
 
     print("All images reduced!")
-
-    if progress_signal:
-        progress_signal.emit("Images reduced!")
 
 def cut_image_around_comk(image, comk, fiber_px_radius:[int, tuple[int,int]], margin):
     """
@@ -1921,9 +1956,49 @@ def get_px_to_mu(main_folder, fiber_diameter):
     with open(os.path.join(main_folder, "px_to_mu.json"), 'w') as f:
         json.dump(px_to_mu, f)
 
+def plot_horizontal_cut(project_folder):
+    """
+    Plot the horizontal cut of the image.
+    Args:
+        project_folder: Main folder of the project.
+
+    """
+    # Define the image folders
+    exit_image_folder = os.path.join(project_folder, "exit/reduced")
+
+    # Get the image and mask files
+    exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('.png')]
+
+    for image in exit_image_files:
+        # Read the first image and mask
+        exit_image = io.imread(os.path.join(exit_image_folder, exit_image_files[0]))
+
+        # Trim the image
+        trimmed_data = image_analysation.cut_image(exit_image, margin=200)
+
+        # Locate center of mass within trimmed image (array)
+        com = image_analysation.LocateFocus(trimmed_data)
+
+        # Convert center of mass to integer indices
+        com_x = int(com[0])
+
+        # Create a horizontal cut through the center of mass
+        cut = trimmed_data[com_x, :]
+
+        # Plot the horizontal cut
+        plt.figure()
+        plt.plot(cut)
+        plt.title(f"Horizontal cut through center of mass")
+        plt.xlabel("Pixel")
+        plt.ylabel("Flux")
+        plt.grid(True)
+        plt.show()
+        """plt.savefig(plots_folder + f"/horizontal_cut.png")
+        plt.close()"""
+
 if __name__ == '__main__':
 
-    image_path = 'D:/Vincent/FG050LGA/SG/exit/reduced/exit_cam_image000_reduced.png'
+    image_path = 'D:/Vincent/40x120_300A_test/SG/exit/dark/exit_cam_dark000.png'
     #image = io.imread(image_path)
     #print(com_of_spot(image, plot=True))
 
@@ -1938,12 +2013,15 @@ if __name__ == '__main__':
 
     #main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
-    main_folder = "D:/Vincent/FG050LGA/SG"
+    main_folder = "D:/Vincent/40x120_300A_test/SG"
+    #plot_horizontal_cut(main_folder)
+
+    reduce_images(main_folder, 11)
 
     # entrance_folder = "entrance_images"
     # exit_folder = "exit_images"
 
-    fiber_diameter = [40, 120]  # Value in micrometers
+    #fiber_diameter = [40, 120]  # Value in micrometers
     """
     # Plot com movement for entrance images
     plot_circle_movement(entrance_folder, fiber_diameter, 'entrance')
@@ -1967,8 +2045,8 @@ if __name__ == '__main__':
 
     #make_comparison_video(main_folder, fiber_diameter)
     #check_mask_flux_all(main_folder)
-    main_folder = "D:/Vincent/40x120_300A_test/SG"
-    make_comparison_video(main_folder, fiber_diameter)
+    #main_folder = "D:/Vincent/40x120_300A_test/SG"
+    #make_comparison_video(main_folder, fiber_diameter)
     #get_sg_params(main_folder, fiber_diameter, fiber_shape="rectangular", plot_all=True, plot_mask=True, save_mask=False)
     #sg_new(main_folder)
     #plot_sg_cool_like(main_folder, [40, 120])

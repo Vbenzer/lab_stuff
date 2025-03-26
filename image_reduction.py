@@ -73,7 +73,7 @@ def reduce_image_with_dark(science_data:np.ndarray, dark_data:np.ndarray, output
     reduced_data = science_data - dark_data
 
     # Clip negative values to zero (or other minimum threshold, if applicable)
-    #reduced_data = np.clip(reduced_data, 0, None) #TODO: Why is this here?
+    #reduced_data = np.clip(reduced_data, 0, None) #TODO: Why was this here?
 
     if save:
         # Check if the output file is .fits or .png

@@ -25,7 +25,7 @@ def main_measure_all_filters(project_folder:str, progress_signal=None, base_dire
 
         # Run the main measuring pipeline for each filter
         analyse_main.main_measure(filter_folder, progress_signal,
-                                  batch_file_path=f"D:\stepper_motor\start_nina_with_fstop_filter{i}.bat",
+                                  batch_file_path=f"D:\\stepper_motor\\start_nina_with_fstop_filter{i}.bat",
                                   base_directory=base_directory)
 
         progress_signal.emit(f"Measurement for filter {i} complete!")
@@ -51,11 +51,13 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
         # Define project subfolder for each filter
         filter_folder = os.path.join(project_folder, folder)
 
-        progress_signal.emit(f"Starting analysis for: {folder}")
+        if progress_signal:
+            progress_signal.emit(f"Starting analysis for: {folder}")
 
         analyse_main.run_from_existing_files(filter_folder, progress_signal)
 
-        progress_signal.emit(f"Analysis for {folder} complete!")
+        if progress_signal:
+            progress_signal.emit(f"Analysis for {folder} complete!")
 
         # Load the f-number and its error from the JSON file
         with open(filter_folder + "/Measurements/f_number.json") as f:
@@ -63,22 +65,61 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
             f_num[i] = data["f_number"]
             f_num_err[i] = data["f_number_err"]
 
-        progress_signal.emit(f"Result: {folder} with f-number: {f_num[i]}")
+        if progress_signal:
+            progress_signal.emit(f"Result: {folder} with f-number: {f_num[i]}")
 
-    progress_signal.emit("All filters complete! Starting final plot.")
+    if progress_signal:
+        progress_signal.emit("All filters complete! Starting final plot.")
+
+    # Save the output f-numbers to a json
+    with open(project_folder + "/f_number.json", "w") as f:
+        json.dump({"f_number": f_num.tolist(), "f_number_err": f_num_err.tolist()}, f)
+
+    plot_main(project_folder)
+
+    # Set measurement name to last folder name of project folder
+    #measurement_name = project_folder.split("/")[-1]
+
+    #file_save_managment.save_measurement_hdf5("D:/Vincent/frd_measurements.h5", measurement_name, f_num, f_num_err)
+
+def plot_main(project_folder:str):
+    # Load the output f-numbers from the JSON file
+    with open(project_folder + "/f_number.json") as f:
+        data = json.load(f)
+        f_num = np.array(data["f_number"])
+        f_num_err = np.array(data["f_number_err"])
 
     # Input f-numbers
-    input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597]) # These are from the setup_F#_EE_98 file, 18.2.25
+    input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597])  # These are from the setup_F#_EE_98 file, 18.2.25
     input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
 
     # Sort the f-numbers in descending order
     f_num = np.sort(f_num)[::-1]
     f_num_err = np.sort(f_num_err)[::-1]
 
+    # Get perimeter of the plot
+    max_f_num = max(input_f_num[0], f_num[0])
+    min_f_num = min(input_f_num[-1], f_num[-1])
+
     # Plot the output f-numbers vs input f-numbers
-    plt.errorbar(input_f_num, f_num, xerr=input_f_num_err, yerr=f_num_err, fmt="o", color="blue", label="Data points", capsize=5)
+    plt.errorbar(input_f_num, f_num, xerr=input_f_num_err, yerr=f_num_err, fmt="o", color="blue", label="Data points",
+                 capsize=5)
     plt.plot(input_f_num, f_num, linestyle='--', color="blue")
-    plt.plot([2.5, 6], [2.5, 6], color="red", label="y=x")
+    plt.plot([input_f_num[4] - 0.2, input_f_num[0] + 0.2], [input_f_num[4] - 0.2, input_f_num[0] + 0.2], color="red",
+             label="y=x")
+
+    for i in range(5):
+        plt.vlines(input_f_num[i], 0, f_num[i], color="black", linestyle='--', linewidth=0.5)
+        plt.text(input_f_num[4] - 0.04, f_num[i], f"{f_num[i]:.2f}", fontsize=8, verticalalignment='bottom',
+                 horizontalalignment='right')
+
+    for i in range(5):
+        plt.hlines(f_num[i], 0, input_f_num[i], color="black", linestyle='--', linewidth=0.5)
+        plt.text(input_f_num[i] + 0.05, input_f_num[4] - 0.2, f"{input_f_num[i]:.2f}", fontsize=8,
+                 verticalalignment='bottom', horizontalalignment='left')
+
+    plt.xlim([min_f_num - 0.2, max_f_num + 0.25])
+    plt.ylim([min_f_num - 0.2, max_f_num + 0.25])
     plt.xlabel("Input f/#")
     plt.ylabel("Output f/#")
     plt.title("Output f/# vs. Input f/#")
@@ -86,12 +127,7 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
     plt.legend()
     plt.savefig(project_folder + "/f_number_vs_input.png")
     plt.close()
-    #plt.show()
-
-    # Set measurement name to last folder name of project folder
-    measurement_name = project_folder.split("/")[-1]
-
-    #file_save_managment.save_measurement_hdf5("D:/Vincent/frd_measurements.h5", measurement_name, f_num, f_num_err)
+    # plt.show()
 
 def sutherland_plot(project_folder:str):
     """
@@ -216,7 +252,7 @@ def sutherland_plot(project_folder:str):
     plt.vlines([], [], [], color='black', linestyle='--', linewidth=0.5, label='Light loss at input = output f-ratio')
 
     plt.xlabel("Output Aperture f/#")
-    plt.ylabel("Encircled Energy")
+    plt.ylabel("Relative Encircled Energy")
     plt.title("Encircled Energy vs. Output Aperture f/#")
     plt.grid(True)
     plt.legend()
@@ -225,40 +261,119 @@ def sutherland_plot(project_folder:str):
     # plt.show()
 
 def plot_f_ratio_circles_on_raw(project_folder):
-    # Input f-numbers
-    input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597])  # These are from the setup_F#_EE_98 file, 18.2.25
-    input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
+        import sg_pipeline
+        import image_analysation as ia
+        from skimage import measure
+        from matplotlib.colors import LogNorm
 
-    filter_to_name_dict = {"2": '6.21', "3": '5.103', "4": '4.571', "5": '4.063', "6": '3.597'}
+        # Input f-numbers
+        input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597])  # These are from the setup_F#_EE_98 file, 18.2.25
+        input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
 
+        NA = 0.22
+
+        filter_to_name_dict = {"2": '6.21', "3": '5.103', "4": '4.571', "5": '4.063', "6": '3.597'}
+
+        folder_list = [folder for folder in sorted(os.listdir(project_folder)[::-1]) if "filter" in folder]
+
+        # Ensure filters are correctly ordered
+        if "filter_2" in folder_list:
+            print("Realigning filter list")
+            #folder_list = folder_list[::-1]
+            bad_names = True
+        else:
+            folder_list = folder_list[::-1]
+            bad_names = False
+
+        # Load the distance to chip from the JSON file
+        dist = np.zeros(5)
+        for i, folder in enumerate(folder_list):
+            with open(project_folder + f"/{folder}/Measurements/f_number.json") as f:
+                data = json.load(f)
+            dist[i] = data["distance_to_chip"]
+
+        distance_to_chip = np.mean(dist)
+
+        for i, folder in enumerate(folder_list):
+            print(f"Processing {folder}")
+            # Access project subfolder for each filter
+            filter_folder = project_folder + f"/{folder}"
+
+            f_ratio_images_folder = filter_folder + "/f_ratio_images"
+            os.makedirs(f_ratio_images_folder, exist_ok=True)
+
+            image_list = os.listdir(filter_folder + "/REDUCED")
+            if "LIGHT_0014_0.08s_reduced.fits" in image_list:
+                image_name = "/REDUCED/LIGHT_0014_0.08s_reduced.fits"
+            else:
+                image_name = f"/REDUCED/{folder}_pos_0_light_reduced.fits"
+
+            # Load the LIGHT_0014_0.08s_reduced.fits file for each filter
+            reduced_image_path = filter_folder + image_name
+            with fits.open(reduced_image_path) as hdul:
+                reduced_image = hdul[0].data.astype(np.float32)
+
+            # Trim data to area of interest (perhaps not necessary with better background reduction)
+            trimmed_data = ia.cut_image(reduced_image, margin=1000)  # If margin too low mask won't fit in image
+
+            # Locate center of mass within trimmed image (array)
+            com = ia.LocateFocus(trimmed_data)
+
+            # Calculate radius of NA
+            aperture_radius_NA = (distance_to_chip + 9.9) * NA / np.sqrt(1 - NA ** 2)  # 9.9: Distance to chip at 0 position
+            aperture_radius_NA = aperture_radius_NA // 7.52e-3
+            mask_NA = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius_NA, plot_mask=False)
+            mask_outline_NA = measure.find_contours(mask_NA, 0.5)[0]
+
+            mask_outline_list = []
+            filter_name = filter_to_name_dict[str(i+2)]
+
+            for fnum in input_f_num:
+                print(f"Processing f/{filter_name}, f/{fnum}")
+                # Calculate the radius of a circle with input f-ratios
+                aperture_radius = (distance_to_chip + 9.9) / (2 * fnum)  # 9.9: Distance to chip at 0 position
+
+                # Convert to pixels
+                aperture_radius = aperture_radius // 7.52e-3
+
+                # Create a circle mask
+                mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius, plot_mask=False)
+
+                mask_outline_list.append(measure.find_contours(mask, 0.5)[0])
+
+            # Only for this make negative values zero bc of log scale
+            trimmed_data = np.where(trimmed_data < 0, 0, trimmed_data)
+
+            # Plot the mask on the raw image
+            plt.figure()
+            plt.title(f"Input f/{filter_name} with artificial apertures")
+            plt.imshow(trimmed_data, cmap='gray', norm=LogNorm())
+            plt.plot(mask_outline_NA[:, 1], mask_outline_NA[:, 0], color='green', linewidth=0.8, alpha=0.5, dashes=(5, 10),
+                     label=f'NA = {NA}')
+
+            # Use a colormap for the outlines
+            cmap = ['blue', 'orange', 'purple', 'red', 'brown']
+            for idx, mask_outline in enumerate(mask_outline_list):
+                color = cmap[idx]
+                plt.plot(mask_outline[:, 1], mask_outline[:, 0], color=color, linewidth=0.5, linestyle="--", alpha=0.5, dashes=(5, 10),
+                         label=f"f/{input_f_num[idx]}")
+
+            plt.axis('off')
+            plt.legend(framealpha=0.5)
+            plt.savefig(f_ratio_images_folder + f"/input_{filter_name}_with_artificial_apertures.png", dpi=300)
+            plt.close()
+
+
+def plot_horizontal_cut(project_folder):
     folder_list = [folder for folder in sorted(os.listdir(project_folder)[::-1]) if "filter" in folder]
-
-    # Ensure filters are correctly ordered
-    if "filter_2" in folder_list:
-        print("Realigning filter list")
-        #folder_list = folder_list[::-1]
-        bad_names = True
-    else:
-        folder_list = folder_list[::-1]
-        bad_names = False
-
-    # Load the distance to chip from the JSON file
-    dist = np.zeros(5)
-    for i, folder in enumerate(folder_list):
-        with open(project_folder + f"/{folder}/Measurements/f_number.json") as f:
-            data = json.load(f)
-        dist[i] = data["distance_to_chip"]
-
-    distance_to_chip = np.mean(dist)
-
 
     for i, folder in enumerate(folder_list):
         print(f"Processing {folder}")
         # Access project subfolder for each filter
         filter_folder = project_folder + f"/{folder}"
 
-        f_ratio_images_folder = filter_folder + "/f_ratio_images"
-        os.makedirs(f_ratio_images_folder, exist_ok=True)
+        plots_folder = filter_folder + "/plots"
+        os.makedirs(plots_folder, exist_ok=True)
 
         image_list = os.listdir(filter_folder + "/REDUCED")
         if "LIGHT_0014_0.08s_reduced.fits" in image_list:
@@ -271,40 +386,31 @@ def plot_f_ratio_circles_on_raw(project_folder):
         with fits.open(reduced_image_path) as hdul:
             reduced_image = hdul[0].data.astype(np.float32)
 
+        # Trim data to area of interest
         import image_analysation as ia
-        # Trim data to area of interest (perhaps not necessary with better background reduction)
-        trimmed_data = ia.cut_image(reduced_image, margin=2000)  # If margin too low mask won't fit in image
+        trimmed_data = ia.cut_image(reduced_image, margin=500)
 
         # Locate center of mass within trimmed image (array)
         com = ia.LocateFocus(trimmed_data)
 
-        for fnum in input_f_num:
-            # Calculate the radius of a circle with input f-ratios
-            aperture_radius = (distance_to_chip + 9.9) / (2 * fnum)  # 9.9: Distance to chip at 0 position
+        # Convert center of mass to integer indices
+        com_x = int(com[0])
 
-            # Convert to pixels
-            aperture_radius = aperture_radius // 7.52e-3
+        # Create a horizontal cut through the center of mass
+        cut = trimmed_data[com_x, :]
 
-            # Create a circle mask
-            import sg_pipeline
-            mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius
-                                                    , plot_mask=False)
-            from skimage import measure
-            mask_outline = measure.find_contours(mask, 0.5)[0]
+        # Plot the horizontal cut
+        plt.figure()
+        plt.plot(cut)
+        plt.title(f"Horizontal cut through center of mass")
+        plt.xlabel("Pixel")
+        plt.ylabel("Flux")
+        plt.grid(True)
+        plt.savefig(plots_folder + f"/horizontal_cut.png")
+        plt.close()
 
-            # Only for this make negative values zero bc of log scale
-            trimmed_data = np.where(trimmed_data < 0, 0, trimmed_data)
 
-            from matplotlib.colors import LogNorm
-            # Plot the mask on the raw image
-            plt.figure()
-            plt.title(f"Input f/{filter_to_name_dict[str(i+2)]} with artificial aperature f/{fnum}")
-            plt.imshow(trimmed_data, cmap='gray', norm=LogNorm())
-            plt.plot(mask_outline[:, 1], mask_outline[:, 0], color='red')
-            plt.axis('off')
-            plt.savefig(f_ratio_images_folder + f"/input_{filter_to_name_dict[str(i+2)]}_with_{fnum}.png")
-            plt.close()
 
 if __name__ == "__main__":
-    project_folder = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5/FRD"
+    project_folder = "D:/Vincent/OptranWF_100_187_P_measurement_3/FRD"
     plot_f_ratio_circles_on_raw(project_folder)

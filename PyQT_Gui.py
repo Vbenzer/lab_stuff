@@ -20,7 +20,7 @@ if sys.platform.startswith("linux"):
 elif sys.platform.startswith("win"):
     print("Windows")
     BASE_PATH = r"\\srv4\labshare\raw_data\fibers\Measurements"
-    #BASE_PATH = r"D:\Vincent"
+    BASE_PATH = r"D:\Vincent"
 else:
     raise OSError("Unsupported OS")
 
@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
         self.folder_name_input.textChanged.connect(self.update_working_dir)
         self.folder_name_input.textChanged.connect(self.update_run_button_state)
 
+
         self.open_fiber_data_button = QPushButton("Open Fiber Data")
         self.open_fiber_data_button.clicked.connect(self.open_fiber_data_window)
 
@@ -119,6 +120,7 @@ class MainWindow(QMainWindow):
         self.comments_button = QPushButton("Add Comments")
         self.comments_button.clicked.connect(self.access_comments_file)
         self.comments_button.setDisabled(True)
+        self.folder_name_input.textChanged.connect(lambda: self.comments_button.setDisabled(self.folder_name_input.text() == ""))
 
         """self.lock_button = QPushButton("Lock In")
         #self.lock_button.clicked.connect(self.lock_inputs)
@@ -191,7 +193,47 @@ class MainWindow(QMainWindow):
 
         selected_function = self.camera_function_combo.currentText()
 
-        if selected_function in ["Thorlabs Camera Live", "Thorlabs Camera Single"]:
+        if selected_function == "Thorlabs Camera Live":
+            self.folder_name_input.hide()
+            self.folder_name_label.hide()
+            self.choose_folder_button.hide()
+            self.recent_folders_combo.hide()
+            self.recent_folders_label.hide()
+            self.working_dir_label.hide()
+            self.working_dir_display.hide()
+            self.comments_button.hide()
+            self.exposure_time_label.hide()
+            self.exposure_time_input.hide()
+            self.run_button.setDisabled(False)
+
+            if hasattr(self, 'placeholder_spacer'):
+                self.layout.removeItem(self.placeholder_spacer)
+                del self.placeholder_spacer
+                self.insert_spacer(162)
+            else:
+                self.insert_spacer(162)
+
+        else:
+            self.folder_name_input.show()
+            self.folder_name_label.show()
+            self.choose_folder_button.show()
+            self.recent_folders_combo.show()
+            self.recent_folders_label.show()
+            self.working_dir_label.show()
+            self.working_dir_display.show()
+            self.comments_button.show()
+            self.exposure_time_label.show()
+            self.exposure_time_input.show()
+            self.run_button.setDisabled(self.folder_name_input.text() == "")
+
+            if hasattr(self, 'placeholder_spacer'):
+                self.layout.removeItem(self.placeholder_spacer)
+                del self.placeholder_spacer
+                self.insert_spacer(30)
+            else:
+                self.insert_spacer(30)
+
+        if selected_function == "Thorlabs Camera Single":
             self.camera_chooser_label.show()
             self.camera_chooser_combo.show()
         else:
@@ -263,6 +305,10 @@ class MainWindow(QMainWindow):
         self.update_ui_state()
 
         working_dir = self.working_dir_display.text()
+
+        # Create folder if it doesnt exits
+        os.makedirs(working_dir)
+
         threading.Thread(target=self.run_camera_function_thread, args=(selected_function, working_dir)).start()
 
     def run_camera_function_thread(self, selected_function, working_dir):
@@ -323,6 +369,7 @@ class MainWindow(QMainWindow):
 
         self.folder_name_input.setText(name)
         self.update_input_visibility()
+        self.update_measurement_button_state()
 
     def insert_spacer(self, height):
         self.placeholder_spacer = QSpacerItem(20, height)
@@ -346,6 +393,7 @@ class MainWindow(QMainWindow):
             self.recent_folders_combo.hide()
             self.choose_folder_button.hide()
             self.folder_name_label.setText("Folder Name:")
+            self.folder_name_input.setText("")
             if hasattr(self, 'placeholder_spacer'):
                 self.layout.removeItem(self.placeholder_spacer)
                 del self.placeholder_spacer
@@ -358,17 +406,10 @@ class MainWindow(QMainWindow):
             self.open_fiber_data_button.hide()
             self.folder_name_input.setReadOnly(False)
             self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-            self.recent_folders_label.hide()
-            self.recent_folders_combo.hide()
-            self.choose_folder_button.hide()
+            self.folder_name_input.setText("Manual_Images")
             self.folder_name_label.setText("Folder Name:")
 
-            if hasattr(self, 'placeholder_spacer'):
-                self.layout.removeItem(self.placeholder_spacer)
-                del self.placeholder_spacer
-                self.insert_spacer(82)
-            else:
-                self.insert_spacer(82)
+            self.update_camera_tab_buttons()  # Ensure buttons are correctly updated
 
         else:
             if hasattr(self, 'placeholder_spacer'):
@@ -379,6 +420,7 @@ class MainWindow(QMainWindow):
             self.folder_name_label.setText("Fiber Name:")
             self.folder_name_input.setReadOnly(True)
             self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            self.folder_name_input.setText(self.folder_name)
 
             # Show the buttons that were hidden for some functions in the general tab
             self.folder_name_label.show()
@@ -432,12 +474,13 @@ class MainWindow(QMainWindow):
 
     def access_comments_file(self):
         working_dir = self.working_dir_display.text()
-        if not working_dir:
+        if working_dir == "":
             self.show_message("Please select a working directory first.")
             return
 
         comments_file_path = os.path.join(working_dir, "comments.txt")
         if not os.path.exists(comments_file_path):
+            os.makedirs(working_dir, exist_ok=True)
             with open(comments_file_path, "w") as file:
                 file.write("Comments:\n")
             self.comments_button.setText("Access Comments")
@@ -494,16 +537,6 @@ class MainWindow(QMainWindow):
 
             self.open_fiber_data_window()
             self.fiber_data_window.load_fiber_data(folder)
-
-            """if self.inputs_locked:
-                self.check_existing_measurements(folder)"""
-
-            """# Check if all required inputs are filled before locking
-            if self.folder_name and self.fiber_dimension and self.fiber_shape != "None":
-                return
-                #self.lock_inputs()
-            else:
-                self.show_message("Please enter fiber name, diameter, length, and shape before locking inputs.")"""
 
             self.update_comments_button()
             update_recent_folders(folder, self.recent_folders, base_directory=self.base_directory)
@@ -1244,6 +1277,10 @@ class MainWindow(QMainWindow):
             self.run_analysis_button.setDisabled(True)
             self.run_measurement_button.setDisabled(True)
             self.choose_folder_button.setDisabled(True)
+        else:
+            self.run_analysis_button.setDisabled(False)
+            self.run_measurement_button.setDisabled(False)
+            self.choose_folder_button.setDisabled(False)
 
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
