@@ -162,6 +162,8 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
     best_location = None
     best_radius = radius
 
+    print("Matching shape")
+
     # Detect edges using Canny edge detector
     edges = feature.canny(image, sigma=2, low_threshold=1, high_threshold=15)
 
@@ -267,6 +269,7 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
             #print("Template shape:", template.shape)
 
             for angle in np.linspace(0, stop_value, num_rotations, endpoint=False): # Iterate over different rotations
+                print("Angle:", angle)
                 # Rotate the template
                 rotated_template = transform.rotate(template, angle, resize=False)
                 rotated_template = (rotated_template * 255).astype(np.uint8)
@@ -707,7 +710,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         image = io.imread(image_path)
 
         # Get the center of mass of the spot. Threshold important to ensure correct spot detection
-        com = com_of_spot(image, threshold=200)
+        com = com_of_spot(image, threshold=100, plot=False)
 
         # Append the center of mass to the list
         entrance_coms.append(com)
@@ -1965,36 +1968,36 @@ def plot_horizontal_cut(project_folder):
     """
     # Define the image folders
     exit_image_folder = os.path.join(project_folder, "exit/reduced")
-    plots_folder = os.path.join(project_folder, "plots")
 
     # Get the image and mask files
     exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('.png')]
 
-    #for image in exit_image_files:
-    # Read the first image and mask
-    exit_image = io.imread(os.path.join(exit_image_folder, exit_image_files[0]))
+    for image in exit_image_files:
+        # Read the first image and mask
+        exit_image = io.imread(os.path.join(exit_image_folder, exit_image_files[0]))
 
-    # Trim the image
-    trimmed_data = image_analysation.cut_image(exit_image, margin=200)
+        # Trim the image
+        trimmed_data = image_analysation.cut_image(exit_image, margin=200)
 
-    # Locate center of mass within trimmed image (array)
-    com = image_analysation.LocateFocus(trimmed_data)
+        # Locate center of mass within trimmed image (array)
+        com = image_analysation.LocateFocus(trimmed_data)
 
-    # Convert center of mass to integer indices
-    com_x = int(com[0])
+        # Convert center of mass to integer indices
+        com_x = int(com[0])
 
-    # Create a horizontal cut through the center of mass
-    cut = trimmed_data[com_x, :]
+        # Create a horizontal cut through the center of mass
+        cut = trimmed_data[com_x, :]
 
-    # Plot the horizontal cut
-    plt.figure()
-    plt.plot(cut)
-    plt.title(f"Horizontal cut through center of mass")
-    plt.xlabel("Pixel")
-    plt.ylabel("Flux")
-    plt.grid(True)
-    plt.savefig(plots_folder + f"/horizontal_cut.png")
-    plt.close()
+        # Plot the horizontal cut
+        plt.figure()
+        plt.plot(cut)
+        plt.title(f"Horizontal cut through center of mass")
+        plt.xlabel("Pixel")
+        plt.ylabel("Flux")
+        plt.grid(True)
+        plt.show()
+        """plt.savefig(plots_folder + f"/horizontal_cut.png")
+        plt.close()"""
 
 if __name__ == '__main__':
 
@@ -2013,8 +2016,8 @@ if __name__ == '__main__':
 
     #main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
-    main_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0000/SG"
-    plot_horizontal_cut(main_folder)
+    main_folder = r"\\srv4\labshare\raw_data\fibers\Measurements\R_25x40_0000_0000\SG"
+    #plot_horizontal_cut(main_folder)
 
     #reduce_images(main_folder, 11)
 
@@ -2032,7 +2035,7 @@ if __name__ == '__main__':
     #entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
     #exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    #get_sg_params(main_folder, fiber_diameter, fiber_shape="circular", plot_all=True, plot_mask=True, save_mask=False)
+    get_sg_params(main_folder, [25, 40], fiber_shape="rectangular", plot_all=True, plot_mask=True, save_mask=False)
 
     #calc_sg(main_folder, plot_result=True)
 
