@@ -13,9 +13,9 @@ def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=
         frame = cam.grab_image(exposure_time=exposure_time)
     else:
         if cam_name == "entrance_cam":
-            frame = cam.grab_image(exposure_time="1s")
-        elif cam_name == "exit_cam":
             frame = cam.grab_image(exposure_time="10ms")
+        elif cam_name == "exit_cam":
+            frame = cam.grab_image(exposure_time="4ms")
         else:
             raise ValueError("Invalid camera name. Please provide a valid camera name.")
 

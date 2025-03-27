@@ -129,6 +129,9 @@ def move_motor_to_position(position:float):
 
 
     """
+    # Open the serial connection
+    open_connection()
+
     # Enable the motor if not already enabled
     print("Enabling motor...")
     send_command(f"SVO 1 1")
