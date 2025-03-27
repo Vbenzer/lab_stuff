@@ -110,7 +110,7 @@ def plot_main(project_folder:str):
 
     for i in range(5):
         plt.vlines(input_f_num[i], 0, f_num[i], color="black", linestyle='--', linewidth=0.5)
-        plt.text(min_f_num - 0.04, f_num[i], f"{f_num[i]:.2f}", fontsize=8, verticalalignment='bottom',
+        plt.text(min_f_num - 0.03, f_num[i], f"{f_num[i]:.2f}", fontsize=8, verticalalignment='bottom',
                  horizontalalignment='right')
 
     for i in range(5):
@@ -217,7 +217,7 @@ def sutherland_plot(project_folder:str):
 
             # Create a circle mask
             import sg_pipeline
-            mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius, plot_mask=True)
+            mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius, plot_mask=False)
 
             # Calculate the flux within the mask
             flux = np.sum(mask * trimmed_data)
@@ -285,9 +285,9 @@ def sutherland_plot(project_folder:str):
         # Add text to the plot
         alignment = "center" #'right' if idx == 0 else 'left'
         padding = 0 #-0.05 if idx == 0 else 0.05
-        plt.text(input_f_num[4 - idx] + padding, 1, f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
+        plt.text(input_f_num[4 - idx] + padding, 1.05, f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
                  fontsize=8,
-                 verticalalignment='top', horizontalalignment=alignment)
+                 verticalalignment='bottom', horizontalalignment=alignment)
 
     # For the legend
     plt.vlines([], [], [], color='black', linestyle='--', linewidth=0.5, label='Light loss at input = output f-ratio')
@@ -469,6 +469,7 @@ def plot_horizontal_cut(project_folder):
 
 
 if __name__ == "__main__":
-    project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/O_50_0000_0000/FRD"
+    project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0000/FRD"
     #sutherland_plot(project_folder)
-    plot_f_ratio_circles_on_raw(project_folder)
+    #plot_f_ratio_circles_on_raw(project_folder)
+    plot_horizontal_cut(project_folder)
