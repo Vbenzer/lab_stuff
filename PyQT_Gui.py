@@ -20,7 +20,7 @@ if sys.platform.startswith("linux"):
 elif sys.platform.startswith("win"):
     print("Windows")
     BASE_PATH = r"\\srv4\labshare\raw_data\fibers\Measurements"
-    BASE_PATH = r"D:\Vincent"
+    #BASE_PATH = r"D:\Vincent"
 else:
     raise OSError("Unsupported OS")
 

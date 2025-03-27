@@ -110,12 +110,12 @@ def plot_main(project_folder:str):
 
     for i in range(5):
         plt.vlines(input_f_num[i], 0, f_num[i], color="black", linestyle='--', linewidth=0.5)
-        plt.text(input_f_num[4] - 0.04, f_num[i], f"{f_num[i]:.2f}", fontsize=8, verticalalignment='bottom',
+        plt.text(min_f_num - 0.04, f_num[i], f"{f_num[i]:.2f}", fontsize=8, verticalalignment='bottom',
                  horizontalalignment='right')
 
     for i in range(5):
         plt.hlines(f_num[i], 0, input_f_num[i], color="black", linestyle='--', linewidth=0.5)
-        plt.text(input_f_num[i] + 0.05, input_f_num[4] - 0.2, f"{input_f_num[i]:.2f}", fontsize=8,
+        plt.text(input_f_num[i] + 0.05, min_f_num - 0.2, f"{input_f_num[i]:.2f}", fontsize=8,
                  verticalalignment='bottom', horizontalalignment='left')
 
     plt.xlim([min_f_num - 0.2, max_f_num + 0.25])
@@ -144,6 +144,8 @@ def sutherland_plot(project_folder:str):
 
     # Load the distance to chip from the JSON file
     dist = np.zeros(5)
+    dist_err = np.zeros(5)
+
     folder_list = [folder for folder in sorted(os.listdir(project_folder))[::-1] if "filter" in folder]
 
     # Ensure filters are correctly ordered
@@ -155,10 +157,22 @@ def sutherland_plot(project_folder:str):
         with open(project_folder + f"/{folder}/Measurements/f_number.json") as f:
             data = json.load(f)
         dist[i] = data["distance_to_chip"]
+        dist_err[i] = data["distance_to_chip_err"]
 
-    distance_to_chip = np.mean(dist)
+    weights = 1 / dist_err ** 2
+    print("Weights:", weights)
+    distance_to_chip = np.sum(dist * weights) / np.sum(weights) # Weighted mean
+    print("Distance to chip:", distance_to_chip)
+    sigma_weighted_mean = np.sqrt(1 / np.sum(weights))
+    print("Sigma weighted mean:", sigma_weighted_mean)
+    std_dev = np.std(dist, ddof=1)
+    print("Standard deviation:", std_dev)
+    distance_to_chip_err = np.sqrt(sigma_weighted_mean**2 + std_dev**2)
+
+    print(distance_to_chip_err)
 
     ee_list = []
+    ee_err_list = []
 
     for i, folder in enumerate(folder_list):
         print(f"Processing: {folder}")
@@ -184,18 +198,26 @@ def sutherland_plot(project_folder:str):
         com = ia.LocateFocus(trimmed_data)
 
         ee_sublist = []
+        ee_err_sublist = []
 
-        for fnum in input_f_num:
+        for fnum, fnum_err in zip(input_f_num, input_f_num_err):
             # Calculate the radius of a circle with input f-ratios
-            aperture_radius = (distance_to_chip + 9.9) / (2 * fnum) # 9.9: Distance to chip at 0 position
+            aperture_radius = (distance_to_chip + 9.9) / (2 * fnum)  # 9.9: Distance to chip at 0 position
+            aperture_radius_err = aperture_radius * np.sqrt(
+                (distance_to_chip_err / (distance_to_chip + 9.9)) ** 2 + (fnum_err / fnum) ** 2)
 
-            # Convert to pixels
-            aperture_radius = aperture_radius // 7.52e-3
+            # Convert to pixels (keep floating-point for error calculations)
+            aperture_radius_pix = aperture_radius / 7.52e-3
+            aperture_radius_err_pix = aperture_radius_err / 7.52e-3
+
+            print("aperture_err", aperture_radius_err_pix)
+
+            # Round only for actual mask application
+            aperture_radius = int(round(aperture_radius_pix))
 
             # Create a circle mask
             import sg_pipeline
-            mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius
-                                                    , plot_mask=False)
+            mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius, plot_mask=True)
 
             # Calculate the flux within the mask
             flux = np.sum(mask * trimmed_data)
@@ -206,9 +228,26 @@ def sutherland_plot(project_folder:str):
 
             # Calculate the encircled energy of the mask
             ee = flux / (flux + flux_outside)
+
+            # Compute uncertainties (assuming Poisson statistics for flux)
+            flux_err = np.sqrt(flux) if flux > 0 else 0  # Avoid division by zero
+            flux_outside_err = np.sqrt(flux_outside) if flux_outside > 0 else 0  # Avoid division by zero
+
+            print("Flux errors", flux_err, flux_outside_err)
+
+            # Compute EE uncertainty
+            ee_err = ee * np.sqrt(
+                (flux_err / flux) ** 2 +
+                (flux_outside_err / flux_outside) ** 2 +
+                (aperture_radius_err_pix / aperture_radius_pix) ** 2
+            )
+
+            print("ee, ee_err:", ee, ee_err)
             ee_sublist.append(ee)
+            ee_err_sublist.append(ee_err)
 
         ee_list.append(ee_sublist)
+        ee_err_list.append(ee_err_sublist)
 
     # Make spline fit
     from scipy.interpolate import PchipInterpolator
@@ -216,6 +255,8 @@ def sutherland_plot(project_folder:str):
     # Change order of ee and f-numbers
     ee_list = np.array(ee_list)
     ee_list = np.flip(ee_list, axis=1)
+    ee_err_list = np.array(ee_err_list)
+    ee_err_list = np.flip(ee_err_list, axis=1)
 
     input_f_num = np.flip(input_f_num)
     input_f_num_err = np.flip(input_f_num_err)
@@ -246,7 +287,7 @@ def sutherland_plot(project_folder:str):
         padding = 0 #-0.05 if idx == 0 else 0.05
         plt.text(input_f_num[4 - idx] + padding, 1, f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
                  fontsize=8,
-                 verticalalignment='bottom', horizontalalignment=alignment)
+                 verticalalignment='top', horizontalalignment=alignment)
 
     # For the legend
     plt.vlines([], [], [], color='black', linestyle='--', linewidth=0.5, label='Light loss at input = output f-ratio')
@@ -270,7 +311,15 @@ def plot_f_ratio_circles_on_raw(project_folder):
         input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597])  # These are from the setup_F#_EE_98 file, 18.2.25
         input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
 
-        NA = 0.22
+        # Read NA from fiber_data.json
+        with open(os.path.join(os.path.dirname(project_folder), 'fiber_data.json')) as f:
+            fiber_data = json.load(f)
+            NA = fiber_data['numerical_aperature']
+            if NA == "":
+                NA = 0.22
+            else:
+                NA = float(NA)
+
 
         filter_to_name_dict = {"2": '6.21', "3": '5.103', "4": '4.571', "5": '4.063', "6": '3.597'}
 
@@ -341,13 +390,21 @@ def plot_f_ratio_circles_on_raw(project_folder):
 
                 mask_outline_list.append(measure.find_contours(mask, 0.5)[0])
 
-            # Only for this make negative values zero bc of log scale
-            trimmed_data = np.where(trimmed_data < 0, 0, trimmed_data)
+            """# Boost everything so that the lowest value is 0 for log scaling
+            trimmed_data = trimmed_data - np.min(trimmed_data)
+            print(np.min(trimmed_data))"""
+
+            # Save trimmed as fits
+            hdu = fits.PrimaryHDU(trimmed_data)
+            hdu.writeto(f_ratio_images_folder + f"/trimmed_{filter_name}.fits", overwrite=True)
 
             # Plot the mask on the raw image
             plt.figure()
             plt.title(f"Input f/{filter_name} with artificial apertures")
-            plt.imshow(trimmed_data, cmap='gray', norm=LogNorm())
+            plt.imshow(trimmed_data, cmap='gray')#, norm=LogNorm())
+            # Add color scale for pixel value next to the image
+            cbar = plt.colorbar()
+            cbar.set_label('Pixel value')
             plt.plot(mask_outline_NA[:, 1], mask_outline_NA[:, 0], color='green', linewidth=0.8, alpha=0.5, dashes=(5, 10),
                      label=f'NA = {NA}')
 
@@ -412,5 +469,6 @@ def plot_horizontal_cut(project_folder):
 
 
 if __name__ == "__main__":
-    project_folder = "D:/Vincent/OptranWF_100_187_P_measurement_3/FRD"
+    project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/O_50_0000_0000/FRD"
+    #sutherland_plot(project_folder)
     plot_f_ratio_circles_on_raw(project_folder)

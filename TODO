@@ -9,13 +9,12 @@ Bugs: (Sorted by priority)
 
 Additions: (Sorted by priority)
 - Group meeting:
-    Can use Quarto for auto-generation of reports on fibers
-    - include images, FRD report, …
-    - can also just use markdown if it’s simpler
-
-
+    - More images in report
     - try log scale for sg input images!!!
     - avila 3. april
+
+
+- Add exp time input for sg
 
 - Add index system for fibers (i guess just smoothly transition to no naming convention)
 
