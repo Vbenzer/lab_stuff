@@ -36,7 +36,7 @@ Ideas:
 
 - Automatically assist with some of the checks, E.g. for frd: Opens thorcam then asks is there the fiber is it oriented horizontally and so on...
 
-- Darks in frd are dependant on the position
+
 
 - Potentially test faster fps with qhyccd for tip tilt with https://github.com/JiangXL/qhyccd-python/blob/master/QHYCCD_Demo.ipynb
 
