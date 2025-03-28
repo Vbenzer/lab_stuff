@@ -1,6 +1,8 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
+    - Camera tab spacer bug
+    - checking existing measurements doesnt work
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
@@ -10,13 +12,14 @@ Bugs: (Sorted by priority)
 Additions: (Sorted by priority)
 - Group meeting:
     - More images in report
-    - try log scale for sg input images!!!
+    - try log scale for sg input images!
     - avila 3. april
 
+- Try bias for thorcam images
 
-- Add exp time input for sg
+- Add exp time input for sg (done, not tested)
 
-- Add index system for fibers (i guess just smoothly transition to no naming convention)
+- Add index system for fibers (i guess just smoothly transition to new naming convention)
 
 - Rework plots, especially frd sutherland plot numbers are hardly readable change so the float atop
     - Add horizontal cut illumination plot for frd and sg bc why not (done but noticed weird background in sg)
@@ -29,8 +32,6 @@ Additions: (Sorted by priority)
 
 
 Ideas:
-- Add numbering system for fibers
-
 - Option to set expo time to recommended value for the measurement
 
 - Automatically assist with some of the checks, E.g. for frd: Opens thorcam then asks is there the fiber is it oriented horizontally and so on...

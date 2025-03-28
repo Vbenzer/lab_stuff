@@ -200,9 +200,15 @@ def sutherland_plot(project_folder:str):
         ee_sublist = []
         ee_err_sublist = []
 
+        old_data = False
+        if old_data:
+            distance_to_chip_at_zero_position = 9.9
+        else:
+            distance_to_chip_at_zero_position = 0
+
         for fnum, fnum_err in zip(input_f_num, input_f_num_err):
             # Calculate the radius of a circle with input f-ratios
-            aperture_radius = (distance_to_chip + 9.9) / (2 * fnum)  # 9.9: Distance to chip at 0 position
+            aperture_radius = (distance_to_chip + distance_to_chip_at_zero_position) / (2 * fnum)  # 9.9: Distance to chip at 0 position
             aperture_radius_err = aperture_radius * np.sqrt(
                 (distance_to_chip_err / (distance_to_chip + 9.9)) ** 2 + (fnum_err / fnum) ** 2)
 
@@ -217,7 +223,7 @@ def sutherland_plot(project_folder:str):
 
             # Create a circle mask
             import sg_pipeline
-            mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius, plot_mask=True)
+            mask = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius, plot_mask=False)
 
             # Calculate the flux within the mask
             flux = np.sum(mask * trimmed_data)
@@ -228,6 +234,16 @@ def sutherland_plot(project_folder:str):
 
             # Calculate the encircled energy of the mask
             ee = flux / (flux + flux_outside)
+
+            # Plot outline of mask with original image and ee value
+            from skimage import measure
+            plt.figure()
+            plt.imshow(trimmed_data, cmap='gray')
+            outline = measure.find_contours(mask, 0.5)[0]
+            plt.plot(outline[:, 1], outline[:, 0], color='red', linewidth=0.8)
+            plt.title(f"Encircled energy: {ee:.3f}")
+            plt.axis('off')
+            plt.show()
 
             # Compute uncertainties (assuming Poisson statistics for flux)
             flux_err = np.sqrt(flux) if flux > 0 else 0  # Avoid division by zero
@@ -280,12 +296,12 @@ def sutherland_plot(project_folder:str):
         plt.plot(x_range, popt_list[idx][0](x_range), linestyle='-', color=colors[idx % len(colors)], linewidth=1)
 
         # Visualize the light loss at the output f-ratio
-        plt.vlines(input_f_num[4-idx], ee[4-idx], 1, color=colors[idx % len(colors)], linestyle='--', linewidth=0.5)
+        plt.vlines(input_f_num[4-idx], ee[4-idx], 1.005, color=colors[idx % len(colors)], linestyle='--', linewidth=0.5)
 
         # Add text to the plot
         alignment = "center" #'right' if idx == 0 else 'left'
         padding = 0 #-0.05 if idx == 0 else 0.05
-        plt.text(input_f_num[4 - idx] + padding, 1, f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
+        plt.text(input_f_num[4 - idx] + padding, 1.02, f"{ee[4 - idx]:.3f}", color=colors[idx % len(colors)],
                  fontsize=8,
                  verticalalignment='top', horizontalalignment=alignment)
 
@@ -470,5 +486,6 @@ def plot_horizontal_cut(project_folder):
 
 if __name__ == "__main__":
     project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/O_50_0000_0000/FRD"
-    #sutherland_plot(project_folder)
-    plot_f_ratio_circles_on_raw(project_folder)
+    project_folder = "D:/Vincent/O_50_0000_0000/FRD"
+    sutherland_plot(project_folder)
+    #plot_f_ratio_circles_on_raw(project_folder)

@@ -1,4 +1,6 @@
 import time
+from tkinter.constants import RAISED
+
 #from cProfile import label
 
 import numpy as np
@@ -1049,7 +1051,7 @@ def main(fiber_diameter:int, fiber_shape:str, number_of_positions:int=11): # Tod
 
     calc_sg(main_image_folder, plot_result=True)
 
-def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None, number_of_positions:int=11):
+def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None, number_of_positions:int=11, exposure_times:dict[str, str]=None):
     """
     Capture images and reduce them for the scrambling gain calculation
     Args:
@@ -1057,8 +1059,13 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         fiber_diameter: Diameter of the fiber in micrometers.
         progress_signal: Signal to update the progress.
         number_of_positions: Number of positions to take images at.
+        exposure_times: Dictionary containing the exposure times for the cameras.
 
     """
+    if exposure_times is None:
+        # Raise an error if the exposure times are not given
+        raise ValueError("Exposure times must be given.")
+
     import thorlabs_cam_control as tcc
     import file_mover
     import time
@@ -1101,8 +1108,8 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
 
     # Take darks
     for i in range(5):
-        tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png")
-        tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png")
+        tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png", exposure_time=exposure_times["entrance_cam"])
+        tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png", exposure_time=exposure_times["exit_cam"])
 
 
 
@@ -1134,8 +1141,8 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         smc.move_motor_to_position(pos_left + i * step_size)
 
         # Take images
-        tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png")
-        tcc.take_image("exit_cam", exit_light_folder + f"/exit_cam_image{i:03d}.png")
+        tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png", exposure_time=exposure_times["entrance_cam"])
+        tcc.take_image("exit_cam", exit_light_folder + f"/exit_cam_image{i:03d}.png", exposure_time=exposure_times["exit_cam"])
 
         print(f"Image {i + 1} out of {number_of_positions} at Position {pos_left + i * step_size} done! "
               f"Move spot to next position")

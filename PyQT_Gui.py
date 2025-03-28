@@ -5,6 +5,8 @@ import json
 import threading
 import time
 import subprocess
+import socket
+import shutil
 from qhycfw3_filter_wheel_control import FilterWheel
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
@@ -18,9 +20,11 @@ if sys.platform.startswith("linux"):
     print("Linux")
     BASE_PATH = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements"
 elif sys.platform.startswith("win"):
-    print("Windows")
-    BASE_PATH = r"\\srv4\labshare\raw_data\fibers\Measurements"
-    #BASE_PATH = r"D:\Vincent"
+    hostname = socket.gethostname()
+    if hostname == "DESKTOP-HEBN59N":
+        BASE_PATH = r"D:\Vincent"
+    else:
+        BASE_PATH = r"\\srv4\labshare\raw_data\fibers\Measurements"
 else:
     raise OSError("Unsupported OS")
 
@@ -111,6 +115,11 @@ class MainWindow(QMainWindow):
         self.open_fiber_data_button = QPushButton("Open Fiber Data")
         self.open_fiber_data_button.clicked.connect(self.open_fiber_data_window)
 
+        self.create_datasheet_button = QPushButton("Create Datasheet")
+        self.create_datasheet_button.clicked.connect(self.create_datasheet)
+        # Initially deactivated
+        self.create_datasheet_button.setDisabled(True)
+
         self.working_dir_label = QLabel("Working Directory:")
         self.working_dir_display = QLabel("")
 
@@ -142,7 +151,7 @@ class MainWindow(QMainWindow):
         self.layout.addLayout(self.create_hbox_layout(self.folder_name_label, self.folder_name_input))
         self.layout.addLayout(self.create_hbox_layout(self.working_dir_label, self.working_dir_display))
 
-        self.layout.addWidget(self.open_fiber_data_button)
+        self.layout.addLayout(self.create_hbox_layout(self.open_fiber_data_button, self.create_datasheet_button))
 
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.choose_folder_button)
@@ -184,6 +193,54 @@ class MainWindow(QMainWindow):
         self.progress_signal.connect(self.update_progress)
 
         self.fiber_data_window = FiberDataWindow(self)
+
+    def create_datasheet(self):
+        working_dir = self.working_dir_display.text()
+        fiber_folder = self.folder_name_input.text()
+        if working_dir == "":
+            self.show_message("Please select a working directory first.")
+            return
+        if not os.path.exists(working_dir):
+            self.show_message("Working directory does not exist.")
+            return
+
+        print(fiber_folder)
+
+        # Use anaconda?
+        anaconda = True
+        if anaconda:
+            command = [
+                r"C:\Users\User\anaconda3\Scripts\activate",
+                "&&",
+                "quarto",
+                "render",
+                r"fiber_datasheet\fiber_datasheet_template.ipynb",
+                "--execute",
+                f"-P fiber_folder:'{fiber_folder}'"
+            ]
+        else:
+            command = [
+                "quarto",
+                "render",
+                "fiber_datasheet_template.ipynb",
+                "--execute",
+                f"-P fiber_folder:{fiber_folder}"
+            ]
+
+        try:
+            self.show_message("Creating datasheet...")
+            result = subprocess.run(" ".join(command), shell=True, check=True, capture_output=True, text=True)
+            print("Command output:", result.stdout)
+            self.show_message("Datasheet created successfully.")
+            # Copy the datasheet to the working directory
+            datasheet_path = os.path.join("fiber_datasheet", "fiber_datasheet_template.pdf")
+            shutil.copy(datasheet_path, working_dir)
+            self.show_message("Datasheet copied to working directory.")
+
+        except subprocess.CalledProcessError as e:
+            print("Error:", e.stderr)
+            self.show_message("Error creating datasheet.")
+
 
     def update_camera_tab_buttons(self):
         if self.tabs.currentWidget() != self.camera_tab:
@@ -331,8 +388,6 @@ class MainWindow(QMainWindow):
 
         elif selected_function == "Qhyccd Camera Single":
             import qhy_ccd_take_image
-
-
             self.qhyccd_cam = qhy_ccd_take_image.Camera(1000)
 
             exposure_time_us = qhy_ccd_take_image.convert_to_us(self.exposure_time_input.text())
@@ -382,8 +437,10 @@ class MainWindow(QMainWindow):
         """
         if self.folder_name != "":
             self.comments_button.setDisabled(False)
+            self.create_datasheet_button.setDisabled(False)
         else:
             self.comments_button.setDisabled(True)
+            self.create_datasheet_button.setDisabled(True)
 
         if self.tabs.currentWidget() == self.general_tab:
             self.open_fiber_data_button.hide()
@@ -551,71 +608,6 @@ class MainWindow(QMainWindow):
 
     def show_message(self, message):
         self.message_label.setText(message)
-
-    def lock_inputs(self):
-        if self.tabs.currentWidget() == self.general_tab:
-            folder_name = self.folder_name_input.text()
-            if not folder_name:
-                self.show_message("Please enter a folder name.")
-                return
-            working_dir = os.path.join(self.base_directory, folder_name)
-            if not os.path.exists(working_dir):
-                os.makedirs(working_dir)
-            self.working_dir_display.setText(working_dir)
-        else:
-            if self.fiber_shape == "None":
-                self.show_message("Fiber data not set. Please open the fiber data window and set the fiber data.")
-                return
-
-            if any(value == "" for value in [self.fiber_name, self.fiber_dimension]):
-                self.show_message("Fiber data not set. Please open the fiber data window and set the fiber data.")
-                return
-
-            working_dir = self.working_dir_display.text()
-            if not os.path.exists(working_dir):
-                os.makedirs(working_dir)
-
-        self.folder_name_input.setDisabled(True)
-        self.inputs_locked = True
-        self.show_message("Inputs locked.")
-        self.run_measurement_button.setDisabled(True)
-        self.run_analysis_button.setDisabled(True)
-        self.check_existing_measurements(working_dir)
-        self.update_checklist()
-
-        # Save fiber data to JSON
-
-
-        # Update all run buttons
-        self.update_measurement_button_state()
-        self.update_run_button_state()
-
-        self.comments_button.setDisabled(False)
-        self.update_comments_button()
-
-        # Update the UI state
-        self.update_ui_state()
-
-        self.unlock_button.setDisabled(False)
-        self.lock_button.setDisabled(True)
-        self.update_run_button_state()
-
-    def unlock_inputs(self):
-        self.folder_name_input.setDisabled(False)
-        self.fiber_diameter_input.setDisabled(False)
-        self.fiber_height_input.setDisabled(False)
-        self.fiber_width_input.setDisabled(False)
-        self.fiber_length_input.setDisabled(False)
-        self.fiber_shape_combo.setDisabled(False)
-        self.inputs_locked = False
-        self.show_message("Inputs unlocked.")
-        self.run_measurement_button.setDisabled(True)
-        self.run_analysis_button.setDisabled(True)
-        self.existing_measurements_label.setText("")
-        self.comments_button.setDisabled(True)
-        self.lock_button.setDisabled(False)
-        self.unlock_button.setDisabled(True)
-        self.update_run_button_state()
 
     def update_run_button_state(self):
         if self.tabs.currentWidget() == self.general_tab:
@@ -909,14 +901,41 @@ class MainWindow(QMainWindow):
         self.exposure_time_input_mt.setFixedWidth(100)
         self.exposure_time_input_mt.setText("70ms")
 
+        self.exposure_time_label_mt_exit = QLabel("Exit Cam Exposure Time:")  # exit cam exp time control
+        self.exposure_time_input_mt_exit = QLineEdit()
+        self.exposure_time_input_mt_exit.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"^\d+(\.\d+)?(ms|s|us)$")))
+        self.exposure_time_input_mt_exit.setFixedWidth(100)
+        self.exposure_time_input_mt_exit.setText("10ms")
+
+        self.exposure_time_label_mt_entrance = QLabel("Entrance Cam Exposure Time:")  # entrance cam exp time control
+        self.exposure_time_input_mt_entrance = QLineEdit()
+        self.exposure_time_input_mt_entrance.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"^\d+(\.\d+)?(ms|s|us)$")))
+        self.exposure_time_input_mt_entrance.setFixedWidth(100)
+        self.exposure_time_input_mt_entrance.setText("10ms")
+        # Initially hidden
+        self.exposure_time_label_mt_exit.hide()
+        self.exposure_time_input_mt_exit.hide()
+        self.exposure_time_label_mt_entrance.hide()
+        self.exposure_time_input_mt_entrance.hide()
+
+
         # Create a widget for the measurement type chooser and set its position
         measurement_type_widget = QWidget()
         measurement_type_layout = QHBoxLayout(measurement_type_widget)
         measurement_type_layout.addWidget(self.measurement_type_label)
         measurement_type_layout.addWidget(self.measurement_type_combo)
         measurement_type_layout.addStretch()
+
         measurement_type_layout.addWidget(self.exposure_time_label_mt)
         measurement_type_layout.addWidget(self.exposure_time_input_mt)
+
+        measurement_type_layout.addWidget(self.exposure_time_label_mt_entrance)
+        measurement_type_layout.addWidget(self.exposure_time_input_mt_entrance)
+        measurement_type_layout.addWidget(self.exposure_time_label_mt_exit)
+        measurement_type_layout.addWidget(self.exposure_time_input_mt_exit)
+
 
         layout.addWidget(measurement_type_widget)
 
@@ -1115,13 +1134,18 @@ class MainWindow(QMainWindow):
 
         if measurement_type == "SG":
             self.check1.setText("Fiber in place: Output at small camera")
-            self.check2.setText("Input spot in center and in focus and oriented horizontally. Exit camera fiber also in focus")
-            self.check3.setText("ThorCam software closed")
-            self.check4.setText("Motor controller plugged in")
+            self.check2.setText("Motor controller plugged in and referenced")
+            self.check3.setText("Input spot in center, in focus and oriented horizontally. Exit camera fiber also in focus")
+            self.check4.setText("Exposure times set. ThorCam software closed")
             self.check5.setText("Lights Out")
 
             self.exposure_time_label_mt.hide()
             self.exposure_time_input_mt.hide()
+
+            self.exposure_time_label_mt_exit.show()
+            self.exposure_time_input_mt_exit.show()
+            self.exposure_time_label_mt_entrance.show()
+            self.exposure_time_input_mt_entrance.show()
 
         elif measurement_type == "FRD":
             self.check1.setText("Fiber in place: Output at large camera")
@@ -1132,6 +1156,11 @@ class MainWindow(QMainWindow):
 
             self.exposure_time_label_mt.show()
             self.exposure_time_input_mt.show()
+
+            self.exposure_time_label_mt_exit.hide()
+            self.exposure_time_input_mt_exit.hide()
+            self.exposure_time_label_mt_entrance.hide()
+            self.exposure_time_input_mt_entrance.hide()
 
         elif measurement_type == "Throughput":
             self.check1.setText("Fiber in place: Output on Photodetector")
@@ -1144,6 +1173,11 @@ class MainWindow(QMainWindow):
 
             self.exposure_time_label_mt.hide()
             self.exposure_time_input_mt.hide()
+
+            self.exposure_time_label_mt_exit.hide()
+            self.exposure_time_input_mt_exit.hide()
+            self.exposure_time_label_mt_entrance.hide()
+            self.exposure_time_input_mt_entrance.hide()
 
         self.update_measurement_button_state()
 
@@ -1285,15 +1319,25 @@ class MainWindow(QMainWindow):
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
         import sg_pipeline
-        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.progress_signal)
+        exposure_time_exit = self.exposure_time_input_mt_exit.text()
+        exposure_time_entrance = self.exposure_time_input_mt_entrance.text()
+        exp_times = {"exit": exposure_time_exit, "entrance": exposure_time_entrance}
+
+
+        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.progress_signal, exposure_times=exp_times)
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
-        #import fiber_frd_measurements
-        self.show_message(f"Running FRD measurement with working dir: {working_dir}")
         import analyse_main as am
         import qhy_ccd_take_image as qhy
+
+        self.show_message(f"Running FRD measurement with working dir: {working_dir}")
+
         exposure_time = qhy.convert_to_us(self.exposure_time_input_mt.text())
         am.main_measure_new(working_dir, progress_signal=self.progress_signal, exp_time=exposure_time)
+
+
+        # Old FRD measurement
+        # import fiber_frd_measurements
         #fiber_frd_measurements.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
