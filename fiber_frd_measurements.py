@@ -160,16 +160,16 @@ def sutherland_plot(project_folder:str):
         dist_err[i] = data["distance_to_chip_err"]
 
     weights = 1 / dist_err ** 2
-    print("Weights:", weights)
+    #print("Weights:", weights)
     distance_to_chip = np.sum(dist * weights) / np.sum(weights) # Weighted mean
-    print("Distance to chip:", distance_to_chip)
+    #print("Distance to chip:", distance_to_chip)
     sigma_weighted_mean = np.sqrt(1 / np.sum(weights))
-    print("Sigma weighted mean:", sigma_weighted_mean)
+    #print("Sigma weighted mean:", sigma_weighted_mean)
     std_dev = np.std(dist, ddof=1)
-    print("Standard deviation:", std_dev)
+    #print("Standard deviation:", std_dev)
     distance_to_chip_err = np.sqrt(sigma_weighted_mean**2 + std_dev**2)
 
-    print(distance_to_chip_err)
+    #print(distance_to_chip_err)
 
     ee_list = []
     ee_err_list = []
@@ -216,7 +216,7 @@ def sutherland_plot(project_folder:str):
             aperture_radius_pix = aperture_radius / 7.52e-3
             aperture_radius_err_pix = aperture_radius_err / 7.52e-3
 
-            print("aperture_err", aperture_radius_err_pix)
+            #print("aperture_err", aperture_radius_err_pix)
 
             # Round only for actual mask application
             aperture_radius = int(round(aperture_radius_pix))
@@ -235,7 +235,7 @@ def sutherland_plot(project_folder:str):
             # Calculate the encircled energy of the mask
             ee = flux / (flux + flux_outside)
 
-            # Plot outline of mask with original image and ee value
+            """# Plot outline of mask with original image and ee value
             from skimage import measure
             plt.figure()
             plt.imshow(trimmed_data, cmap='gray')
@@ -243,13 +243,13 @@ def sutherland_plot(project_folder:str):
             plt.plot(outline[:, 1], outline[:, 0], color='red', linewidth=0.8)
             plt.title(f"Encircled energy: {ee:.3f}")
             plt.axis('off')
-            plt.show()
+            plt.savefig(filter_folder + f"/encircled_energy_{fnum}.png", dpi=300)"""
 
             # Compute uncertainties (assuming Poisson statistics for flux)
             flux_err = np.sqrt(flux) if flux > 0 else 0  # Avoid division by zero
             flux_outside_err = np.sqrt(flux_outside) if flux_outside > 0 else 0  # Avoid division by zero
 
-            print("Flux errors", flux_err, flux_outside_err)
+            #print("Flux errors", flux_err, flux_outside_err)
 
             # Compute EE uncertainty
             ee_err = ee * np.sqrt(
@@ -258,7 +258,7 @@ def sutherland_plot(project_folder:str):
                 (aperture_radius_err_pix / aperture_radius_pix) ** 2
             )
 
-            print("ee, ee_err:", ee, ee_err)
+            #print("ee, ee_err:", ee, ee_err)
             ee_sublist.append(ee)
             ee_err_sublist.append(ee_err)
 

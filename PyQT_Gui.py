@@ -364,7 +364,7 @@ class MainWindow(QMainWindow):
         working_dir = self.working_dir_display.text()
 
         # Create folder if it doesnt exits
-        os.makedirs(working_dir)
+        os.makedirs(working_dir, exist_ok=True)
 
         threading.Thread(target=self.run_camera_function_thread, args=(selected_function, working_dir)).start()
 
@@ -839,13 +839,17 @@ class MainWindow(QMainWindow):
         self.progress_signal.emit(f"Running {selected_function}...")
         self.stop_event = threading.Event()
         if selected_function == "Measure System F-ratio":
+            """import fiber_frd_measurements as frd
+            frd.main_measure_all_filters(working_dir, progress_signal=self.progress_signal,
+                                         base_directory=self.base_directory)"""
+            import qhy_ccd_take_image as qhy
+            exposure_time = qhy.convert_to_us(self.exposure_time_input_gt.text())
+            import analyse_main as am
+            am.main_measure_new(working_dir, progress_signal=self.progress_signal, exp_time=exposure_time)
+
             import fiber_frd_measurements as frd
-            #import qhy_ccd_take_image as qhy
-            #exposure_time = qhy.convert_to_us(self.exposure_time_input_gt.text())
-            #import analyse_main as am
-            #am.main_measure_new(working_dir, progress_signal=self.progress_signal, exposure_time)
-            frd.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
             frd.main_analyse_all_filters(working_dir, progress_signal=self.progress_signal)
+
         elif selected_function == "Make Throughput Calibration":
             import throughput_analysis as ta
             calibration_folder_name = os.path.basename(working_dir)

@@ -32,6 +32,7 @@ def run_batch_file(batch_file_path:str):
         print(f"Error occurred while running the batch file: {e}")
 
 def main_measure_new(project_folder:str, progress_signal=None, exp_time:int=70000):
+
     import move_to_filter as mtf
     import step_motor_control as smc
 

@@ -1,8 +1,8 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
-    - Camera tab spacer bug
     - checking existing measurements doesnt work
+    - can run measure system fratio without folder
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
