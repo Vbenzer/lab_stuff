@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 # Constant input f-number (the same for all measurements)
-input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597]) # These are from the setup_F#_EE_98 file, 18.2.25
-input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
+input_f_num = np.array([6.152, 5.103, 4.57, 4.089, 3.578]) # These are from the setup_F#_EE_98_Measurement_2 file, 31.3.25
+input_f_num_err = np.array([0.003, 0.007, 0.03, 0.01, 0.021])
 
 
 # Function to read measurements from HDF5 file and plot the data

@@ -18,7 +18,7 @@ from PyQt6.QtGui import QRegularExpressionValidator
 
 if sys.platform.startswith("linux"):
     print("Linux")
-    BASE_PATH = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements"
+    BASE_PATH = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements"
 elif sys.platform.startswith("win"):
     hostname = socket.gethostname()
     if hostname == "DESKTOP-HEBN59N":

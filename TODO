@@ -14,6 +14,8 @@ Additions: (Sorted by priority)
     - More images in report
     - avila 3. april
 
+- add general way to choose frd calibration data
+
 - try log scale for sg input images
 
 - Add exp time input for sg (done, not tested)

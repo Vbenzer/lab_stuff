@@ -90,8 +90,9 @@ def plot_main(project_folder:str):
         f_num_err = np.array(data["f_number_err"])
 
     # Input f-numbers
-    input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597])  # These are from the setup_F#_EE_98 file, 18.2.25
-    input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
+    input_f_num = np.array(
+        [6.152, 5.103, 4.57, 4.089, 3.578])  # These are from the setup_F#_EE_98_Measurement_2 file, 31.3.25
+    input_f_num_err = np.array([0.003, 0.007, 0.03, 0.01, 0.021])
 
     # Sort the f-numbers in descending order
     f_num = np.sort(f_num)[::-1]
@@ -139,8 +140,9 @@ def sutherland_plot(project_folder:str):
 
     """
     # Input f-numbers
-    input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597]) # These are from the setup_F#_EE_98 file, 18.2.25
-    input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
+    input_f_num = np.array(
+        [6.152, 5.103, 4.57, 4.089, 3.578])  # These are from the setup_F#_EE_98_Measurement_2 file, 31.3.25
+    input_f_num_err = np.array([0.003, 0.007, 0.03, 0.01, 0.021])
 
     # Load the distance to chip from the JSON file
     dist = np.zeros(5)
@@ -324,8 +326,9 @@ def plot_f_ratio_circles_on_raw(project_folder):
         from matplotlib.colors import LogNorm
 
         # Input f-numbers
-        input_f_num = np.array([6.21, 5.103, 4.571, 4.063, 3.597])  # These are from the setup_F#_EE_98 file, 18.2.25
-        input_f_num_err = np.array([0.04, 0.007, 0.01, 0.005, 0.013])
+        input_f_num = np.array(
+            [6.152, 5.103, 4.57, 4.089, 3.578])  # These are from the setup_F#_EE_98_Measurement_2 file, 31.3.25
+        input_f_num_err = np.array([0.003, 0.007, 0.03, 0.01, 0.021])
 
         # Read NA from fiber_data.json
         with open(os.path.join(os.path.dirname(project_folder), 'fiber_data.json')) as f:
@@ -385,7 +388,7 @@ def plot_f_ratio_circles_on_raw(project_folder):
             com = ia.LocateFocus(trimmed_data)
 
             # Calculate radius of NA
-            aperture_radius_NA = (distance_to_chip + 9.9) * NA / np.sqrt(1 - NA ** 2)  # 9.9: Distance to chip at 0 position
+            aperture_radius_NA = (distance_to_chip) * NA / np.sqrt(1 - NA ** 2)  #+ 9.9: Distance to chip at 0 position (old setup)
             aperture_radius_NA = aperture_radius_NA // 7.52e-3
             mask_NA = sg_pipeline.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius_NA, plot_mask=False)
             mask_outline_NA = measure.find_contours(mask_NA, 0.5)[0]
@@ -396,7 +399,7 @@ def plot_f_ratio_circles_on_raw(project_folder):
             for fnum in input_f_num:
                 print(f"Processing f/{filter_name}, f/{fnum}")
                 # Calculate the radius of a circle with input f-ratios
-                aperture_radius = (distance_to_chip + 9.9) / (2 * fnum)  # 9.9: Distance to chip at 0 position
+                aperture_radius = (distance_to_chip) / (2 * fnum)  # 9.9: Distance to chip at 0 position (old setup)
 
                 # Convert to pixels
                 aperture_radius = aperture_radius // 7.52e-3
@@ -406,9 +409,9 @@ def plot_f_ratio_circles_on_raw(project_folder):
 
                 mask_outline_list.append(measure.find_contours(mask, 0.5)[0])
 
-            """# Boost everything so that the lowest value is 0 for log scaling
+            # Boost everything so that the lowest value is 0 for log scaling
             trimmed_data = trimmed_data - np.min(trimmed_data)
-            print(np.min(trimmed_data))"""
+            print(np.min(trimmed_data))
 
             # Save trimmed as fits
             hdu = fits.PrimaryHDU(trimmed_data)
@@ -417,7 +420,7 @@ def plot_f_ratio_circles_on_raw(project_folder):
             # Plot the mask on the raw image
             plt.figure()
             plt.title(f"Input f/{filter_name} with artificial apertures")
-            plt.imshow(trimmed_data, cmap='gray')#, norm=LogNorm())
+            plt.imshow(trimmed_data, cmap='gray', norm=LogNorm())
             # Add color scale for pixel value next to the image
             cbar = plt.colorbar()
             cbar.set_label('Pixel value')
