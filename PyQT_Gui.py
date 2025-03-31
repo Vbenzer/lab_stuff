@@ -271,6 +271,13 @@ class MainWindow(QMainWindow):
                 self.insert_spacer(162)
 
         else:
+            if hasattr(self, 'placeholder_spacer'):
+                self.layout.removeItem(self.placeholder_spacer)
+                del self.placeholder_spacer
+                self.insert_spacer(30)
+            else:
+                self.insert_spacer(30)
+
             self.folder_name_input.show()
             self.folder_name_label.show()
             self.choose_folder_button.show()
@@ -282,13 +289,6 @@ class MainWindow(QMainWindow):
             self.exposure_time_label.show()
             self.exposure_time_input.show()
             self.run_button.setDisabled(self.folder_name_input.text() == "")
-
-            if hasattr(self, 'placeholder_spacer'):
-                self.layout.removeItem(self.placeholder_spacer)
-                del self.placeholder_spacer
-                self.insert_spacer(30)
-            else:
-                self.insert_spacer(30)
 
         if selected_function == "Thorlabs Camera Single":
             self.camera_chooser_label.show()
