@@ -1,8 +1,6 @@
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-from networkx.classes import number_of_edges
-
 import file_save_managment
 import analyse_main
 from astropy.io import fits
