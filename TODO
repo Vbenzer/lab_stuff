@@ -16,6 +16,11 @@ Additions: (Sorted by priority)
     -
 - Change nf_ff to constant trim for both entrance and exit
 
+- Add functions to GUI:
+    - Horizontal cuts
+    - nf ff stuff
+    - should be a few more...
+
 - Add images to show nf ff with different spot positions
 
 - try log scale for sg input images

@@ -1,7 +1,7 @@
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-from networkx.classes import number_of_edges
+from skimage import io, transform
 
 import file_save_managment
 import analyse_main
@@ -182,25 +182,25 @@ def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], prog
         com = ia.LocateFocus(entrance_reduced_data)
         cut_image = cut_image_around_comk(entrance_reduced_data, com, fiber_input_radius, margin=50)
         # Save the cut image as png
-        plt.imshow(cut_image, cmap='gray', origin='lower')
-        plt.axis('off')
-        plt.savefig(os.path.join(entrance_folder_cut, f"entrance_cam_cut{i:03d}.png"))
-        plt.close()
+        cut_image = (cut_image - np.min(cut_image)) / (np.max(cut_image) - np.min(cut_image)) * 255
+        io.imsave(os.path.join(entrance_folder_cut, f"entrance_cam_cut{i:03d}.png"), cut_image.astype(np.uint8))
 
         # Cut exit images
         # Load the reduced exit images
         with fits.open(os.path.join(exit_folder_reduced, exit_reduced_images[i])) as hdul:
             exit_reduced_data = hdul[0].data.astype(np.float32)
         trimmed_data = ia.cut_image(exit_reduced_data, margin=500)
-        plt.imshow(trimmed_data, cmap='gray', origin='lower')
-        plt.axis('off')
-        plt.savefig(os.path.join(exit_folder_cut, f"exit_cam_cut{i:03d}.png"))
-        plt.close()
+
+        # Raise values so that minimum is 0
+        trimmed_data = (trimmed_data - np.min(trimmed_data)) / (np.max(trimmed_data) - np.min(trimmed_data)) * 255
+        # Resize the image to 1/10
+        trimmed_data = transform.resize(trimmed_data, (trimmed_data.shape[0] // 10, trimmed_data.shape[1] // 10),
+                                        anti_aliasing=True)
+
+
+        io.imsave(os.path.join(exit_folder_cut, f"exit_cam_cut{i:03d}.png"), trimmed_data.astype(np.uint8))
 
     print("All images reduced and cut!")
-
-
-
 
 
 def main_measure_all_filters(project_folder:str, progress_signal=None, base_directory=None):
@@ -685,9 +685,10 @@ def plot_horizontal_cut(project_folder):
 
 
 if __name__ == "__main__":
-    project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/O_50_0000_0000/FRD"
-    project_folder = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5_measurement_2/NF_FF"
+    project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0001/NF_FF"
+    #project_folder = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5_measurement_2/NF_FF"
     #sutherland_plot(project_folder)
     #plot_f_ratio_circles_on_raw(project_folder)
-    nf_ff_capture(project_folder, 28, {"entrance_cam": "10ms", "exit_cam": 25000})
-    nf_ff_process(project_folder, 28)
+    #nf_ff_capture(project_folder, 28, {"entrance_cam": "10ms", "exit_cam": 25000})
+    nf_ff_process(project_folder, [25,40])
+    #plot_horizontal_cut(project_folder)

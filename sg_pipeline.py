@@ -1973,38 +1973,39 @@ def plot_horizontal_cut(project_folder):
         project_folder: Main folder of the project.
 
     """
+    plots_folder = os.path.join(project_folder, "plots")
+
     # Define the image folders
     exit_image_folder = os.path.join(project_folder, "exit/reduced")
 
     # Get the image and mask files
     exit_image_files = [f for f in os.listdir(exit_image_folder) if f.endswith('.png')]
 
-    for image in exit_image_files:
-        # Read the first image and mask
-        exit_image = io.imread(os.path.join(exit_image_folder, exit_image_files[0]))
+    # Read the first image and mask
+    exit_image = io.imread(os.path.join(exit_image_folder, exit_image_files[0]))
 
-        # Trim the image
-        trimmed_data = image_analysation.cut_image(exit_image, margin=200)
+    # Trim the image
+    trimmed_data = image_analysation.cut_image(exit_image, margin=200)
 
-        # Locate center of mass within trimmed image (array)
-        com = image_analysation.LocateFocus(trimmed_data)
+    # Locate center of mass within trimmed image (array)
+    com = image_analysation.LocateFocus(trimmed_data)
 
-        # Convert center of mass to integer indices
-        com_x = int(com[0])
+    # Convert center of mass to integer indices
+    com_x = int(com[0])
 
-        # Create a horizontal cut through the center of mass
-        cut = trimmed_data[com_x, :]
+    # Create a horizontal cut through the center of mass
+    cut = trimmed_data[com_x, :]
 
-        # Plot the horizontal cut
-        plt.figure()
-        plt.plot(cut)
-        plt.title(f"Horizontal cut through center of mass")
-        plt.xlabel("Pixel")
-        plt.ylabel("Flux")
-        plt.grid(True)
-        plt.show()
-        """plt.savefig(plots_folder + f"/horizontal_cut.png")
-        plt.close()"""
+    # Plot the horizontal cut
+    plt.figure()
+    plt.plot(cut)
+    plt.title(f"Horizontal cut through center of mass")
+    plt.xlabel("Pixel")
+    plt.ylabel("Flux")
+    plt.grid(True)
+    #plt.show()
+    plt.savefig(plots_folder + f"/horizontal_cut.png")
+    plt.close()
 
 if __name__ == '__main__':
 
@@ -2023,8 +2024,8 @@ if __name__ == '__main__':
 
     #main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
-    main_folder = r"\\srv4\labshare\raw_data\fibers\Measurements\R_25x40_0000_0000\SG"
-    #plot_horizontal_cut(main_folder)
+    main_folder = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0001/SG"
+    plot_horizontal_cut(main_folder)
 
     #reduce_images(main_folder, 11)
 
@@ -2042,7 +2043,7 @@ if __name__ == '__main__':
     #entrance_folder = "D:/Vincent/thorlabs_cams_images/entrance/reduced"
     #exit_folder = "D:/Vincent/thorlabs_cams_images/exit/reduced"
 
-    get_sg_params(main_folder, [25, 40], fiber_shape="rectangular", plot_all=True, plot_mask=True, save_mask=False)
+    #get_sg_params(main_folder, [25, 40], fiber_shape="rectangular", plot_all=True, plot_mask=True, save_mask=False)
 
     #calc_sg(main_folder, plot_result=True)
 

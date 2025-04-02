@@ -18,7 +18,7 @@ from PyQt6.QtGui import QRegularExpressionValidator
 
 if sys.platform.startswith("linux"):
     print("Linux")
-    BASE_PATH = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements"
+    BASE_PATH = r"s"
 elif sys.platform.startswith("win"):
     hostname = socket.gethostname()
     if hostname == "DESKTOP-HEBN59N":
@@ -207,7 +207,7 @@ class MainWindow(QMainWindow):
         print(fiber_folder)
 
         # Use anaconda?
-        anaconda = True
+        anaconda = False
         if anaconda:
             command = [
                 r"C:\Users\User\anaconda3\Scripts\activate",
@@ -220,21 +220,26 @@ class MainWindow(QMainWindow):
             ]
         else:
             command = [
+                r""
                 "quarto",
                 "render",
-                "fiber_datasheet_template.ipynb",
+                r"fiber_datasheet/fiber_datasheet_template.ipynb",
                 "--execute",
                 f"-P fiber_folder:{fiber_folder}"
             ]
 
+        env = os.environ.copy()
+        env["QUARTO_PYTHON"] = "/usr/bin/python3"
+        print(env)
+        print(command)
         try:
             self.show_message("Creating datasheet...")
-            result = subprocess.run(" ".join(command), shell=True, check=True, capture_output=True, text=True)
+            result = subprocess.run(" ".join(command), env=env, shell=True, check=True, capture_output=True, text=True)
             print("Command output:", result.stdout)
             self.show_message("Datasheet created successfully.")
             # Copy the datasheet to the working directory
             datasheet_path = os.path.join("fiber_datasheet", "fiber_datasheet_template.pdf")
-            shutil.copy(datasheet_path, working_dir)
+            shutil.copyfile(datasheet_path, working_dir + "/Datasheet.pdf")
             self.show_message("Datasheet copied to working directory.")
 
         except subprocess.CalledProcessError as e:
