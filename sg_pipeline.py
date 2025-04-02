@@ -1108,8 +1108,8 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
 
     # Take darks
     for i in range(5):
-        tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png", exposure_time=exposure_times["entrance_cam"])
-        tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png", exposure_time=exposure_times["exit_cam"])
+        tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png", exposure_time=exposure_times["entrance"])
+        tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png", exposure_time=exposure_times["exit"])
 
 
 
@@ -1141,8 +1141,8 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         smc.move_motor_to_position(pos_left + i * step_size)
 
         # Take images
-        tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png", exposure_time=exposure_times["entrance_cam"])
-        tcc.take_image("exit_cam", exit_light_folder + f"/exit_cam_image{i:03d}.png", exposure_time=exposure_times["exit_cam"])
+        tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png", exposure_time=exposure_times["entrance"])
+        tcc.take_image("exit_cam", exit_light_folder + f"/exit_cam_image{i:03d}.png", exposure_time=exposure_times["exit"])
 
         print(f"Image {i + 1} out of {number_of_positions} at Position {pos_left + i * step_size} done! "
               f"Move spot to next position")
