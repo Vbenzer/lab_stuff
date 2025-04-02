@@ -6,6 +6,166 @@ import analyse_main
 from astropy.io import fits
 import os
 
+fw = None
+cam = None
+
+def init_camera(exp_time:int):
+    global cam
+    cam = qhy_ccd_take_image.Camera(exp_time=exp_time)
+
+def init_filter_wheel():
+    global fw
+    fw = qhycfw3_filter_wheel_control.FilterWheel('COM5')
+
+def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], exposure_times:dict[str, str]=None,
+                         progress_signal=None):
+    import step_motor_control as smc
+    import move_to_filter as mtf
+    import qhy_ccd_take_image
+    import qhycfw3_filter_wheel_control
+    import thorlabs_cam_control
+
+    if exposure_times is None:
+        raise ValueError("Exposure times must be provided.")
+
+    # Connect filter wheel and cameras in thread
+    fw_thread = threading.Thread(target=init_filter_wheel)
+    cam_thread = threading.Thread(target=init_camera, args=([exp_times["exit_cam"]]))
+
+    fw_thread.start()
+    cam_thread.start()
+
+    # Make sure everything is ready
+    fw_thread.join()
+    cam_thread.join()
+
+    # Set filter wheel to f/3.5
+    fw.move_to_filter("3.5")
+
+    # Define folders
+    entrance_folder = os.path.join(project_folder, "entrance")
+    exit_folder = os.path.join(project_folder, "exit")
+    os.makedirs(entrance_folder, exist_ok=True)
+    os.makedirs(exit_folder, exist_ok=True)
+
+    entrance_folder_light = os.path.join(entrance_folder, "light")
+    exit_folder_light = os.path.join(exit_folder, "light")
+    os.makedirs(entrance_folder_light, exist_ok=True)
+    os.makedirs(exit_folder_light, exist_ok=True)
+
+    entrance_folder_dark = os.path.join(entrance_folder, "dark")
+    exit_folder_dark = os.path.join(exit_folder, "dark")
+    os.makedirs(entrance_folder_dark, exist_ok=True)
+    os.makedirs(exit_folder_dark, exist_ok=True)
+
+    entrance_folder_reduced = os.path.join(entrance_folder, "reduced")
+    exit_folder_reduced = os.path.join(exit_folder, "reduced")
+    os.makedirs(entrance_folder_reduced, exist_ok=True)
+    os.makedirs(exit_folder_reduced, exist_ok=True)
+
+    # Calculate the step size and leftmost position. Also handle rectangular case
+    if isinstance(fiber_diameter, tuple):
+        max_size = max(fiber_diameter)
+        step_size = max_size / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
+        pos_left = 5 - max_size / 1000 * 0.8 / 2  # Leftmost position in mm
+    else:
+        step_size = fiber_diameter / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
+        pos_left = 5 - fiber_diameter / 1000 * 0.8 / 2  # Leftmost position in mm
+
+    # Take images
+    for i in range(number_of_positions):
+        print("Taking image:", i, ", at position:", pos_left + i * step_size)
+
+        # Move the motor to the next position
+        smc.move_motor_to_position(pos_left + i * step_size)
+
+        # Take darks
+        mtf.move("Closed")
+        tcc.take_image("entrance_cam", entrance_dark_folder + f"/entrance_cam_dark{i:03d}.png",
+                   exposure_time=exposure_times["entrance_cam"])
+        cam.take_single_frame(exit_folder_dark, f"exit_cam_dark{i:03d}.fits")
+
+
+        # Take images
+        mtf.move("Open")
+        tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png",
+                       exposure_time=exposure_times["entrance_cam"])
+        tcc.take_image("exit_cam", exit_light_folder + f"/exit_cam_image{i:03d}.png",
+                       exposure_time=exposure_times["exit_cam"])
+    print("All images taken!")
+
+def nf_ff_process(project_folder:str, progress_signal=None):
+    import image_reduction as ir
+    import image_analysation as ia
+    # Define folders
+    entrance_folder = os.path.join(project_folder, "entrance")
+    exit_folder = os.path.join(project_folder, "exit")
+
+    entrance_folder_light = os.path.join(entrance_folder, "light")
+    exit_folder_light = os.path.join(exit_folder, "light")
+
+    entrance_folder_dark = os.path.join(entrance_folder, "dark")
+    exit_folder_dark = os.path.join(exit_folder, "dark")
+
+    entrance_folder_reduced = os.path.join(entrance_folder, "reduced")
+    exit_folder_reduced = os.path.join(exit_folder, "reduced")
+    os.makedirs(entrance_folder_reduced, exist_ok=True)
+    os.makedirs(exit_folder_reduced, exist_ok=True)
+
+    entrance_folder_cut = os.path.join(entrance_folder, "cut")
+    exit_folder_cut = os.path.join(exit_folder, "cut")
+    os.makedirs(entrance_folder_cut, exist_ok=True)
+    os.makedirs(exit_folder_cut, exist_ok=True)
+
+    # Get the list of light and dark images
+    entrance_light_images = sorted(os.listdir(entrance_folder_light))
+    exit_light_images = sorted(os.listdir(exit_folder_light))
+
+    entrance_dark_images = sorted(os.listdir(entrance_folder_dark))
+    exit_dark_images = sorted(os.listdir(exit_folder_dark))
+
+    # Reduce the images
+    for i in range(len(entrance_light_images)):
+        print("Reducing image", i)
+        output_file_path_entrance = os.path.join(entrance_folder_reduced, f"entrance_cam_reduced{i:03d}.fits")
+        ir.reduce_image_with_dark(entrance_light_images[i], entrance_dark_images[i],
+                                                  output_file_path_entrance)
+
+        output_file_path_exit = os.path.join(exit_folder_reduced, f"exit_cam_reduced{i:03d}.fits")
+        ir.reduce_image_with_dark(exit_light_images[i], exit_dark_images[i],
+                                                  output_file_path_exit)
+    print("All images reduced!")
+
+    # Get list of reduced images
+    entrance_reduced_images = sorted(os.listdir(entrance_folder_reduced))
+    exit_reduced_images = sorted(os.listdir(exit_folder_reduced))
+
+    # Calculate the radius of the fiber in pixels, also handle rectangular case
+    if isinstance(fiber_diameter, (tuple, list)):
+        fiber_input_radius = (
+        int(fiber_diameter[0] / 0.5169363821005045 / 2), int(fiber_diameter[1] / 0.5169363821005045 / 2))
+    else:
+        fiber_input_radius = int(fiber_diameter / 0.5169363821005045 / 2)
+
+    # Cut the images to size
+    for i in range(len(entrance_light_images)):
+        print("Cutting image", i)
+        # Cut entrance images
+        from sg_pipeline import cut_image_around_comk
+        com = ia.LocateFocus(entrance_reduced_images[i])
+        cut_image = cut_image_around_comk(entrance_reduced_images[i], com, fiber_input_radius)
+        cut_image.save(os.path.join(entrance_folder_cut, f"entrance_cam_cut{i:03d}.fits"))
+
+        # Cut exit images
+        trimmed_data = ia.cut_image(exit_reduced_images[i], margin=500)
+        trimmed_data.save(os.path.join(exit_folder_cut, f"exit_cam_cut{i:03d}.fits"))
+
+    print("All images reduced and cut!")
+
+
+
+
+
 def main_measure_all_filters(project_folder:str, progress_signal=None, base_directory=None):
     """
     Run the measuring pipeline for all filters.

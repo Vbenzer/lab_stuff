@@ -1,8 +1,10 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
+    - not sure how to reproduce but fiber dimension sometimes resets to weird values
     - checking existing measurements doesnt work
     - can run measure system fratio without folder
+
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
@@ -10,26 +12,18 @@ Bugs: (Sorted by priority)
 
 
 Additions: (Sorted by priority)
-- Measure sg again now with clean camera!
 - Group meeting:
-    - More images in report
-    - avila 3. april
+    -
 
-- add general way to choose frd calibration data
+- Add images to show nf ff with different spot positions
 
 - try log scale for sg input images
-
-- Add exp time input for sg (done, not tested)
-
-- Add index system for fibers (i guess just smoothly transition to no naming convention)
-
-- Rework plots, especially frd sutherland plot numbers are hardly readable change so the float atop
-    - Add horizontal cut illumination plot for frd and sg bc why not (done but noticed weird background in sg)
 
 - Rethink the plot all option for all measurements... maybe add a way to select which measurements to plot
 
 - Add to gui:
     - qol stuff:
+        - add general way to choose frd calibration da
         - make sure that analysis dependencies are enforced
 
 
