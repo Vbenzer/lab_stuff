@@ -1,6 +1,8 @@
 import numpy as np
 import json
 import matplotlib.pyplot as plt
+from networkx.classes import number_of_edges
+
 import file_save_managment
 import analyse_main
 from astropy.io import fits
@@ -10,11 +12,13 @@ fw = None
 cam = None
 
 def init_camera(exp_time:int):
+    import qhy_ccd_take_image
     global cam
     cam = qhy_ccd_take_image.Camera(exp_time=exp_time)
 
 def init_filter_wheel():
     global fw
+    import qhycfw3_filter_wheel_control
     fw = qhycfw3_filter_wheel_control.FilterWheel('COM5')
 
 def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], exposure_times:dict[str, str]=None,
@@ -23,14 +27,18 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
     import move_to_filter as mtf
     import qhy_ccd_take_image
     import qhycfw3_filter_wheel_control
-    import thorlabs_cam_control
+    import thorlabs_cam_control as tcc
+    import threading
 
     if exposure_times is None:
         raise ValueError("Exposure times must be provided.")
 
+    # Create and check project folder
+    os.makedirs(project_folder)
+
     # Connect filter wheel and cameras in thread
     fw_thread = threading.Thread(target=init_filter_wheel)
-    cam_thread = threading.Thread(target=init_camera, args=([exp_times["exit_cam"]]))
+    cam_thread = threading.Thread(target=init_camera, args=([exposure_times["exit_cam"]]))
 
     fw_thread.start()
     cam_thread.start()
@@ -63,8 +71,10 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
     os.makedirs(entrance_folder_reduced, exist_ok=True)
     os.makedirs(exit_folder_reduced, exist_ok=True)
 
+
+    number_of_positions = 11
     # Calculate the step size and leftmost position. Also handle rectangular case
-    if isinstance(fiber_diameter, tuple):
+    if isinstance(fiber_diameter, (tuple, list)):
         max_size = max(fiber_diameter)
         step_size = max_size / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
         pos_left = 5 - max_size / 1000 * 0.8 / 2  # Leftmost position in mm
@@ -81,20 +91,20 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
 
         # Take darks
         mtf.move("Closed")
-        tcc.take_image("entrance_cam", entrance_dark_folder + f"/entrance_cam_dark{i:03d}.png",
-                   exposure_time=exposure_times["entrance_cam"])
+        tcc.take_image("entrance_cam", entrance_folder_dark + f"/entrance_cam_dark{i:03d}.fits",
+                   exposure_time=exposure_times["entrance_cam"], save_fits=True)
         cam.take_single_frame(exit_folder_dark, f"exit_cam_dark{i:03d}.fits")
 
 
         # Take images
         mtf.move("Open")
-        tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png",
-                       exposure_time=exposure_times["entrance_cam"])
-        tcc.take_image("exit_cam", exit_light_folder + f"/exit_cam_image{i:03d}.png",
-                       exposure_time=exposure_times["exit_cam"])
+        tcc.take_image("entrance_cam", entrance_folder_light + f"/entrance_cam_image{i:03d}.fits",
+                       exposure_time=exposure_times["entrance_cam"], save_fits=True)
+        cam.take_single_frame(exit_folder_light, f"exit_cam_image{i:03d}.fits")
+    smc.move_motor_to_position(5)
     print("All images taken!")
 
-def nf_ff_process(project_folder:str, progress_signal=None):
+def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None):
     import image_reduction as ir
     import image_analysation as ia
     # Define folders
@@ -128,12 +138,24 @@ def nf_ff_process(project_folder:str, progress_signal=None):
     for i in range(len(entrance_light_images)):
         print("Reducing image", i)
         output_file_path_entrance = os.path.join(entrance_folder_reduced, f"entrance_cam_reduced{i:03d}.fits")
-        ir.reduce_image_with_dark(entrance_light_images[i], entrance_dark_images[i],
-                                                  output_file_path_entrance)
+        # Load the entrance light and dark images
+        with fits.open(os.path.join(entrance_folder_light, entrance_light_images[i])) as hdul:
+            entrance_light_data = hdul[0].data.astype(np.float32)
+
+        with fits.open(os.path.join(entrance_folder_dark, entrance_dark_images[i])) as hdul:
+            entrance_dark_data = hdul[0].data.astype(np.float32)
+
+        ir.reduce_image_with_dark(entrance_light_data, entrance_dark_data, output_file_path_entrance, save=True)
+
+        # Load the exit light and dark images
+        with fits.open(os.path.join(exit_folder_light, exit_light_images[i])) as hdul:
+            exit_light_data = hdul[0].data.astype(np.float32)
+
+        with fits.open(os.path.join(exit_folder_dark, exit_dark_images[i])) as hdul:
+            exit_dark_data = hdul[0].data.astype(np.float32)
 
         output_file_path_exit = os.path.join(exit_folder_reduced, f"exit_cam_reduced{i:03d}.fits")
-        ir.reduce_image_with_dark(exit_light_images[i], exit_dark_images[i],
-                                                  output_file_path_exit)
+        ir.reduce_image_with_dark(exit_light_data, exit_dark_data, output_file_path_exit, save=True)
     print("All images reduced!")
 
     # Get list of reduced images
@@ -152,13 +174,28 @@ def nf_ff_process(project_folder:str, progress_signal=None):
         print("Cutting image", i)
         # Cut entrance images
         from sg_pipeline import cut_image_around_comk
-        com = ia.LocateFocus(entrance_reduced_images[i])
-        cut_image = cut_image_around_comk(entrance_reduced_images[i], com, fiber_input_radius)
-        cut_image.save(os.path.join(entrance_folder_cut, f"entrance_cam_cut{i:03d}.fits"))
+
+        # Load the reduced entrance images
+        with fits.open(os.path.join(entrance_folder_reduced, entrance_reduced_images[i])) as hdul:
+            entrance_reduced_data = hdul[0].data.astype(np.float32)
+
+        com = ia.LocateFocus(entrance_reduced_data)
+        cut_image = cut_image_around_comk(entrance_reduced_data, com, fiber_input_radius, margin=50)
+        # Save the cut image as png
+        plt.imshow(cut_image, cmap='gray', origin='lower')
+        plt.axis('off')
+        plt.savefig(os.path.join(entrance_folder_cut, f"entrance_cam_cut{i:03d}.png"))
+        plt.close()
 
         # Cut exit images
-        trimmed_data = ia.cut_image(exit_reduced_images[i], margin=500)
-        trimmed_data.save(os.path.join(exit_folder_cut, f"exit_cam_cut{i:03d}.fits"))
+        # Load the reduced exit images
+        with fits.open(os.path.join(exit_folder_reduced, exit_reduced_images[i])) as hdul:
+            exit_reduced_data = hdul[0].data.astype(np.float32)
+        trimmed_data = ia.cut_image(exit_reduced_data, margin=500)
+        plt.imshow(trimmed_data, cmap='gray', origin='lower')
+        plt.axis('off')
+        plt.savefig(os.path.join(exit_folder_cut, f"exit_cam_cut{i:03d}.png"))
+        plt.close()
 
     print("All images reduced and cut!")
 
@@ -649,6 +686,8 @@ def plot_horizontal_cut(project_folder):
 
 if __name__ == "__main__":
     project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/O_50_0000_0000/FRD"
-    project_folder = "D:/Vincent/O_50_0000_0000/FRD"
-    sutherland_plot(project_folder)
+    project_folder = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5_measurement_2/NF_FF"
+    #sutherland_plot(project_folder)
     #plot_f_ratio_circles_on_raw(project_folder)
+    nf_ff_capture(project_folder, 28, {"entrance_cam": "10ms", "exit_cam": 25000})
+    nf_ff_process(project_folder, 28)

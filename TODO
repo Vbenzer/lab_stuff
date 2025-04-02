@@ -14,6 +14,7 @@ Bugs: (Sorted by priority)
 Additions: (Sorted by priority)
 - Group meeting:
     -
+- Change nf_ff to constant trim for both entrance and exit
 
 - Add images to show nf ff with different spot positions
 
