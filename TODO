@@ -14,10 +14,10 @@ Bugs: (Sorted by priority)
 Additions: (Sorted by priority)
 - Group meeting:
     - Shake fiber input for sg improvement?
-    - Fiber size measurement (with area? but try normal first and see if its precise enough)
+    - Fiber size measurement
     - Cerium oxide for fiber polishing
 
-- Change nf_ff to constant trim for both entrance and exit
+- Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
 
 - Add functions to GUI:
     - Horizontal cuts
@@ -26,7 +26,7 @@ Additions: (Sorted by priority)
 
 - Add images to show nf ff with different spot positions
 
-- try log scale for sg input images
+- try log scale for sg input images (not sure if that makes a difference for the image detection or differentiation of spot and fiber face)
 
 - Rethink the plot all option for all measurements... maybe add a way to select which measurements to plot
 

@@ -893,7 +893,7 @@ class MainWindow(QMainWindow):
                 self.filter_wheel.move_to_filter(f_ratio)
         elif selected_function == "Measure Fiber Size":
             import fiber_frd_measurements as frd
-            print("WIP")
+            print("WIP") # Placeholder for future implementation
 
 
         self.progress_signal.emit(f"{selected_function} complete.")

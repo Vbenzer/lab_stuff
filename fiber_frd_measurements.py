@@ -34,10 +34,10 @@ def measure_fiber_size(project_folder:str, exposure_times:dict[str, str]=None):
                    exposure_time=exposure_times["exit_cam"], save_fits=True)
 
     # Load the image
-    entrance_image = fits.open(project_folder + "/entrance_cam_image.fits")[0].data.astype(np.float32)
+    exit_image = fits.open(project_folder + "/exit_cam_image.fits")[0].data.astype(np.float32)
 
     # Get fiber dimension
-    fiber_data = ia.measure_fiber_dimensions(entrance_image)
+    fiber_data = ia.measure_fiber_dimensions(exit_image)
 
     print(fiber_data["dimensions_mu"])
 
