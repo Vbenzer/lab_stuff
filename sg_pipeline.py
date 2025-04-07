@@ -1966,7 +1966,7 @@ def get_px_to_mu(main_folder, fiber_diameter):
     with open(os.path.join(main_folder, "px_to_mu.json"), 'w') as f:
         json.dump(px_to_mu, f)
 
-def plot_horizontal_cut(project_folder):
+def plot_horizontal_cut_nf(project_folder):
     """
     Plot the horizontal cut of the image.
     Args:
@@ -2025,7 +2025,7 @@ if __name__ == '__main__':
     #main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
 
     main_folder = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0001/SG"
-    plot_horizontal_cut(main_folder)
+    plot_horizontal_cut_nf(main_folder)
 
     #reduce_images(main_folder, 11)
 

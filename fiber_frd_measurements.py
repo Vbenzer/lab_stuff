@@ -7,6 +7,7 @@ import file_save_managment
 import analyse_main
 from astropy.io import fits
 import os
+import thorlabs_cam_control as tcc
 
 fw = None
 cam = None
@@ -21,13 +22,31 @@ def init_filter_wheel():
     import qhycfw3_filter_wheel_control
     fw = qhycfw3_filter_wheel_control.FilterWheel('COM5')
 
+def measure_fiber_size(project_folder:str, exposure_times:dict[str, str]=None):
+    import image_analysation as ia
+    if exposure_times is None:
+        raise ValueError("Exposure times must be provided.")
+
+    os.makedirs(project_folder, exist_ok=True)
+
+    # Take entrance image
+    tcc.take_image("exit_cam", project_folder + "/exit_cam_image.fits",
+                   exposure_time=exposure_times["exit_cam"], save_fits=True)
+
+    # Load the image
+    entrance_image = fits.open(project_folder + "/entrance_cam_image.fits")[0].data.astype(np.float32)
+
+    # Get fiber dimension
+    fiber_data = ia.measure_fiber_dimensions(entrance_image)
+
+    print(fiber_data["dimensions_mu"])
+
 def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], exposure_times:dict[str, str]=None,
                          progress_signal=None):
     import step_motor_control as smc
     import move_to_filter as mtf
     import qhy_ccd_take_image
     import qhycfw3_filter_wheel_control
-    import thorlabs_cam_control as tcc
     import threading
 
     if exposure_times is None:
@@ -637,7 +656,7 @@ def plot_f_ratio_circles_on_raw(project_folder):
             plt.close()
 
 
-def plot_horizontal_cut(project_folder):
+def plot_horizontal_cut_ff(project_folder):
     folder_list = [folder for folder in sorted(os.listdir(project_folder)[::-1]) if "filter" in folder]
 
     for i, folder in enumerate(folder_list):

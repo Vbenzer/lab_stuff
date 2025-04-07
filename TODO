@@ -13,7 +13,10 @@ Bugs: (Sorted by priority)
 
 Additions: (Sorted by priority)
 - Group meeting:
-    -
+    - Shake fiber input for sg improvement?
+    - Fiber size measurement (with area? but try normal first and see if its precise enough)
+    - Cerium oxide for fiber polishing
+
 - Change nf_ff to constant trim for both entrance and exit
 
 - Add functions to GUI:

@@ -653,7 +653,8 @@ class MainWindow(QMainWindow):
         self.general_function_combo.addItems(
             ["Measure System F-ratio", "Make Throughput Calibration", "Adjust Tip/Tilt",
              "Motor Controller: Reference", "Motor Controller: Move to Position",
-             "Measure Eccentricity", "FF with each Filter", "Change Color Filter", "Change System F-ratio"])
+             "Measure Eccentricity", "FF with each Filter", "Change Color Filter", "Change System F-ratio",
+             "Measure Fiber Size"])
 
         # Create a widget for the function chooser and set its position
         function_widget = QWidget()
@@ -828,7 +829,7 @@ class MainWindow(QMainWindow):
     def run_general_function(self):
         selected_function = self.general_function_combo.currentText()
 
-        if (selected_function in ["Measure Eccentricity", "Adjust Tip/Tilt", "FF with each Filter"]
+        if (selected_function in ["Measure Eccentricity", "Adjust Tip/Tilt", "FF with each Filter", "Measure Fiber Size"]
                 and self.folder_name != ""):
             self.show_message("Please enter folder name before running the function.")
             return
@@ -890,6 +891,10 @@ class MainWindow(QMainWindow):
             if self.filter_wheel:
                 f_ratio = self.fratio_input_combo.currentText()
                 self.filter_wheel.move_to_filter(f_ratio)
+        elif selected_function == "Measure Fiber Size":
+            import fiber_frd_measurements as frd
+            print("WIP")
+
 
         self.progress_signal.emit(f"{selected_function} complete.")
         self.experiment_running = False

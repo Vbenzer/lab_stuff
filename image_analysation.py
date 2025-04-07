@@ -306,7 +306,7 @@ def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder
         radii.append(radius)
     return radii
 
-def measure_eccentricity(data, plot:bool=False):
+def measure_eccentricity(data, plot: bool = False):
     from skimage.filters import threshold_otsu
     from skimage.feature import canny
     from skimage import io, measure, color
@@ -319,24 +319,14 @@ def measure_eccentricity(data, plot:bool=False):
         plt.imshow(trimmed_data, cmap='gray')
         plt.show()
 
-
     # Find otsu threshold
     threshold = threshold_otsu(trimmed_data)
-
     thresholded_image = trimmed_data > threshold
 
     if plot:
         plt.figure()
         plt.imshow(thresholded_image, cmap='gray')
         plt.show()
-
-    """edges = canny(thresholded_image)
-
-    if plot:
-        # Show the image
-        plt.figure()
-        plt.imshow(edges, cmap='gray')
-        plt.show()"""
 
     # Label connected regions
     labeled_image = measure.label(thresholded_image)
@@ -364,25 +354,114 @@ def measure_eccentricity(data, plot:bool=False):
 
     if len(properties) == 1:
         return properties[0].eccentricity
-
     else:
         print("Multiple regions found, returning None")
-        # Iterate through properties and print eccentricity
         for prop in properties:
             print(f'Label: {prop.label}, Eccentricity: {prop.eccentricity}')
-
         return None
+
+
+import cv2
+from skimage.filters import threshold_otsu
+from skimage import measure
+def measure_fiber_dimensions(data, px_to_mu=0.439453125, plot=False):
+    # Step 1: Trim and threshold image
+    trimmed_data = cut_image(data, margin=500)
+    threshold = threshold_otsu(trimmed_data)
+    binary = trimmed_data > threshold
+
+    # Step 2: Label regions and filter by area
+    labeled = measure.label(binary)
+    props = [prop for prop in measure.regionprops(labeled) if prop.area >= 300]
+
+    results = []
+
+    # Step 3: Analyze each region
+    for prop in props:
+        coords = prop.coords
+
+        # Switch x, y for cv2
+        coords_yx = np.array(coords)
+        coords_yx[:, 0], coords_yx[:, 1] = coords[:, 1], coords[:, 0]
+        coords = coords_yx.astype(np.int32)
+
+        rect = cv2.minAreaRect(coords)
+        (cx, cy), (w, h), angle = rect
+
+        width_mu = min(w, h) * px_to_mu
+        height_mu = max(w, h) * px_to_mu
+        diameter_mu = prop.equivalent_diameter * px_to_mu
+        eccentricity = prop.eccentricity
+        aspect_ratio = height_mu / width_mu if width_mu > 0 else 0
+
+        # Step 4: Shape classification logic
+        if eccentricity < 0.1:
+            shape = 'circular'
+            dimensions = {'diameter': diameter_mu}
+        elif eccentricity < 0.5:
+            shape = 'octagonal'
+            dimensions = {'diameter': diameter_mu}
+        else:
+            shape = 'rectangular'
+            dimensions = {'width': width_mu, 'height': height_mu}
+
+        results.append({
+            'label': prop.label,
+            'shape': shape,
+            'eccentricity': eccentricity,
+            'aspect_ratio': aspect_ratio,
+            'dimensions_mu': dimensions,
+        })
+
+        # Step 5: Optional plot
+        if plot:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.imshow(labeled, cmap='gray')
+
+            # Draw the box around the region
+            box = np.intp(cv2.boxPoints(rect))
+            ax.plot(*zip(*np.append(box, [box[0]], axis=0)), 'k-', lw=2)
+
+            # Mark the label at the center
+            ax.text(cx, cy, f"{prop.label}", color='red', ha='center', va='center', fontsize=12)
+
+            # Determine which is major/minor based on width and height
+            major_len = max(w, h) / 2
+            minor_len = min(w, h) / 2
+
+            # OpenCV angle logic fix
+            angle_rad = np.deg2rad(angle)
+            if w < h:
+                angle_rad += np.pi / 2
+
+            # Direction vectors
+            major_vec = np.array([np.cos(angle_rad), np.sin(angle_rad)])
+            minor_vec = np.array([-major_vec[1], major_vec[0]])
+
+            center = np.array([cx, cy])
+            major_end = center + major_vec * major_len
+            minor_end = center + minor_vec * minor_len
+
+            ax.plot([center[0], major_end[0]], [center[1], major_end[1]], 'r-', lw=2.5, label='Major Axis')
+            ax.plot([center[0], minor_end[0]], [center[1], minor_end[1]], 'b-', lw=2.5, label='Minor Axis')
+
+            ax.legend()
+            ax.set_title(f"Label {prop.label}: {shape.capitalize()} Fiber")
+            ax.axis("off")
+            plt.show()
+
+    return results if results else None
 
 # Usage
 if __name__ == "__main__":
     #Path of fits file to analyse
     #fits_file = 'D:/Vincent/OptranWF_100_187_P_measurement_3/FRD/filter_2/LIGHT/LIGHT_0012_0.08s.fits'
-    fits_file = 'D:/Vincent/eccentricity/image.fits'
+    fits_file = '/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/eccentricity/circ100_test.fits'
 
     #Turn data to numpy array
     data = fits_to_arr(fits_file)
 
-    ecc = measure_eccentricity(data, plot=True)
-    print(ecc)
+    datas = measure_fiber_dimensions(data, plot=True)
+    print(datas)
 
 
