@@ -39,7 +39,7 @@ def measure_fiber_size(project_folder:str, exposure_times:dict[str, str]=None):
     # Get fiber dimension
     fiber_data = ia.measure_fiber_dimensions(exit_image)
 
-    print(fiber_data["dimensions_mu"])
+    print(fiber_data[0]["dimensions_mu"])
 
 def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], exposure_times:dict[str, str]=None,
                          progress_signal=None):
@@ -704,10 +704,12 @@ def plot_horizontal_cut_ff(project_folder):
 
 
 if __name__ == "__main__":
-    project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0001/NF_FF"
+    #project_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0001/NF_FF"
     #project_folder = "D:/Vincent/IFG_MM_0.3_TJK_2FC_PC_28_100_5_measurement_2/NF_FF"
+    project_folder = r"\\srv4\labshare\raw_data\fibers\Measurements\test"
+    measure_fiber_size(project_folder, {"entrance_cam": "10ms", "exit_cam": "0.5ms"})
     #sutherland_plot(project_folder)
     #plot_f_ratio_circles_on_raw(project_folder)
     #nf_ff_capture(project_folder, 28, {"entrance_cam": "10ms", "exit_cam": 25000})
-    nf_ff_process(project_folder, [25,40])
+    #nf_ff_process(project_folder, [25,40])
     #plot_horizontal_cut(project_folder)

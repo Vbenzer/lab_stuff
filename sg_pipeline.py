@@ -2019,13 +2019,9 @@ if __name__ == '__main__':
 
     #image_to_fits(image_path)
 
-    #entrance_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/entrance/reduced'
-    #exit_folder = 'E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_test5/exit/reduced'
+    #main_folder = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0001/SG"
 
-    #main_folder = "E:/Important_Data/Education/Uni/Master/S4/Lab Stuff/SG_images/thorlabs_cams_images_oct_89_other_way+camclean"
-
-    main_folder = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/R_25x40_0000_0001/SG"
-    plot_horizontal_cut_nf(main_folder)
+    #plot_horizontal_cut_nf(main_folder)
 
     #reduce_images(main_folder, 11)
 
