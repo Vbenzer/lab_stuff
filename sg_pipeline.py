@@ -712,7 +712,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         image = io.imread(image_path)
 
         # Get the center of mass of the spot. Threshold important to ensure correct spot detection
-        com = com_of_spot(image, threshold=100, plot=False)
+        com = com_of_spot(image, threshold=10, plot=False)
 
         # Append the center of mass to the list
         entrance_coms.append(com)
