@@ -1,10 +1,7 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
-    - not sure how to reproduce but fiber dimension sometimes resets to weird values
-    - checking existing measurements doesnt work
-    - can run measure system fratio without folder
-
+    - fiber dimension sometimes resets to weird values (cant reproduce)
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
@@ -20,11 +17,11 @@ Additions: (Sorted by priority)
 - Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
 
 - Add functions to GUI:
-    - Horizontal cuts
-    - nf ff stuff
-    - should be a few more...
+    - Horizontal cuts (done, not tested)
+    - nf ff stuff (done, not tested)
+    - fiber size measurement (done, not tested)
 
-- Add images to show nf ff with different spot positions
+- Rework sg com and comk plots
 
 - try log scale for sg input images (not sure if that makes a difference for the image detection or differentiation of spot and fiber face)
 
