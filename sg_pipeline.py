@@ -2008,6 +2008,104 @@ def plot_horizontal_cut_nf(project_folder):
     plt.savefig(plots_folder + f"/horizontal_cut.png")
     plt.close()
 
+def plot_com_comk_on_image_cut(project_folder):
+    # Define folders
+    video_prep_folder = os.path.join(project_folder, "video_prep")
+    entrance_folder = os.path.join(video_prep_folder, "entrance")
+    exit_folder = os.path.join(video_prep_folder, "exit")
+    plots_folder = os.path.join(project_folder, "plots")
+    com_comk_on_image_entr_folder = os.path.join(plots_folder, "com_comk_on_image_entrance")
+    com_comk_on_image_exit_folder = os.path.join(plots_folder, "com_comk_on_image_exit")
+
+    # Create folders if they don't exist
+    os.makedirs(com_comk_on_image_entr_folder, exist_ok=True)
+    os.makedirs(com_comk_on_image_exit_folder, exist_ok=True)
+
+    # Check if video_prep folder exists
+    if not os.path.exists(video_prep_folder):
+        print(f"Video prep folder does not exist: {video_prep_folder}")
+        return
+
+    # Read sg parameter json
+    with open(os.path.join(project_folder, "scrambling_gain_parameters.json"), 'r') as f:
+        parameters = json.load(f)
+
+    entrance_coms_list = parameters["entrance_coms"]
+    entrance_comk_list = parameters["entrance_comk"]
+    exit_coms_list = parameters["exit_coms"]
+    exit_comk_list = parameters["exit_comk"]
+    entrance_coms_list = np.array(entrance_coms_list)
+    entrance_comk_list = np.array(entrance_comk_list)
+    exit_coms_list = np.array(exit_coms_list)
+    exit_comk_list = np.array(exit_comk_list)
+
+    # Get the first image to get the size
+    entrance_image = io.imread(os.path.join(entrance_folder, f"entrance_cam_image000_reduced_cut.png"))
+    entr_img_h_size = entrance_image.shape[0] // 2
+
+    exit_image = io.imread(os.path.join(exit_folder, f"exit_cam_image000_reduced_cut.png"))
+    exit_img_h_size = exit_image.shape[0] // 2
+
+    # Translate coms and comk to cut image system by referencing it to the int(comk) of the first image which then is the center of the cut image
+    entrance_comk_list_cut = [tuple([entr_img_h_size, entr_img_h_size]) for _ in range(len(entrance_coms_list))]
+    entrance_norm = entrance_comk_list - entrance_coms_list
+    entrance_coms_list_cut = entrance_comk_list_cut - entrance_norm
+
+    exit_norm = exit_coms_list - np.array([int(exit_comk_list[0][0]), int(exit_comk_list[0][1])])
+    exit_coms_list_cut = exit_norm * 20 + np.array([exit_img_h_size, exit_img_h_size])
+    exit_comk_list_cut = exit_comk_list - np.array([int(exit_comk_list[0][0]), int(exit_comk_list[0][1])]) + np.array([exit_img_h_size, exit_img_h_size])
+
+    # Plot entrance COMs and COMKs
+    for i in range(len(entrance_coms_list)):
+        entrance_image = io.imread(os.path.join(entrance_folder, f"entrance_cam_image{i:03d}_reduced_cut.png"))
+        entrance_com = entrance_coms_list_cut[i]
+        entrance_comk = entrance_comk_list_cut[i]
+
+        # Draw a line between the COM and COMK
+        plt.plot([entrance_com[1], entrance_comk[1]], [entrance_com[0], entrance_comk[0]], color='blue',
+                 linestyle='--', linewidth=0.5, label='Distance')
+
+        # Annotate the distance between the dots
+        distance = np.sqrt(entrance_norm[i][0] ** 2 + entrance_norm[i][1] ** 2)
+        plt.text((entrance_com[1] + entrance_comk[1]) / 2, (entrance_com[0] + entrance_comk[0]) / 2, f"{distance:.2f} px",
+                 color='blue', fontsize=6)
+
+        # Plot the image with the COM and COMK
+        plt.imshow(entrance_image, cmap='gray')
+        plt.scatter(entrance_com[1], entrance_com[0], color='r', s=10, label='Center of Mass')
+        plt.scatter(entrance_comk[1], entrance_comk[0], color='g', s=10, label='Center of Mask')
+        plt.title(f"Entrance Image {i}")
+        plt.axis('off')
+        plt.legend(loc='upper right', fontsize=6)
+        plt.savefig(os.path.join(com_comk_on_image_entr_folder, f"entrance_image_{i}_com.png"), dpi="figure")
+        plt.close()
+
+    # Plot exit COMs and COMKs
+    for i in range(len(exit_coms_list)):
+        exit_image = io.imread(os.path.join(exit_folder, f"exit_cam_image{i:03d}_reduced_cut.png"))
+        exit_com = exit_coms_list_cut[i]
+        exit_comk = exit_comk_list_cut[i]
+
+        # Plot the image with the COM and COMK
+        plt.imshow(exit_image, cmap='gray')
+        plt.scatter(exit_com[1], exit_com[0], color='r', s=10, label='Center of Mass')
+        plt.scatter(exit_comk[1], exit_comk[0], color='g', s=10, label='Center of Mask')
+
+        # Draw a line between the COM and COMK
+        plt.plot([exit_com[1], exit_comk[1]], [exit_com[0], exit_comk[0]], color='blue', linestyle='--', linewidth=0.5,
+                 label='Distance')
+
+        # Annotate the distance between the dots
+        distance = np.sqrt(exit_norm[i][0] ** 2 + exit_norm[i][1] ** 2)
+        plt.text((exit_com[1] + exit_comk[1]) / 2, (exit_com[0] + exit_comk[0]) / 2, f"{distance:.2f} (* 20) px", color='blue',
+                 fontsize=6)
+
+        plt.title(f"Exit Image {i}")
+        plt.axis('off')
+        plt.legend(loc='upper right', fontsize=6)
+        plt.savefig(os.path.join(com_comk_on_image_exit_folder, f"exit_image_{i}_com.png"), dpi="figure")
+        plt.close()
+
 if __name__ == '__main__':
 
     image_path = 'D:/Vincent/40x120_300A_test/SG/exit/dark/exit_cam_dark000.png'
@@ -2069,6 +2167,9 @@ if __name__ == '__main__':
 
     #image_path = "D:/Vincent/oct_89_good/SG/exit/reduced/exit_cam_image000_reduced.png"
     #image_to_fits(image_path)
+
+    project_folder = "D:/Vincent/oct_89_good/SG"
+    plot_com_comk_on_image_cut(project_folder)
 
     """calib_folder = "D:/Vincent/fiber_size_calibration2"
     capture_px_mu_calib_images(calib_folder, 10)

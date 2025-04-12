@@ -31,7 +31,7 @@ Additions: (Sorted by priority)
 - Add to gui:
     - qol stuff:
         - add general way to choose frd calibration da
-        - make sure that analysis dependencies are enforced
+        - make sure that analysis dependencies are enforced (visually also with indentations)
 
 
 Ideas:
