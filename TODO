@@ -22,6 +22,7 @@ Additions: (Sorted by priority)
     - fiber size measurement (done, not tested)
 
 - Rework sg com and comk plots
+    - sg entrance spot position probably biased
 
 - try log scale for sg input images (not sure if that makes a difference for the image detection or differentiation of spot and fiber face)
 

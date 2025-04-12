@@ -1938,6 +1938,7 @@ def capture_px_mu_calib_images(main_folder, number_of_images):
     time.sleep(30)
     for i in range(number_of_images):
         tcc.take_image("exit_cam", exit_folder + f"/entrance_cam{i:03d}.png", exposure_time="1ms")
+
 def get_px_to_mu(main_folder, fiber_diameter):
 
     entrance_folder = os.path.join(main_folder, "entrance")
