@@ -35,6 +35,8 @@ Additions: (Sorted by priority)
 
 
 Ideas:
+- Add logs to the GUI (to better reproduce bugs)
+
 - Option to set expo time to recommended value for the measurement
 
 - Automatically assist with some of the checks, E.g. for frd: Opens thorcam then asks is there the fiber is it oriented horizontally and so on...
