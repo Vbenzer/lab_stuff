@@ -634,10 +634,13 @@ class MainWindow(QMainWindow):
 
             elif self.analysis_type_combo.currentText() == "SG" or self.analysis_type_combo.currentText() == "FRD":
                 if (self.plot_sg_checkbox.isChecked() or self.calc_sg_checkbox.isChecked()
-                        or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
-                        or self.plot_masks_checkbox.isChecked() or self.make_video_checkbox.isChecked()
-                        or self.sg_new_checkbox.isChecked() or self.calc_frd_checkbox.isChecked()
-                        or self.plot_sutherland_checkbox.isChecked() or self.plot_f_ratio_circles_on_raw_checkbox.isChecked()
+                    or self.plot_coms_checkbox.isChecked() or self.get_params_checkbox.isChecked()
+                    or self.plot_masks_checkbox.isChecked() or self.make_video_checkbox.isChecked()
+                    or self.sg_new_checkbox.isChecked() or self.calc_frd_checkbox.isChecked()
+                    or self.plot_sutherland_checkbox.isChecked() or self.plot_f_ratio_circles_on_raw_checkbox.isChecked()
+                    or self.plot_com_comk_on_image_cut_checkbox.isChecked() or self.plot_nf_horizontal_cut_checkbox.isChecked()
+
+
                 ):
                     self.run_analysis_button.setDisabled(False)
                 else:
@@ -1089,6 +1092,7 @@ class MainWindow(QMainWindow):
         self.plot_f_ratio_circles_on_raw_checkbox = QCheckBox("Plot F-ratio Circles on Raw Image")
         self.plot_nf_horizontal_cut_checkbox = QCheckBox("Plot NF Horizontal Cut")
         self.plot_ff_horizontal_cut_checkbox = QCheckBox("Plot FF Horizontal Cut")
+        self.plot_com_comk_on_image_cut_checkbox = QCheckBox("Plot COM and COMK on Cut Image")
 
         self.plot_sg_checkbox.stateChanged.connect(self.update_run_button_state)
         self.calc_sg_checkbox.stateChanged.connect(self.update_run_button_state)
@@ -1102,6 +1106,7 @@ class MainWindow(QMainWindow):
         self.plot_f_ratio_circles_on_raw_checkbox.stateChanged.connect(self.update_run_button_state)
         self.plot_nf_horizontal_cut_checkbox.stateChanged.connect(self.update_run_button_state)
         self.plot_ff_horizontal_cut_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.plot_com_comk_on_image_cut_checkbox.stateChanged.connect(self.update_run_button_state)
 
         self.calibration_folder_label = QLabel("Calibration Folder:")
         self.calibration_folder_input = QLineEdit()
@@ -1115,6 +1120,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.plot_coms_checkbox)
         layout.addWidget(self.plot_masks_checkbox)
         layout.addWidget(self.make_video_checkbox)
+        layout.addWidget(self.plot_com_comk_on_image_cut_checkbox)
         layout.addWidget(self.sg_new_checkbox)
         layout.addWidget(self.calc_frd_checkbox)
         layout.addWidget(self.plot_sutherland_checkbox)
@@ -1144,7 +1150,7 @@ class MainWindow(QMainWindow):
                          self.get_params_checkbox, self.plot_masks_checkbox, self.make_video_checkbox,
                          self.sg_new_checkbox, self.calc_frd_checkbox, self.plot_sutherland_checkbox,
                          self.plot_f_ratio_circles_on_raw_checkbox, self.plot_nf_horizontal_cut_checkbox,
-                         self.plot_ff_horizontal_cut_checkbox
+                         self.plot_ff_horizontal_cut_checkbox, self.plot_com_comk_on_image_cut_checkbox,
                          ]:
             checkbox.setChecked(False)
 
@@ -1157,6 +1163,7 @@ class MainWindow(QMainWindow):
             self.make_video_checkbox.show()
             self.sg_new_checkbox.show()
             self.plot_nf_horizontal_cut_checkbox.show()
+            self.plot_com_comk_on_image_cut_checkbox.show()
             self.calc_frd_checkbox.hide()
             self.plot_sutherland_checkbox.hide()
             self.plot_f_ratio_circles_on_raw_checkbox.hide()
@@ -1174,6 +1181,7 @@ class MainWindow(QMainWindow):
             self.make_video_checkbox.hide()
             self.sg_new_checkbox.hide()
             self.plot_nf_horizontal_cut_checkbox.hide()
+            self.plot_com_comk_on_image_cut_checkbox.hide()
             self.calc_frd_checkbox.show()
             self.plot_sutherland_checkbox.show()
             self.plot_f_ratio_circles_on_raw_checkbox.show()
@@ -1190,6 +1198,7 @@ class MainWindow(QMainWindow):
             self.make_video_checkbox.hide()
             self.sg_new_checkbox.hide()
             self.plot_nf_horizontal_cut_checkbox.hide()
+            self.plot_com_comk_on_image_cut_checkbox.hide()
             self.calc_frd_checkbox.hide()
             self.plot_sutherland_checkbox.hide()
             self.plot_f_ratio_circles_on_raw_checkbox.hide()
@@ -1379,6 +1388,10 @@ class MainWindow(QMainWindow):
 
             if self.make_video_checkbox.isChecked():
                 sg_pipeline.make_comparison_video(directory, fiber_diameter)
+
+            if self.plot_com_comk_on_image_cut_checkbox.isChecked():
+                self.progress_signal.emit("Running plot_com_comk_on_image_cut...")
+                sg_pipeline.plot_com_comk_on_image_cut(directory)
 
             if self.sg_new_checkbox.isChecked():
                 sg_pipeline.sg_new(directory, progress_signal=self.progress_signal)
