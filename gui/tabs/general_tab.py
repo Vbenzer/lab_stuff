@@ -4,10 +4,14 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              )
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
+from gui.tabs.helpers import HelperFunctions
 
-class GeneralTab:
-    def __init__(self, main_ctrl):
-        self.main = main_ctrl
+import threading
+
+class GeneralTab(HelperFunctions):
+    def __init__(self, main, main_init):
+        self.main = main
+        self.main_init = main_init
         layout = QVBoxLayout()
 
         self.general_function_label = QLabel("Select Function:")
@@ -84,7 +88,7 @@ class GeneralTab:
 
         self.stop_button = QPushButton("Stop")
         self.stop_button.setDisabled(True)
-        self.stop_button.clicked.connect(self.stop_general_function)
+        self.stop_button.clicked.connect(self.main_init.stop_general_function)
         layout.addWidget(self.stop_button)
 
         # Add the Run button to the General tab
@@ -93,30 +97,29 @@ class GeneralTab:
         self.run_button_gt.clicked.connect(self.run_general_function)
         layout.addWidget(self.run_button_gt)
 
-        self.main.general_tab.setLayout(layout)
+        self.main_init.general_tab.setLayout(layout)
 
         # Connect the signal and update the stop button visibility
         self.general_function_combo.currentIndexChanged.connect(self.update_general_tab_buttons)
-        self.main.folder_name_input.textChanged.connect(self.update_general_tab_buttons)
+        self.main_init.folder_name_input.textChanged.connect(self.update_general_tab_buttons)
         self.update_general_tab_buttons()
 
     def run_general_function(self):
         selected_function = self.general_function_combo.currentText()
 
         if (selected_function in ["Measure Eccentricity", "Adjust Tip/Tilt", "FF with each Filter", "Measure Fiber Size"]
-                and self.folder_name != ""):
+                and self.main.folder_name != ""):
             self.show_message("Please enter folder name before running the function.")
             return
 
+        self.main.experiment_running = True
+        self.main_init.update_ui_state()
 
-        self.experiment_running = True
-        self.update_ui_state()
-
-        working_dir = self.working_dir_display.text()
+        working_dir = self.main_init.working_dir_display.text()
         threading.Thread(target=self.run_general_function_thread, args=(selected_function, working_dir)).start()
 
     def run_general_function_thread(self, selected_function, working_dir):
-        self.progress_signal.emit(f"Running {selected_function}...")
+        self.main.progress_signal.emit(f"Running {selected_function}...")
         self.stop_event = threading.Event()
         if selected_function == "Measure System F-ratio":
             """import fiber_frd_measurements as frd
@@ -125,16 +128,16 @@ class GeneralTab:
             import qhy_ccd_take_image as qhy
             exposure_time = qhy.convert_to_us(self.exposure_time_input_gt.text())
             import analyse_main as am
-            am.main_measure_new(working_dir, progress_signal=self.progress_signal, exp_time=exposure_time)
+            am.main_measure_new(working_dir, progress_signal=self.main.progress_signal, exp_time=exposure_time)
 
             import fiber_frd_measurements as frd
-            frd.main_analyse_all_filters(working_dir, progress_signal=self.progress_signal)
+            frd.main_analyse_all_filters(working_dir, progress_signal=self.main.progress_signal)
 
         elif selected_function == "Make Throughput Calibration":
             import throughput_analysis as ta
             calibration_folder_name = os.path.basename(working_dir)
-            ta.measure_all_filters(working_dir, progress_signal=self.progress_signal, calibration=calibration_folder_name,
-                                   base_directory=self.base_directory)
+            ta.measure_all_filters(working_dir, progress_signal=self.main.progress_signal, calibration=calibration_folder_name,
+                                   base_directory=self.main.base_directory)
         elif selected_function == "Adjust Tip/Tilt":
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("tiptilt", self.stop_event)
@@ -182,17 +185,16 @@ class GeneralTab:
                 fiber_dimension = self.fiber_dimension
             # First capture the images
             frd.nf_ff_capture(self.working_dir, fiber_diameter=fiber_dimension, exposure_times=exposure_times)
-            self.progress_signal.emit(f"Capture done, now processing...")
+            self.main.progress_signal.emit(f"Capture done, now processing...")
             # Then analyze the images
             frd.nf_ff_process(self.working_dir, fiber_diameter=fiber_dimension)
 
-
-        self.progress_signal.emit(f"{selected_function} complete.")
-        self.experiment_running = False
-        self.update_ui_state()
+        self.main.progress_signal.emit(f"{selected_function} complete.")
+        self.main.experiment_running = False
+        self.main_init.update_ui_state()
 
     def update_general_tab_buttons(self):
-        if self.tabs.currentWidget() != self.general_tab:
+        if self.main_init.tabs.currentWidget() != self.main_init.general_tab:
             return
 
         selected_function = self.general_function_combo.currentText()
@@ -211,17 +213,17 @@ class GeneralTab:
             else 200
         )
 
-        if hasattr(self, 'placeholder_spacer'):
-            self.layout.removeItem(self.placeholder_spacer)
-            del self.placeholder_spacer
-        self.insert_spacer(spacer_height)
+        if hasattr(self.main, 'placeholder_spacer'):
+            self.main.layout.removeItem(self.main.placeholder_spacer)
+            del self.main.placeholder_spacer
+        self.main.insert_spacer(spacer_height)
 
         # Hide all elements by default
-        self.create_datasheet_button.hide()
-        self.open_fiber_data_button.hide()
-        self.recent_folders_combo.hide()
-        self.recent_folders_label.hide()
-        self.choose_folder_button.hide()
+        self.main_init.create_datasheet_button.hide()
+        self.main_init.open_fiber_data_button.hide()
+        self.main_init.recent_folders_combo.hide()
+        self.main_init.recent_folders_label.hide()
+        self.main_init.choose_folder_button.hide()
         self.exposure_time_label_gt.hide()
         self.exposure_time_input_gt.hide()
         self.exposure_time_label_gt_2.hide()
@@ -233,22 +235,22 @@ class GeneralTab:
         self.fratio_input_label.hide()
         self.fratio_input_combo.hide()
         self.stop_button.hide()
-        self.folder_name_input.hide()
-        self.folder_name_label.hide()
-        self.working_dir_label.hide()
-        self.working_dir_display.hide()
-        self.comments_button.hide()
-        self.folder_name_label.setText("Folder Name:")
-        self.show_message("")
+        self.main_init.folder_name_input.hide()
+        self.main_init.folder_name_label.hide()
+        self.main_init.working_dir_label.hide()
+        self.main_init.working_dir_display.hide()
+        self.main_init.comments_button.hide()
+        self.main_init.folder_name_label.setText("Folder Name:")
+        self.main_init.show_message("")
         self.run_button_gt.setDisabled(True)
 
         # Handle specific functions
         if selected_function == "Measure System F-ratio":
-            self.folder_name_input.show()
-            self.folder_name_label.show()
-            self.working_dir_label.show()
-            self.working_dir_display.show()
-            self.comments_button.show()
+            self.main_init.folder_name_input.show()
+            self.main_init.folder_name_label.show()
+            self.main_init.working_dir_label.show()
+            self.main_init.working_dir_display.show()
+            self.main_init.comments_button.show()
             self.exposure_time_label_gt.show()
             self.exposure_time_input_gt.show()
 
@@ -260,65 +262,65 @@ class GeneralTab:
             self.number_input.show()
 
         elif selected_function == "FF with each Filter":
-            self.folder_name_label.show()
-            self.folder_name_input.show()
-            self.working_dir_label.show()
-            self.working_dir_display.show()
-            self.comments_button.show()
+            self.main_init.folder_name_label.show()
+            self.main_init.folder_name_input.show()
+            self.main_init.working_dir_label.show()
+            self.main_init.working_dir_display.show()
+            self.main_init.comments_button.show()
 
         elif selected_function == "Change Color Filter":
             self.filter_input_label.show()
             self.filter_input_combo.show()
 
         elif selected_function == "Change System F-ratio":
-            if not self.filter_wheel_initiated:
-                threading.Thread(target=self.initialize_filter_wheel).start()
+            if not self.main.filter_wheel_initiated:
+                threading.Thread(target=self.main.initialize_filter_wheel).start()
             self.fratio_input_label.show()
             self.fratio_input_combo.show()
-            self.fratio_input_combo.setDisabled(not self.filter_wheel_ready)
+            self.fratio_input_combo.setDisabled(not self.main.filter_wheel_ready)
 
         elif selected_function == "Measure Fiber Size":
-            self.folder_name_input.setText("Fiber_Size_Measurement")
-            self.folder_name_label.show()
-            self.folder_name_input.show()
-            self.working_dir_label.show()
-            self.working_dir_display.show()
-            self.comments_button.show()
+            self.main_init.folder_name_input.setText("Fiber_Size_Measurement")
+            self.main_init.folder_name_label.show()
+            self.main_init.folder_name_input.show()
+            self.main_init.working_dir_label.show()
+            self.main_init.working_dir_display.show()
+            self.main_init.comments_button.show()
             self.exposure_time_label_gt.show()
             self.exposure_time_input_gt.show()
 
         elif selected_function == "Near-Field, Far-Field Comparison":
-            self.folder_name_input.setText(self.folder_name)
-            self.folder_name_input.show()
-            self.folder_name_label.show()
-            self.working_dir_label.show()
-            self.working_dir_display.show()
-            self.comments_button.show()
-            self.open_fiber_data_button.show()
-            self.recent_folders_combo.show()
-            self.recent_folders_label.show()
-            self.choose_folder_button.show()
+            self.main_init.folder_name_input.setText(self.main.folder_name)
+            self.main_init.folder_name_input.show()
+            self.main_init.folder_name_label.show()
+            self.main_init.working_dir_label.show()
+            self.main_init.working_dir_display.show()
+            self.main_init.comments_button.show()
+            self.main_init.open_fiber_data_button.show()
+            self.main_init.recent_folders_combo.show()
+            self.main_init.recent_folders_label.show()
+            self.main_init.choose_folder_button.show()
             self.exposure_time_label_gt.show()
             self.exposure_time_input_gt.show()
             self.exposure_time_label_gt_2.show()
             self.exposure_time_input_gt_2.show()
-            if not self.fiber_dimension:
-                self.show_message("Please enter fiber dimension before running the function.")
+            if not self.main.fiber_dimension:
+                self.main_init.show_message("Please enter fiber dimension before running the function.")
                 return
 
         elif selected_function == "Make Throughput Calibration":
-            self.folder_name_input.show()
-            self.folder_name_label.show()
-            self.working_dir_label.show()
-            self.working_dir_display.show()
-            self.comments_button.show()
-            self.folder_name_label.setText("Calibration Name:")
+            self.main_init.folder_name_input.show()
+            self.main_init.folder_name_label.show()
+            self.main_init.working_dir_label.show()
+            self.main_init.working_dir_display.show()
+            self.main_init.comments_button.show()
+            self.main_init.folder_name_label.setText("Calibration Name:")
 
         # Run button state
         if selected_function in ["Measure System F-ratio", "Near-Field, Far-Field Comparison", "FF with each Filter",
                                  "Make Throughput Calibration", "Measure Fiber Size"]:
-            self.run_button_gt.setDisabled(self.folder_name_input.text() == "")
-        elif selected_function in ["Change System F-ratio"] and not self.filter_wheel_ready:
+            self.run_button_gt.setDisabled(self.main_init.folder_name_input.text() == "")
+        elif selected_function in ["Change System F-ratio"] and not self.main.filter_wheel_ready:
             self.run_button_gt.setDisabled(True)
         else:
             self.run_button_gt.setDisabled(False)

@@ -5,9 +5,12 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
+import threading, os, json
+
 class AnalyseTab:
-    def __init__(self, main_ctrl):
-        self.main = main_ctrl
+    def __init__(self, main, main_init):
+        self.main = main
+        self.main_init = main_init
         layout = QVBoxLayout()
 
         self.analysis_type_label = QLabel("Analysis Type:")
@@ -37,25 +40,25 @@ class AnalyseTab:
         self.plot_ff_horizontal_cut_checkbox = QCheckBox("Plot FF Horizontal Cut")
         self.plot_com_comk_on_image_cut_checkbox = QCheckBox("Plot COM and COMK on Cut Image")
 
-        self.plot_sg_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.calc_sg_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.plot_coms_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.get_params_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.plot_masks_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.make_video_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.sg_new_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.calc_frd_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.plot_sutherland_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.plot_f_ratio_circles_on_raw_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.plot_nf_horizontal_cut_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.plot_ff_horizontal_cut_checkbox.stateChanged.connect(self.update_run_button_state)
-        self.plot_com_comk_on_image_cut_checkbox.stateChanged.connect(self.update_run_button_state)
+        self.plot_sg_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.calc_sg_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.plot_coms_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.get_params_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.plot_masks_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.make_video_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.sg_new_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.calc_frd_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.plot_sutherland_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.plot_f_ratio_circles_on_raw_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.plot_nf_horizontal_cut_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.plot_ff_horizontal_cut_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
+        self.plot_com_comk_on_image_cut_checkbox.stateChanged.connect(self.main_init.update_run_button_state)
 
         self.calibration_folder_label = QLabel("Calibration Folder:")
         self.calibration_folder_input = QLineEdit()
-        self.calibration_folder_input.textChanged.connect(self.update_run_button_state)
+        self.calibration_folder_input.textChanged.connect(self.main_init.update_run_button_state)
         self.calibration_folder_button = QPushButton("Choose Calibration Folder")
-        self.calibration_folder_button.clicked.connect(self.choose_calibration_folder)
+        self.calibration_folder_button.clicked.connect(self.main.choose_calibration_folder)
 
         layout.addWidget(self.get_params_checkbox)
         layout.addWidget(self.plot_sg_checkbox)
@@ -82,61 +85,61 @@ class AnalyseTab:
         self.run_analysis_button.clicked.connect(self.run_analysis)
         layout.addWidget(self.run_analysis_button)
 
-        self.main.analyse_tab.setLayout(layout)
+        self.main_init.analyse_tab.setLayout(layout)
         self.update_analysis_tab()
 
     def run_analysis(self):
-        if not self.folder_name and self.fiber_dimension and self.fiber_shape != "":
+        if not self.main.folder_name and self.main.fiber_dimension and self.main.fiber_shape != "":
             self.show_message("Please lock the inputs before running the analysis.")
             return
 
         analysis_type = self.analysis_type_combo.currentText()
-        working_dir = self.working_dir_display.text()
-        fiber_shape = self.fiber_shape
+        working_dir = self.main_init.working_dir_display.text()
+        fiber_shape = self.main.fiber_shape
 
         if fiber_shape == "rectangular":
-            fiber_diameter = (int(self.fiber_dimension[0]), int(self.fiber_dimension[1]))
+            fiber_diameter = (int(self.main.fiber_dimension[0]), int(self.main.fiber_dimension[1]))
         else:
-            fiber_diameter = int(self.fiber_dimension)
+            fiber_diameter = int(self.main.fiber_dimension)
 
         calibration_folder = self.calibration_folder_input.text() if analysis_type == "Throughput" else None
 
-        self.experiment_running = True
-        self.update_ui_state()
+        self.main.experiment_running = True
+        self.main_init.update_ui_state()
 
         threading.Thread(target=self.run_analysis_thread,
                          args=(analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_folder)).start()
 
     def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_folder):
-        self.progress_signal.emit("Starting analysis...")
+        self.main.progress_signal.emit("Starting analysis...")
         if analysis_type == "SG":
             directory = os.path.join(working_dir, "SG")
             import sg_pipeline
             if self.get_params_checkbox.isChecked():
                 print("Getting SG parameters with fiber diameter:", fiber_diameter, "and fiber shape:", fiber_shape)
-                sg_pipeline.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.progress_signal)
+                sg_pipeline.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.main.progress_signal)
 
             if self.plot_sg_checkbox.isChecked():
-                sg_pipeline.plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.progress_signal)
+                sg_pipeline.plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.main.progress_signal)
 
             if self.calc_sg_checkbox.isChecked():
-                sg_pipeline.calc_sg(directory, progress_signal=self.progress_signal)
+                sg_pipeline.calc_sg(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_coms_checkbox.isChecked():
-                sg_pipeline.plot_coms(directory, progress_signal=self.progress_signal)
+                sg_pipeline.plot_coms(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_masks_checkbox.isChecked():
-                sg_pipeline.plot_masks(directory, fiber_diameter, progress_signal=self.progress_signal)
+                sg_pipeline.plot_masks(directory, fiber_diameter, progress_signal=self.main.progress_signal)
 
             if self.make_video_checkbox.isChecked():
                 sg_pipeline.make_comparison_video(directory, fiber_diameter)
 
             if self.plot_com_comk_on_image_cut_checkbox.isChecked():
-                self.progress_signal.emit("Running plot_com_comk_on_image_cut...")
+                self.main.progress_signal.emit("Running plot_com_comk_on_image_cut...")
                 sg_pipeline.plot_com_comk_on_image_cut(directory)
 
             if self.sg_new_checkbox.isChecked():
-                sg_pipeline.sg_new(directory, progress_signal=self.progress_signal)
+                sg_pipeline.sg_new(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_nf_horizontal_cut_checkbox.isChecked():
                 sg_pipeline.plot_horizontal_cut_nf(directory)
@@ -145,7 +148,7 @@ class AnalyseTab:
             directory = os.path.join(working_dir, "FRD")
             import fiber_frd_measurements as frd
             if self.calc_frd_checkbox.isChecked():
-                frd.main_analyse_all_filters(directory, progress_signal=self.progress_signal)
+                frd.main_analyse_all_filters(directory, progress_signal=self.main.progress_signal)
             if self.plot_sutherland_checkbox.isChecked():
                 frd.sutherland_plot(directory)
             if self.plot_f_ratio_circles_on_raw_checkbox.isChecked():
@@ -158,9 +161,9 @@ class AnalyseTab:
             import throughput_analysis
             throughput_analysis.main(directory, calibration_folder)
 
-        self.progress_signal.emit("Analysis complete.")
-        self.experiment_running = False
-        self.update_ui_state()
+        self.main.progress_signal.emit("Analysis complete.")
+        self.main.experiment_running = False
+        self.main_init.update_ui_state()
 
     def update_analysis_tab(self):
         analysis_type = self.analysis_type_combo.currentText()
@@ -226,3 +229,4 @@ class AnalyseTab:
             self.calibration_folder_input.show()
             self.calibration_folder_button.show()
             self.plot_ff_horizontal_cut_checkbox.hide()
+

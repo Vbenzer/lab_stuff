@@ -7,6 +7,9 @@ import time
 import subprocess
 import socket
 import shutil
+
+from gui.tabs.helpers import HelperFunctions
+from gui.widgets import Widgets
 from qhycfw3_filter_wheel_control import FilterWheel
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -18,6 +21,7 @@ from PyQt6.QtGui import QRegularExpressionValidator
 
 
 from gui.main_window import MainWindowInit
+from gui.widgets import FiberDataWindow
 
 
 if sys.platform.startswith("linux"):
@@ -42,7 +46,7 @@ def save_recent_folders(recent_folders:str, file_path:str):
     with open(file_path, 'w') as file:
         json.dump(recent_folders, file)
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow, HelperFunctions, Widgets):
     progress_signal = pyqtSignal(str)
 
     def __init__(self):
@@ -78,7 +82,7 @@ class MainWindow(QMainWindow):
 
         self.main_window_init = MainWindowInit(self)
 
-
+        self.fiber_data_window = FiberDataWindow(self)
 
     def initialize_filter_wheel(self):
         import serial.tools.list_ports
@@ -87,9 +91,9 @@ class MainWindow(QMainWindow):
             self.filter_wheel_initiated = True
             self.filter_wheel = FilterWheel('COM5')
             self.filter_wheel_ready = True
-            self.update_general_tab_buttons()
+            self.main_window_init.general_tab_init.update_general_tab_buttons()
         else:
-            self.show_message("COM5 is not available.")
+            self.main_window_init.show_message("COM5 is not available.")
 
     def update_fiber_shape_inputs(self):
         fiber_shape = self.fiber_shape_combo.currentText()

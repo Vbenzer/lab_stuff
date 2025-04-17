@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
+import os
+
 from gui.tabs.helpers import HelperFunctions
 from gui.tabs.analyse_tab import AnalyseTab
 from gui.tabs.camera_tab import CameraTab
@@ -42,9 +44,10 @@ def update_recent_folders(folder:str, recent_folders:list[str], max_recent=2, ba
         recent_folders.pop()
     save_recent_folders(recent_folders, file_path=base_directory + r'\recent_folders.json')
 
-class MainWindowInit(HelperFunctions):
+class MainWindowInit(HelperFunctions, Widgets):
     def __init__(self, main_ctrl):
         self.main = main_ctrl
+        self.main_init = self  # Define reference to self as main_init
 
         self.folder_name_label = QLabel("Fiber Name:")
         self.folder_name_input = QLineEdit()
@@ -55,7 +58,7 @@ class MainWindowInit(HelperFunctions):
         self.folder_name_input.textChanged.connect(self.update_run_button_state)
 
         self.open_fiber_data_button = QPushButton("Open Fiber Data")
-        self.open_fiber_data_button.clicked.connect(self.open_fiber_data_window)
+        self.open_fiber_data_button.clicked.connect(self.main.open_fiber_data_window)
 
         self.create_datasheet_button = QPushButton("Create Datasheet")
         self.create_datasheet_button.clicked.connect(self.create_datasheet)
@@ -92,8 +95,6 @@ class MainWindowInit(HelperFunctions):
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.choose_folder_button)
         button_layout.addWidget(self.comments_button)
-        # button_layout.addWidget(self.lock_button)
-        # button_layout.addWidget(self.unlock_button)
         self.main.layout.addLayout(button_layout)
 
         self.recent_folders_label = QLabel("Recent Folders:")
@@ -118,32 +119,25 @@ class MainWindowInit(HelperFunctions):
         self.tabs.addTab(self.general_tab, "General")
         self.tabs.addTab(self.camera_tab, "Cameras")
 
-        self.measure_tab_init = MeasureTab(self)
-        self.analyse_tab_init = AnalyseTab(self)
-        self.general_tab_init = GeneralTab(self)
-        self.camera_tab_init = CameraTab(self)
+        self.measure_tab_init = MeasureTab(self.main, self.main_init)
+        self.analyse_tab_init = AnalyseTab(self.main, self.main_init)
+        self.general_tab_init = GeneralTab(self.main, self.main_init)
+        self.camera_tab_init = CameraTab(self.main, self.main_init)
 
         self.tabs.currentChanged.connect(self.update_ui_state)
         self.tabs.currentChanged.connect(self.update_run_button_state)
 
         self.main.progress_signal.connect(self.update_progress)
 
-        self.fiber_data_window = FiberDataWindow(self)
-
-    def open_fiber_data_window(self):
-        self.fiber_data_window.fiberDataChanged.connect(self.update_fiber_data)
-        self.fiber_data_window.update_window()
-        self.fiber_data_window.show()
-
     def update_ui_state(self):
-        state = self.experiment_running
+        state = self.main.experiment_running
         if state:
-            self.run_analysis_button.setDisabled(True)
-            self.run_measurement_button.setDisabled(True)
+            self.analyse_tab_init.run_analysis_button.setDisabled(True)
+            self.measure_tab_init.run_measurement_button.setDisabled(True)
             self.choose_folder_button.setDisabled(True)
         else:
-            self.run_analysis_button.setDisabled(False)
-            self.run_measurement_button.setDisabled(False)
+            self.analyse_tab_init.run_analysis_button.setDisabled(False)
+            self.measure_tab_init.run_measurement_button.setDisabled(False)
             self.choose_folder_button.setDisabled(False)
 
     def update_input_visibility(self):
@@ -167,12 +161,12 @@ class MainWindowInit(HelperFunctions):
             self.choose_folder_button.hide()
             self.folder_name_label.setText("Folder Name:")
             self.folder_name_input.setText("")
-            if hasattr(self, 'placeholder_spacer'):
-                self.main.layout.removeItem(self.placeholder_spacer)
-                del self.placeholder_spacer
-                self.insert_spacer(82)
+            if hasattr(self.main, 'placeholder_spacer'):
+                self.main.layout.removeItem(self.main.placeholder_spacer)
+                del self.main.placeholder_spacer
+                self.main.insert_spacer(82)
             else:
-                self.insert_spacer(82)
+                self.main.insert_spacer(82)
             self.general_tab_init.update_general_tab_buttons()  # Ensure buttons are correctly updated
 
         elif self.tabs.currentWidget() == self.camera_tab:
@@ -186,10 +180,10 @@ class MainWindowInit(HelperFunctions):
             self.camera_tab_init.update_camera_tab_buttons()  # Ensure buttons are correctly updated
 
         else:
-            if hasattr(self, 'placeholder_spacer'):
-                self.layout.removeItem(self.placeholder_spacer)
-                del self.placeholder_spacer
-                self.layout.update()
+            if hasattr(self.main, 'placeholder_spacer'):
+                self.main.layout.removeItem(self.main.placeholder_spacer)
+                del self.main.placeholder_spacer
+                self.main.layout.update()
 
             self.create_datasheet_button.show()
             self.folder_name_label.setText("Fiber Name:")
@@ -246,7 +240,7 @@ class MainWindowInit(HelperFunctions):
         dialog.setWindowTitle("Select Folder")
         dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
-        dialog.setDirectory(self.base_directory)
+        dialog.setDirectory(self.main.base_directory)
         if dialog.exec():
             folder = dialog.selectedFiles()[0]
         else:
@@ -256,11 +250,11 @@ class MainWindowInit(HelperFunctions):
             self.working_dir_display.setText(folder)
             self.folder_name_input.setText(os.path.basename(folder))
 
-            self.open_fiber_data_window()
-            self.fiber_data_window.load_fiber_data(folder)
+            self.main.open_fiber_data_window()
+            self.main.fiber_data_window.load_fiber_data(folder)
 
             self.update_comments_button()
-            update_recent_folders(folder, self.recent_folders, base_directory=self.base_directory)
+            update_recent_folders(folder, self.recent_folders, base_directory=self.main.base_directory)
             self.update_recent_folders_combo()
 
     def select_recent_folder(self, index):
@@ -268,8 +262,8 @@ class MainWindowInit(HelperFunctions):
             folder = self.recent_folders[index - 1]
             self.working_dir_display.setText(folder)
             self.folder_name_input.setText(os.path.basename(folder))
-            self.open_fiber_data_window()
-            self.fiber_data_window.load_fiber_data(folder)
+            self.main.open_fiber_data_window()
+            self.main.fiber_data_window.load_fiber_data(folder)
             self.update_comments_button()
 
     def update_recent_folders_combo(self):
@@ -279,7 +273,7 @@ class MainWindowInit(HelperFunctions):
         self.recent_folders_combo.setCurrentIndex(0)
 
     def show_message(self, message):
-        self.message_label.setText(message)
+        self.main.message_label.setText(message)
 
     def update_progress(self, message):
         if not self.progress_text_edit.isVisible():
@@ -298,7 +292,7 @@ class MainWindowInit(HelperFunctions):
     def update_working_dir(self):
         fiber_name = self.folder_name_input.text()
         if fiber_name:
-            working_dir = os.path.join(self.base_directory, fiber_name)
+            working_dir = os.path.join(self.main.base_directory, fiber_name)
             self.working_dir_display.setText(working_dir)
         else:
             self.working_dir_display.setText("")
@@ -313,9 +307,9 @@ class MainWindowInit(HelperFunctions):
             measurements.append("Throughput")
 
         if measurements:
-            self.existing_measurements_label.setText(f"Measurements already done: {', '.join(measurements)}")
+            self.measure_tab_init.existing_measurements_label.setText(f"Measurements already done: {', '.join(measurements)}")
         else:
-            self.existing_measurements_label.setText("No measurements done yet.")
+            self.measure_tab_init.existing_measurements_label.setText("No measurements done yet.")
 
     def create_datasheet(self):
         working_dir = self.working_dir_display.text()

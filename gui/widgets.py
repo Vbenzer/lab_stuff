@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
+import os, json
+
 class FiberDataWindow(QDialog):
     fiberDataChanged = pyqtSignal(str, object, str)  # Define a signal
 
@@ -232,7 +234,7 @@ class FiberDataWindow(QDialog):
             self.fiber_height_label.hide()
             self.fiber_height_input.hide()
 
-    @pyqtSlot()
+    @pyqtSlot(str, object, str)
     def emit_fiber_data_changed(self):
         self.fiberDataChanged.emit(
             self.fiber_name_input.text(),
@@ -240,27 +242,27 @@ class FiberDataWindow(QDialog):
             self.fiber_shape_combo.currentText()
         )
 
+class Widgets:
+    def open_fiber_data_window(self):
+        self.fiber_data_window.fiberDataChanged.connect(self.update_fiber_data)
+        self.fiber_data_window.update_window()
+        self.fiber_data_window.show()
 
-def open_fiber_data_window(self):
-    self.fiber_data_window.fiberDataChanged.connect(self.update_fiber_data)
-    self.fiber_data_window.update_window()
-    self.fiber_data_window.show()
+    @pyqtSlot(str, object, str)
+    def update_fiber_data(self, name, dimension, shape):
+        self.folder_name = name
+        self.fiber_dimension = dimension
+        self.fiber_shape = shape
 
-@pyqtSlot(str, object, str)
-def update_fiber_data(self, name, dimension, shape):
-    self.folder_name = name
-    self.fiber_dimension = dimension
-    self.fiber_shape = shape
+        self.main_window_init.folder_name_input.setText(name)
+        self.main_window_init.update_input_visibility()
+        self.main_window_init.measure_tab_init.update_measurement_button_state()
+        folder = os.path.join(self.base_directory, name)
+        self.main_window_init.check_existing_measurements(folder)
 
-    self.folder_name_input.setText(name)
-    self.update_input_visibility()
-    self.update_measurement_button_state()
-    folder = os.path.join(self.base_directory, name)
-    self.check_existing_measurements(folder)
-
-def save_fiber_data(self, folder, fiber_diameter, fiber_shape, fiber_length):
-    file_path = os.path.join(folder, "fiber_data.json")
-    with open(file_path, "w") as file:
-        # noinspection PyTypeChecker
-        json.dump({"fiber_diameter": fiber_diameter, "fiber_shape": fiber_shape,
-                   "fiber_length": fiber_length}, file)
+    def save_fiber_data(self, folder, fiber_diameter, fiber_shape, fiber_length):
+        file_path = os.path.join(folder, "fiber_data.json")
+        with open(file_path, "w") as file:
+            # noinspection PyTypeChecker
+            json.dump({"fiber_diameter": fiber_diameter, "fiber_shape": fiber_shape,
+                       "fiber_length": fiber_length}, file)

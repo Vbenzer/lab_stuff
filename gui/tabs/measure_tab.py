@@ -5,9 +5,13 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
+import threading
+
 class MeasureTab:
-    def __init__(self, main_ctrl):
+    def __init__(self, main_ctrl, main_init_ctrl):
         self.main = main_ctrl
+        self.main_init = main_init_ctrl
+
         layout = QVBoxLayout()
 
         self.measurement_type_label = QLabel("Measurement Type:")
@@ -93,13 +97,13 @@ class MeasureTab:
         self.run_measurement_button.clicked.connect(self.run_measurement)
         layout.addWidget(self.run_measurement_button)
 
-        self.main.measure_tab.setLayout(layout)
+        self.main_init.measure_tab.setLayout(layout)
 
         # Update the checklist based on the default selected measurement type
         self.update_checklist()
 
     def run_measurement(self):
-        if self.folder_name and self.fiber_shape and self.fiber_dimension == "":
+        if self.main.folder_name and self.main.fiber_shape and self.main.fiber_dimension == "":
             self.show_message("Please enter fiber data before running the measurement.")
 
         if not (self.check1.isChecked() and self.check2.isChecked() and self.check3.isChecked()
@@ -108,25 +112,25 @@ class MeasureTab:
             self.show_message("Please complete all checklist items before running the measurement.")
             return
 
-        fiber_name = self.folder_name
-        fiber_shape = self.fiber_shape
+        fiber_name = self.main.folder_name
+        fiber_shape = self.main.fiber_shape
 
         if fiber_shape == "rectangular":
-            fiber_diameter = (int(self.fiber_dimension[0]), int(self.fiber_dimension[1]))
+            fiber_diameter = (int(self.main.fiber_dimension[0]), int(self.main.fiber_dimension[1]))
         else:
-            fiber_diameter = int(self.fiber_dimension)
+            fiber_diameter = int(self.main.fiber_dimension)
 
         measurement_type = self.measurement_type_combo.currentText()
-        working_dir = self.working_dir_display.text()
+        working_dir = self.main_init.working_dir_display.text()
 
-        self.experiment_running = True
-        self.update_ui_state()
+        self.main.experiment_running = True
+        self.main_init.update_ui_state()
 
         threading.Thread(target=self.run_measurement_thread, args=(measurement_type, working_dir, fiber_diameter,
                                                                    fiber_shape)).start()
 
     def run_measurement_thread(self, measurement_type, working_dir, fiber_diameter, fiber_shape):
-        self.progress_signal.emit("Starting measurement...")
+        self.main.progress_signal.emit("Starting measurement...")
         # Call the appropriate measurement function
         if measurement_type == "SG":
             working_dir = os.path.join(working_dir, "SG")
@@ -138,10 +142,9 @@ class MeasureTab:
             working_dir = os.path.join(working_dir, "Throughput")
             self.measure_throughput(working_dir, fiber_diameter, fiber_shape)
 
-
-        self.progress_signal.emit("Measurement complete.")
-        self.experiment_running = False
-        self.update_ui_state()
+        self.main.progress_signal.emit("Measurement complete.")
+        self.main.experiment_running = False
+        self.main_init.update_ui_state()
 
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
@@ -150,7 +153,7 @@ class MeasureTab:
         exposure_time_entrance = self.exposure_time_input_mt_entrance.text()
         exp_times = {"exit": exposure_time_exit, "entrance": exposure_time_entrance}
 
-        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.progress_signal, exposure_times=exp_times)
+        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.main.progress_signal, exposure_times=exp_times)
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
         import analyse_main as am
@@ -159,20 +162,15 @@ class MeasureTab:
         self.show_message(f"Running FRD measurement with working dir: {working_dir}")
 
         exposure_time = qhy.convert_to_us(self.exposure_time_input_mt.text())
-        am.main_measure_new(working_dir, progress_signal=self.progress_signal, exp_time=exposure_time)
-
-
-        # Old FRD measurement
-        # import fiber_frd_measurements
-        #fiber_frd_measurements.main_measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
+        am.main_measure_new(working_dir, progress_signal=self.main.progress_signal, exp_time=exposure_time)
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running Throughput measurement with working dir: {working_dir}")
         import throughput_analysis
-        throughput_analysis.measure_all_filters(working_dir, progress_signal=self.progress_signal, base_directory=self.base_directory)
+        throughput_analysis.measure_all_filters(working_dir, progress_signal=self.main.progress_signal, base_directory=self.main.base_directory)
 
     def update_measurement_button_state(self):
-        if (self.main.folder_name and self.fiber_dimension and self.fiber_shape != ""
+        if (self.main.folder_name and self.main.fiber_dimension and self.main.fiber_shape != ""
                 and self.check1.isChecked()
                 and self.check2.isChecked() and self.check3.isChecked()
                 and self.check4.isChecked() and self.check5.isChecked()
@@ -241,4 +239,3 @@ class MeasureTab:
             self.exposure_time_input_mt_entrance.hide()
 
         self.update_measurement_button_state()
-

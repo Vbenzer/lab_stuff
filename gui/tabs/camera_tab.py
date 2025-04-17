@@ -5,10 +5,15 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
-class CameraTab:
-    def __init__(self, main_ctrl):
-        self.main = main_ctrl
-        self.main.update_input_visibility()
+from gui.tabs.helpers import HelperFunctions
+
+import threading
+
+class CameraTab(HelperFunctions):
+    def __init__(self, main, main_init):
+        self.main = main
+        self.main_init = main_init
+        self.main_init.update_input_visibility()
 
         layout = QVBoxLayout()
 
@@ -49,11 +54,11 @@ class CameraTab:
         self.run_button_ct.clicked.connect(self.run_camera_function)
         layout.addWidget(self.run_button_ct)
 
-        self.main.camera_tab.setLayout(layout)
+        self.main_init.camera_tab.setLayout(layout)
 
     def run_camera_function(self):
         selected_function = self.camera_function_combo.currentText()
-        folder_name = self.folder_name_input.text()
+        folder_name = self.main.folder_name
 
         if selected_function in ["Thorlabs Camera", "Qhyccd Camera"] and folder_name != "":
             self.show_message("Please enter folder name before running the function.")
@@ -62,18 +67,17 @@ class CameraTab:
         if not self.exposure_time_input.hasAcceptableInput():
             return
 
-        self.experiment_running = True
-        self.update_ui_state()
+        self.main.experiment_running = True
+        self.main_init.update_ui_state()
 
-        working_dir = self.working_dir_display.text()
+        working_dir = self.main_init.working_dir_display.text()
 
-        # Create folder if it doesnt exits
         os.makedirs(working_dir, exist_ok=True)
 
         threading.Thread(target=self.run_camera_function_thread, args=(selected_function, working_dir)).start()
 
     def run_camera_function_thread(self, selected_function, working_dir):
-        self.progress_signal.emit(f"Running {selected_function}...")
+        self.main.progress_signal.emit(f"Running {selected_function}...")
         if selected_function == "Thorlabs Camera Live":
             import thorlabs_cam_control
             thorlabs_cam_control.open_thorcam()
@@ -100,57 +104,57 @@ class CameraTab:
             self.qhyccd_cam.take_single_frame(working_dir, image_name, show=True)
             self.qhyccd_cam.close()
 
-        self.progress_signal.emit(f"{selected_function} complete.")
-        self.experiment_running = False
-        self.update_ui_state()
+        self.main.progress_signal.emit(f"{selected_function} complete.")
+        self.main.experiment_running = False
+        self.main_init.update_ui_state()
 
     def update_camera_tab_buttons(self):
-        if self.tabs.currentWidget() != self.camera_tab:
+        if self.main_init.tabs.currentWidget() != self.main_init.camera_tab:
             return
 
-        self.update_run_button_state()
+        self.main_init.update_run_button_state()
 
         selected_function = self.camera_function_combo.currentText()
 
         if selected_function == "Thorlabs Camera Live":
-            self.folder_name_input.hide()
-            self.folder_name_label.hide()
-            self.choose_folder_button.hide()
-            self.recent_folders_combo.hide()
-            self.recent_folders_label.hide()
-            self.working_dir_label.hide()
-            self.working_dir_display.hide()
-            self.comments_button.hide()
+            self.main_init.folder_name_input.hide()
+            self.main_init.folder_name_label.hide()
+            self.main_init.choose_folder_button.hide()
+            self.main_init.recent_folders_combo.hide()
+            self.main_init.recent_folders_label.hide()
+            self.main_init.working_dir_label.hide()
+            self.main_init.working_dir_display.hide()
+            self.main_init.comments_button.hide()
             self.exposure_time_label.hide()
             self.exposure_time_input.hide()
             self.run_button_ct.setDisabled(False)
 
-            if hasattr(self, 'placeholder_spacer'):
-                self.layout.removeItem(self.placeholder_spacer)
-                del self.placeholder_spacer
-                self.insert_spacer(162)
+            if hasattr(self.main, 'placeholder_spacer'):
+                self.main.layout.removeItem(self.main.placeholder_spacer)
+                del self.main.placeholder_spacer
+                self.main.insert_spacer(162)
             else:
-                self.insert_spacer(162)
+                self.main.insert_spacer(162)
 
         else:
-            if hasattr(self, 'placeholder_spacer'):
-                self.layout.removeItem(self.placeholder_spacer)
-                del self.placeholder_spacer
-                self.insert_spacer(30)
+            if hasattr(self.main, 'placeholder_spacer'):
+                self.main.layout.removeItem(self.main.placeholder_spacer)
+                del self.main.placeholder_spacer
+                self.main.insert_spacer(30)
             else:
-                self.insert_spacer(30)
+                self.main.insert_spacer(30)
 
-            self.folder_name_input.show()
-            self.folder_name_label.show()
-            self.choose_folder_button.show()
-            self.recent_folders_combo.show()
-            self.recent_folders_label.show()
-            self.working_dir_label.show()
-            self.working_dir_display.show()
-            self.comments_button.show()
+            self.main_init.folder_name_input.show()
+            self.main_init.folder_name_label.show()
+            self.main_init.choose_folder_button.show()
+            self.main_init.recent_folders_combo.show()
+            self.main_init.recent_folders_label.show()
+            self.main_init.working_dir_label.show()
+            self.main_init.working_dir_display.show()
+            self.main_init.comments_button.show()
             self.exposure_time_label.show()
             self.exposure_time_input.show()
-            self.run_button_ct.setDisabled(self.folder_name_input.text() == "")
+            self.run_button_ct.setDisabled(self.main_init.folder_name_input.text() == "")
 
         if selected_function == "Thorlabs Camera Single":
             self.camera_chooser_label.show()
@@ -158,3 +162,4 @@ class CameraTab:
         else:
             self.camera_chooser_label.hide()
             self.camera_chooser_combo.hide()
+
