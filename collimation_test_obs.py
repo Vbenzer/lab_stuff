@@ -1,7 +1,7 @@
-import image_analysation
-import image_reduction
-import find_f_number
-import file_mover
+import core.data_processing
+import image_analysation_obs
+import image_reduction_obs
+import find_f_number_obs
 from astropy.io import fits
 import os
 import numpy as np
@@ -20,7 +20,7 @@ def main(project_folder:str): # Obsolete
 
 
 
-    m_dark = image_reduction.create_master_dark(dark_folder, plot=False)
+    m_dark = core.data_processing.create_master_dark(dark_folder, plot=False)
 
     reduced_data = []
     for file_name in os.listdir(light_folder):
@@ -31,7 +31,7 @@ def main(project_folder:str): # Obsolete
 
             os.makedirs(reduce_images_folder, exist_ok=True)
             output_file = os.path.join(reduce_images_folder, file_name+"_reduced.fits")
-            red_file = image_reduction.reduce_image_with_dark(light_frame, m_dark, output_file, save=True)
+            red_file = core.data_processing.reduce_image_with_dark(light_frame, m_dark, output_file, save=True)
             reduced_data.append(red_file)
 
 
@@ -44,14 +44,14 @@ def main(project_folder:str): # Obsolete
 
     for n,red in enumerate(reduced_data):
         # Trim data to area of interest (perhaps not necessary with better background reduction)
-        trimmed_data = image_analysation.cut_image(red, margin=500)  # Margin at 500 good for now
+        trimmed_data = core.data_processing.cut_image(red, margin=500)  # Margin at 500 good for now
 
         # Locate center of mass within trimmed image (array)
-        com = image_analysation.LocateFocus(trimmed_data)
+        com = core.data_processing.locate_focus(trimmed_data)
 
         # Find aperture with 95% (or other) encircled energy
         os.makedirs(measurements_folder+f"/Radius", exist_ok=True)
-        radius = image_analysation.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=False, save_file=measurements_folder+f"/Radius/datapoint{n}")
+        radius = core.data_processing.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=False, save_file=measurements_folder + f"/Radius/datapoint{n}")
         radii.append(radius)
 
     radius=radii[0]*7.52e-3

@@ -5,6 +5,9 @@ from ctypes import *
 from enum import Enum
 
 import warnings
+
+import core.data_processing
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 qhyccddll = cdll.LoadLibrary('.\\qhyccd.dll')
@@ -349,8 +352,8 @@ def measure_eccentricity(measure:bool=True, stop_signal:bool=False):
                 fits.writeto("D:/Vincent/eccentricity/image.fits", img, overwrite=True)
 
             #measurements_folder = "D:/Vincent/eccentricity/"
-            import image_analysation as ia
-            ecc = ia.measure_eccentricity(img, plot=False)
+            import image_analysation_obs as ia
+            ecc = core.data_processing.measure_eccentricity(img, plot=False)
 
             print(f"Eccentricity: {ecc}")
 

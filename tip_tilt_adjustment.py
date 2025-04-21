@@ -1,11 +1,12 @@
-import image_analysation as ia
+import core.data_processing
+import core.file_management
+import image_analysation_obs as ia
 import os
 from skimage import io
 import json
 import matplotlib.pyplot as plt
 from astropy.io import fits
 import numpy as np
-import file_mover
 
 """# Plot image
 plt.imshow(image)
@@ -21,10 +22,10 @@ def analyse_f_number(image:np.ndarray, measurements_folder:str):
 
     """
     # Calculate radius
-    trimmed_data = ia.cut_image(image, margin=500)  # Margin at 500 good for now
+    trimmed_data = core.data_processing.cut_image(image, margin=500)  # Margin at 500 good for now
 
     # Locate center of mass within trimmed image (array)
-    com = ia.LocateFocus(trimmed_data)
+    com = core.data_processing.locate_focus(trimmed_data)
 
     # Swap x and y
     com = (com[1], com[0])
@@ -33,7 +34,7 @@ def analyse_f_number(image:np.ndarray, measurements_folder:str):
 
     # Find aperture with encircled energy
     os.makedirs(measurements_folder, exist_ok=True)
-    radius = ia.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=True, save_data=False)
+    radius = core.data_processing.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=True, save_data=False)
 
     print(f"Radius: {radius}")
 
@@ -95,5 +96,5 @@ if __name__ == "__main__":
     analyse_f_number(image, measurements_folder)
 
     # Clear Nina folder
-    file_mover.clear_folder(nina_output)
+    core.file_management.clear_folder(nina_output)
 

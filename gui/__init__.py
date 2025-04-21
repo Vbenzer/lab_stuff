@@ -1,24 +1,16 @@
 #!/usr/bin/env python3
 import sys
-import os
 import json
 import threading
-import time
-import subprocess
 import socket
-import shutil
 
 from gui.tabs.helpers import HelperFunctions
 from gui.widgets import Widgets
-from qhycfw3_filter_wheel_control import FilterWheel
+from core.hardware.filter_wheel_fratio import FilterWheel
 
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
-                             QSizePolicy, QDialog, QVBoxLayout, QMessageBox
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QFileDialog, QVBoxLayout
                              )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
-from PyQt6.QtGui import QRegularExpressionValidator
-
+from PyQt6.QtCore import pyqtSignal
 
 from gui.main_window import MainWindowInit
 from gui.widgets import FiberDataWindow

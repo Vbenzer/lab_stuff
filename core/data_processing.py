@@ -1,8 +1,14 @@
-import numpy as np
-from astropy.io import fits
-import os
-import matplotlib.pyplot as plt
 import json
+import os
+
+import cv2
+import numpy as np
+from PIL import Image
+from astropy.io import fits
+from matplotlib import pyplot as plt
+from skimage import measure
+from skimage.filters import threshold_otsu
+
 
 def fits_to_arr(filename: str) -> np.ndarray:
     """
@@ -18,22 +24,25 @@ def fits_to_arr(filename: str) -> np.ndarray:
         data = hdul[0].data
     return data
 
-def LocateFocus(array, **kwargs):
-    '''
-    Locating the input focus point on the fiber cross-section.
-    Methodology is to locate the brightest spot in the image and
-    perform a circle fitting.
 
-    Parameters:
-    [array]     input numpy.array for the image\n
-    kwargs:\n
-    [threshold] manual input of the threshold
+def locate_focus(array, **kwargs):
+    """
+    Locates the input focus point on the fiber cross-section by identifying the
+    brightest spot in the image and performing circle fitting.
+
+    Args:
+        array (numpy.ndarray): Input image as a NumPy array.
+        **kwargs:
+            threshold (float, optional): Manually specified threshold for detection.
 
     Returns:
-    [location_y]    y coordinate for the contour of the focus point\n
-    [location_x]    x coordinate for the contour of the focus point\n
-    [radius]        radius of the focus point
-    '''
+        tuple:
+            location_y (int): Y-coordinate of the focus point's contour.
+            location_x (int): X-coordinate of the focus point's contour.
+            radius (float): Radius of the detected focus point.
+    """
+
+
     from skimage.morphology import convex_hull_image, disk
     from skimage.filters import threshold_otsu
     from skimage.feature import canny
@@ -59,21 +68,22 @@ def LocateFocus(array, **kwargs):
     return com
 
 
-def FitCircular(binary, **kwargs):
-    '''
-    Fitting the shape of circular fiber with hough transform.
+def fit_circular(binary, **kwargs):
+    """
+    Fits the shape of a circular fiber using the Hough Transform.
 
-    Parameters:
-    -----------
-    [binary]                 binary aoi array \n
-    [radi_modification]      modify radii for the fitted circular area\n
-    [full_out]\t             whether to output the detailed information\n
-    [rmin,rmax]\t            min and max of fitted radius
+    Args:
+        binary (numpy.ndarray): Binary area of interest (AOI) array.
+        **kwargs:
+            radi_modification (float, optional): Value to adjust the fitted radius.
+            full_out (bool, optional): Whether to return detailed output information.
+            rmin (int, optional): Minimum radius to consider during fitting.
+            rmax (int, optional): Maximum radius to consider during fitting.
 
     Returns:
-    -----------
-    [fitted]    fitted circular binary array used as aoi
-    '''
+        numpy.ndarray: Fitted circular binary array used as AOI.
+    """
+
     from skimage.feature import canny
     from skimage.transform import hough_circle
     from skimage.draw import disk
@@ -98,16 +108,21 @@ def FitCircular(binary, **kwargs):
     else:
         return aoi
 
-def Area_of_Interest(array, **kwargs):
-    '''
-    Finding the area of interest for input array with threshold and convex hull method
 
-    Parameters:
-    [array]     input numpy.array
+def area_of_interest(array, **kwargs):
+    """
+    Finds the area of interest (AOI) in the input array using thresholding and a convex hull method.
+
+    Args:
+        array (numpy.ndarray): Input array to analyze.
+        **kwargs:
+            threshold (float, optional): Custom threshold value. If not provided, Otsu's method is used.
+            filtering (bool, optional): Whether to apply median filtering before the convex hull. Defaults to True.
 
     Returns:
-    [aoi]       boolean array indicating the area of interest
-    '''
+        numpy.ndarray: Boolean array indicating the area of interest.
+    """
+
     from skimage.filters import threshold_otsu
     from skimage.filters import median
     from skimage.morphology import convex_hull_image, disk
@@ -122,6 +137,7 @@ def Area_of_Interest(array, **kwargs):
     aoi = convex_hull_image(filter)
 
     return aoi
+
 
 def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float=0.98, plot:bool=False, save_data:bool=True, save_file:str=None):
     """
@@ -239,20 +255,19 @@ def trimming(array, yrange, xrange, margin=0, square=False):
 
 def cut_image(array, margin=20, **kwargs):
     """
-    Finding the index range of the area of interest to narrow down the image.
+    Finds the index range of the area of interest (AOI) and trims the image accordingly.
 
-    Parameters:
-    ------------
-    [array]         input numpy.array to be trimmed\n
-    [margin]        margin for the range to be trimmed\n
-    [aoi (opt)]     manually given area of interest as boolean array\n
+    Args:
+        array (numpy.ndarray): Input array to be trimmed.
+        margin (int, optional): Margin to include around the trimmed region. Defaults to 20.
+        **kwargs:
+            aoi (numpy.ndarray, optional): Manually provided boolean AOI array. If not given, it will be computed automatically.
 
     Returns:
-    ------------
-    [out_array]  Trimmed image
+        numpy.ndarray: Trimmed image array.
     """
     aoi = kwargs.get("aoi", None)
-    if aoi is None: aoi = Area_of_Interest(array)
+    if aoi is None: aoi = area_of_interest(array)
     y_range, x_range = narrow_index(aoi)
     out_array = trimming(array, y_range, x_range, margin)
 
@@ -261,14 +276,15 @@ def cut_image(array, margin=20, **kwargs):
 
 def narrow_index(binary: np.ndarray[bool]) -> tuple[list[int], list[int]]:
     """
-    Finding the index range of the interested area to narrow down the image.
+    Finds the index range of the area of interest to narrow down the image.
 
-    Parameters:
-    [binary]     input numpy.array for the interested area (binary needed) (boolean array)
+    Args:
+        binary (numpy.ndarray): Boolean array representing the area of interest.
 
     Returns:
-    [y_range]    y coordinate range
-    [x_range]    x coordinate range
+        tuple:
+            y_range (list[int]): Start and end indices in the vertical (Y) direction.
+            x_range (list[int]): Start and end indices in the horizontal (X) direction.
     """
     from skimage.feature import canny
 
@@ -297,7 +313,7 @@ def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder
         trimmed_data = cut_image(red, margin=500)  # Margin at 500 good for now
 
         # Locate center of mass within trimmed image (array)
-        com = LocateFocus(trimmed_data)
+        com = locate_focus(trimmed_data)
 
         # Find aperture with encircled energy
         os.makedirs(measurements_folder + f"/Radius", exist_ok=True)
@@ -306,7 +322,17 @@ def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder
         radii.append(radius)
     return radii
 
-def measure_eccentricity(data, plot: bool = False):
+
+def measure_eccentricity(data:np.ndarray, plot: bool = False):
+    """
+    Measure the eccentricity of a fiber in an image.
+    Args:
+        data: Numpy array of the image data
+        plot: Boolean to plot the image and the labeled regions
+
+    Returns: Eccentricity of the fiber, if only one region is found.
+
+    """
     from skimage.filters import threshold_otsu
     from skimage.feature import canny
     from skimage import io, measure, color
@@ -361,10 +387,17 @@ def measure_eccentricity(data, plot: bool = False):
         return None
 
 
-import cv2
-from skimage.filters import threshold_otsu
-from skimage import measure
-def measure_fiber_dimensions(data, px_to_mu=0.439453125, plot=False):
+def measure_fiber_dimensions(data:np.ndarray, px_to_mu=0.439453125, plot=False):
+    """
+    Measure the dimensions of a fiber in an image.
+    Args:
+        data: Numpy array of the image data
+        px_to_mu: Pixels to microns conversion factor
+        plot: Boolean to plot the image and the labeled regions
+
+    Returns: The dimensions of the fiber in microns, if only one region is found.
+
+    """
     # Step 1: Trim and threshold image
     trimmed_data = cut_image(data, margin=500)
     threshold = threshold_otsu(trimmed_data)
@@ -452,16 +485,247 @@ def measure_fiber_dimensions(data, px_to_mu=0.439453125, plot=False):
 
     return results if results else None
 
-# Usage
-if __name__ == "__main__":
-    #Path of fits file to analyse
-    #fits_file = 'D:/Vincent/OptranWF_100_187_P_measurement_3/FRD/filter_2/LIGHT/LIGHT_0012_0.08s.fits'
-    fits_file = '/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/eccentricity/circ100_test.fits'
 
-    #Turn data to numpy array
-    data = fits_to_arr(fits_file)
+def create_master_dark(dark_folder:str, img_path:str=None, plot:bool=False, save:bool=False) -> np.ndarray:
+    """
+    Create a master dark frame by averaging all dark frames in the folder.
 
-    datas = measure_fiber_dimensions(data, plot=True)
-    print(datas)
+    Parameters:
+        dark_folder (str): Path to the folder containing dark frames.
+        img_path (str): Path to save the plot.
+        plot (bool, optional): If True, plot the master dark frame.
+        save (bool, optional): If True, save the master dark frame as a FITS file.
+
+    Returns:
+        np.ndarray: The master dark frame.
+    """
+    dark_data = []  # Initialize list to store all dark frame data
+
+    # Iterate over all FITS files in the folder
+    for file_name in os.listdir(dark_folder):
+        if file_name.endswith(".fits"):  # Only process FITS files
+            file_path = os.path.join(dark_folder, file_name)
+            with fits.open(file_path) as hdul:
+                dark_frame = hdul[0].data.astype(np.float32)  # Convert to float for precision
+                dark_data.append(dark_frame)  # Append to the list
+        if file_name.endswith(".png"):
+            file_path = os.path.join(dark_folder, file_name)
+            dark_frame = plt.imread(file_path)
+            dark_data.append(dark_frame)
+
+    # Calculate the master dark frame as the mean of all dark frames
+    master_dark = np.mean(dark_data, axis=0)
+    if save or plot:
+        plt.figure()
+        plt.imshow(master_dark, cmap='gray', origin='lower')
+        if save:
+            if img_path is None:
+                raise ValueError("'img_path' must be provided if 'save' is True")
+            plt.savefig(img_path)
+        if plot:
+            plt.show()
 
 
+    return master_dark
+
+
+def reduce_image_with_dark(science_data:np.ndarray, dark_data:np.ndarray, output_file:str, save:bool=False,
+                           plot:bool=False, save_plot:bool=False, img_path:str=None) -> np.ndarray:
+    """
+    Reduces a science image by subtracting a dark frame.
+
+    Parameters:
+        science_data (np.ndarray): Science image data.
+        dark_data (np.ndarray): Dark image data.
+        output_file (str): Path to save the reduced FITS file.
+        save (bool): Save reduce image to file?
+        plot (bool, optional): If True, plot the reduced image.
+        save_plot: Save plot as image if True.
+        img_path: Required if save_plot is set to True. Path to save plot to.
+
+    Returns:
+          np.ndarray: The reduced image data.
+    """
+
+    # Ensure data are of the same shape
+    if science_data.shape != dark_data.shape:
+        raise ValueError("Science image and dark frame must have the same dimensions.")
+
+    # Subtract the dark frame from the science image
+    reduced_data = science_data - dark_data
+
+    # Clip negative values to zero (or other minimum threshold, if applicable)
+    #reduced_data = np.clip(reduced_data, 0, None) #TODO: Why was this here?
+
+    if save:
+        # Check if the output file is .fits or .png
+        if output_file.endswith(".fits"):
+            # Save the reduced image to a new FITS file
+            hdu = fits.PrimaryHDU(data=reduced_data)
+            hdu.writeto(output_file, overwrite=True)
+            print(f"Reduced image saved to: {output_file}")
+
+        elif output_file.endswith(".png"):
+            # Save the reduced image to a new PNG file
+            cv2.imwrite(output_file, reduced_data)
+            print(f"Reduced image saved to: {output_file}")
+
+        else:
+            raise ValueError("Output file must be a .fits or .png file.")
+
+    if plot or save_plot:
+        # Plotting
+        plt.figure(figsize=(12, 4))
+        plt.subplot(1, 3, 1)
+        plt.title("Science Image")
+        plt.imshow(science_data, cmap='gray', origin='lower')
+        plt.colorbar()
+
+        plt.subplot(1, 3, 2)
+        plt.title("Dark Frame")
+        plt.imshow(dark_data, cmap='gray', origin='lower')
+        plt.colorbar()
+
+        plt.subplot(1, 3, 3)
+        plt.title("Reduced Image")
+        plt.imshow(reduced_data, cmap='gray', origin='lower')
+        plt.colorbar()
+
+        plt.tight_layout()
+        if plot:
+            plt.show()
+        if save_plot:
+            if img_path is None:
+                raise ValueError("'img_path' must be provided if 'save' is True")
+            plt.savefig(img_path)
+        plt.close()
+
+    return reduced_data
+
+
+def plot_images(science_file, dark_file, reduced_file):
+    """
+    Plots the science, reduced and dark image.
+    Args:
+        science_file: Path of the science image FITS file.
+        dark_file: Path of the dark frame FITS file.
+        reduced_file: Path of the reduced FITS file.
+
+    Returns: Plots
+
+    """
+    #Load images
+    with fits.open(science_file) as hdul:
+        science_data = hdul[0].data.astype(np.float32)
+
+    with fits.open(dark_file) as hdul:
+        dark_data = hdul[0].data.astype(np.float32)
+
+    with fits.open(reduced_file) as hdul:
+        reduced_data = hdul[0].data.astype(np.float32)
+
+    # Plotting
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 3, 1)
+    plt.title("Science Image")
+    plt.imshow(science_data, cmap='gray', origin='lower')
+    plt.colorbar()
+
+    plt.subplot(1, 3, 2)
+    plt.title("Dark Frame")
+    plt.imshow(dark_data, cmap='gray', origin='lower')
+    plt.colorbar()
+
+    plt.subplot(1, 3, 3)
+    plt.title("Reduced Image")
+    plt.imshow(reduced_data, cmap='gray', origin='lower')
+    plt.colorbar()
+
+    plt.tight_layout()
+    plt.show()
+
+
+def png_to_numpy(image_path):
+    """
+    Reads a PNG image and converts it to a NumPy array.
+
+    Parameters:
+        image_path (str): Path to the PNG image.
+
+    Returns:
+        np.ndarray: The image as a NumPy array.
+    """
+    with Image.open(image_path) as img:
+        return np.array(img)
+
+
+def image_to_fits(image_path:str):
+    """
+    Converts an image array to a FITS file. Saves the image with the same name.
+
+    Parameters:
+        image_path: The path to the image file.
+    """
+    # Convert the image to a NumPy array
+    image_array = png_to_numpy(image_path)
+
+    # Create a PrimaryHDU object from the image array
+    hdu = fits.PrimaryHDU(image_array)
+
+    # Create an HDUList to contain the HDU
+    hdul = fits.HDUList([hdu])
+
+    fits_path = image_path.replace('.png', '.fits')
+
+    # Write the HDUList to a FITS file
+    hdul.writeto(fits_path, overwrite=True)
+
+
+def com_of_spot(image:np.ndarray, threshold=None, plot:bool=False):
+    """
+    Calculate the center of mass of a spot in the given image.
+    Args:
+        image: The input image as a NumPy array.
+        threshold: Threshold for the spot detection.
+        plot: If True, plot the image with the center of mass marked.
+
+    Returns:
+        com (tuple): The (y, x) coordinates of the center of mass.
+    """
+    # Get Area of Interest
+    aoi = core.data_processing.area_of_interest(image, threshold=threshold)
+
+    # Get the range of the AOI
+    y_range, x_range = core.data_processing.narrow_index(aoi)
+
+    # Cut the image to the AOI
+    cut_image = core.data_processing.cut_image(image, aoi=aoi, margin=10)
+
+    # Get the center of mass of the cut image
+    com = core.data_processing.locate_focus(cut_image)
+
+    dim = cut_image.shape
+    size = [dim[1] / 100, dim[0] / 100]
+
+
+    if plot:
+        # noinspection PyTypeChecker
+        plt.figure(figsize=size)
+        plt.imshow(cut_image, cmap='gray', origin='lower')
+        plt.scatter(com[1], com[0], color='red', s=0.1, marker='.')  # Mark the COM with a red 'x'
+        plt.title('Cut Image with Center of Mass')
+        plt.axis('off')
+        plt.show()
+
+    # Adjust the center of mass to the original image, also adjust for the margin
+    com = [com[0] + y_range[0] - 10, com[1] + x_range[0] - 10]
+
+    if plot:
+        plt.figure(figsize=(12.80, 10.24))
+        plt.imshow(image, cmap='gray', origin='lower')
+        plt.scatter(com[1], com[0], color='red', s=0.5, marker='.')  # Mark the COM with a red 'x'
+        plt.title('Original Image with Center of Mass')
+        plt.axis('off')
+        plt.show()
+
+    return com

@@ -25,7 +25,7 @@ def measure_single_filter(main_folder, filter_name, number_of_measurements):
         number_of_measurements: Number of data points to take.
     """
 
-    import power_meter_control as pmc
+    from core.hardware import power_meter_control as pmc
     # Make the measurement
     pmc.make_measurement(main_folder, number_of_measurements, filter_name + ".json")
 
@@ -40,7 +40,6 @@ def measure_all_filters(main_folder, number_of_measurements=100, progress_signal
         base_directory: Base directory of the project.
     """
     import datetime
-    import move_to_filter
 
     if calibration:
         date = datetime.datetime.now().strftime("%Y-%m-%d")

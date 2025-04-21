@@ -7,6 +7,10 @@ from PyQt6.QtGui import QRegularExpressionValidator
 
 import threading
 
+import analysis.frd_analysis
+import analysis.sg_analysis
+
+
 class MeasureTab:
     def __init__(self, main_ctrl, main_init_ctrl):
         self.main = main_ctrl
@@ -148,21 +152,21 @@ class MeasureTab:
 
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
-        import sg_pipeline
+        import unused_sg_functions
         exposure_time_exit = self.exposure_time_input_mt_exit.text()
         exposure_time_entrance = self.exposure_time_input_mt_entrance.text()
         exp_times = {"exit": exposure_time_exit, "entrance": exposure_time_entrance}
 
-        sg_pipeline.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.main.progress_signal, exposure_times=exp_times)
+        analysis.sg_analysis.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.main.progress_signal, exposure_times=exp_times)
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
-        import analyse_main as am
+        import analyse_main_obs as am
         import qhy_ccd_take_image as qhy
 
         self.show_message(f"Running FRD measurement with working dir: {working_dir}")
 
         exposure_time = qhy.convert_to_us(self.exposure_time_input_mt.text())
-        am.main_measure_new(working_dir, progress_signal=self.main.progress_signal, exp_time=exposure_time)
+        analysis.frd_analysis.main_measure_frd(working_dir, progress_signal=self.main.progress_signal, exp_time=exposure_time)
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running Throughput measurement with working dir: {working_dir}")

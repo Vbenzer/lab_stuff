@@ -7,6 +7,11 @@ from PyQt6.QtGui import QRegularExpressionValidator
 
 import threading, os, json
 
+import analysis.frd_analysis
+import analysis.sg_analysis
+import analysis.visualization
+
+
 class AnalyseTab:
     def __init__(self, main, main_init):
         self.main = main
@@ -114,10 +119,10 @@ class AnalyseTab:
         self.main.progress_signal.emit("Starting analysis...")
         if analysis_type == "SG":
             directory = os.path.join(working_dir, "SG")
-            import sg_pipeline
+            import unused_sg_functions
             if self.get_params_checkbox.isChecked():
                 print("Getting SG parameters with fiber diameter:", fiber_diameter, "and fiber shape:", fiber_shape)
-                sg_pipeline.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.main.progress_signal)
+                analysis.sg_analysis.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.main.progress_signal)
 
             if self.plot_sg_checkbox.isChecked():
                 sg_pipeline.plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.main.progress_signal)
@@ -126,35 +131,35 @@ class AnalyseTab:
                 sg_pipeline.calc_sg(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_coms_checkbox.isChecked():
-                sg_pipeline.plot_coms(directory, progress_signal=self.main.progress_signal)
+                analysis.visualization.plot_coms(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_masks_checkbox.isChecked():
-                sg_pipeline.plot_masks(directory, fiber_diameter, progress_signal=self.main.progress_signal)
+                analysis.visualization.plot_masks(directory, fiber_diameter, progress_signal=self.main.progress_signal)
 
             if self.make_video_checkbox.isChecked():
-                sg_pipeline.make_comparison_video(directory, fiber_diameter)
+                analysis.visualization.make_comparison_video(directory, fiber_diameter)
 
             if self.plot_com_comk_on_image_cut_checkbox.isChecked():
                 self.main.progress_signal.emit("Running plot_com_comk_on_image_cut...")
-                sg_pipeline.plot_com_comk_on_image_cut(directory)
+                analysis.visualization.plot_com_comk_on_image_cut(directory)
 
             if self.sg_new_checkbox.isChecked():
-                sg_pipeline.sg_new(directory, progress_signal=self.main.progress_signal)
+                analysis.sg_analysis.sg_new(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_nf_horizontal_cut_checkbox.isChecked():
-                sg_pipeline.plot_horizontal_cut_nf(directory)
+                analysis.visualization.plot_horizontal_cut_nf(directory)
 
         elif analysis_type == "FRD":
             directory = os.path.join(working_dir, "FRD")
-            import fiber_frd_measurements as frd
+            import fiber_frd_measurements_obs as frd
             if self.calc_frd_checkbox.isChecked():
-                frd.main_analyse_all_filters(directory, progress_signal=self.main.progress_signal)
+                analysis.frd_analysis.main_analyse_all_filters(directory, progress_signal=self.main.progress_signal)
             if self.plot_sutherland_checkbox.isChecked():
-                frd.sutherland_plot(directory)
+                analysis.visualization.sutherland_plot(directory)
             if self.plot_f_ratio_circles_on_raw_checkbox.isChecked():
-                frd.plot_f_ratio_circles_on_raw(directory)
+                analysis.visualization.plot_f_ratio_circles_on_raw(directory)
             if self.plot_nf_horizontal_cut_checkbox.isChecked():
-                frd.plot_horizontal_cut_ff(directory)
+                analysis.visualization.plot_horizontal_cut_ff(directory)
 
         elif analysis_type == "Throughput":
             directory = os.path.join(working_dir, "Throughput")

@@ -54,7 +54,7 @@ def open_thorcam():
     Returns:
 
     """
-    from analyse_main import run_batch_file
+    from core.file_management import run_batch_file
 
     run_batch_file("D:\stepper_motor\open_thorcam.bat")
 

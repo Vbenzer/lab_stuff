@@ -1,5 +1,66 @@
 import os
 import shutil
+import subprocess
+import time
+import h5py
+import numpy as np
+
+
+def write_progress(step:str):
+    """
+    Writes the progress of the experiment to a file to be read by the GUI.
+    Args:
+        step: Description of the current step.
+    """
+    with open("progress.txt", "a") as f:
+        f.write(f"{step}\n")
+
+
+def progress_file_remove():
+    """
+    Removes the progress file after the experiment is complete
+    """
+    with open("progress.txt", "a") as f:
+        f.write("Experiment Complete\n")
+    time.sleep(2)
+    if os.path.exists("progress.txt"):
+        os.remove("progress.txt")
+
+
+def create_new_hdf5(file_path:str):
+    # Create a new HDF5 file
+    h5py.File(file_path, 'a')
+    print("File created at:", file_path)
+
+
+def create_hdf5_group(folder_path:str, group_name:str):
+    with h5py.File(folder_path,"w") as f:
+        f.create_group(group_name)
+    print("Created new group:", group_name, "at:", folder_path)
+
+
+def add_data_to_hdf(path:str, data, dataset_name:str):
+    with h5py.File(path, "a") as f:
+        dset = f.create_dataset(dataset_name, data)
+    print("Wrote data to:", dataset_name)
+    return dset
+
+
+def add_plot_to_hdf(file_path:str, plot_path:str, plot_name:str):
+    with h5py.File(file_path, "w") as f:
+        with open(plot_path, "rb") as img:
+            f.create_dataset(plot_name, data=np.frombuffer(img.read(), dtype="uint8"))
+    print("Plot:", plot_name, "saved to:", file_path)
+
+
+def save_measurement_hdf5(filename, measurement_name, f_number, f_number_err):
+    with h5py.File(filename, 'a') as file:
+        # Create a group for each measurement ID
+        measurement_group = file.create_group(measurement_name)
+
+        # Save the two arrays under the measurement group
+        measurement_group.create_dataset('f_number', data=f_number)
+        measurement_group.create_dataset('f_number_err', data=f_number_err)
 
 def move_files_and_folders(source_folder:str, destination_folder:str):
     """
@@ -22,6 +83,7 @@ def move_files_and_folders(source_folder:str, destination_folder:str):
             print(f"Moving folder: {item}")
             shutil.move(source_path, destination_path)
 
+
 def copy_files_and_folders(source_folder:str, destination_folder:str):
     """
     Copy all files and subfolders from the source folder to the destination folder.
@@ -43,6 +105,7 @@ def copy_files_and_folders(source_folder:str, destination_folder:str):
             print(f"Copying folder: {item}")
             shutil.copytree(source_path, destination_path)
 
+
 def clear_folder(folder_path):
     """
     Clear all files and subfolders from the specified folder.
@@ -60,6 +123,7 @@ def clear_folder(folder_path):
             # Remove directories
             shutil.rmtree(item_path)
             print(f"Deleted folder: {item_path}")
+
 
 def synchronize_directories(source_folder: str, destination_folder: str):
     """
@@ -101,10 +165,30 @@ def synchronize_directories(source_folder: str, destination_folder: str):
                 shutil.rmtree(destination_path)
 
 if __name__ == "__main__":
-    source_folder = r"D:\Vincent"
+    hdf_file = "test.hdf5"
+    test_data = np.array([1, 2, 3, 4, 5])
+    create_new_hdf5(hdf_file)
+    create_hdf5_group(hdf_file, "test_group")
+    add_data_to_hdf(hdf_file, test_data, "test_data")
+
+    r'''source_folder = r"D:\Vincent"
     destination_folder = r"\\srv4\labshare\raw_data\fibers\Measurements"
 
     # Ensure the destination folder exists
-    #os.makedirs(destination_folder, exist_ok=True)
-    #copy_files_and_folders(source_folder, destination_folder)
-    synchronize_directories(source_folder, destination_folder)
+    # os.makedirs(destination_folder, exist_ok=True)
+    # copy_files_and_folders(source_folder, destination_folder)
+    synchronize_directories(source_folder, destination_folder)'''
+
+
+def run_batch_file(batch_file_path:str):
+    """
+    Runs a batch file using subprocess
+    Args:
+        batch_file_path: Path of the file.
+    """
+    try:
+        # Use subprocess to run the batch file
+        result = subprocess.run(batch_file_path, shell=True, check=True, text=True)
+        print(f"Batch file executed successfully with return code {result.returncode}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error occurred while running the batch file: {e}")

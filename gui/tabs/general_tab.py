@@ -1,9 +1,11 @@
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
-                             QSizePolicy, QDialog, QVBoxLayout, QMessageBox
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QLabel, QLineEdit,
+                             QPushButton, QComboBox, QVBoxLayout
                              )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
+from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
+
+import analysis.frd_analysis
+import analysis.general_analysis
 from gui.tabs.helpers import HelperFunctions
 
 import threading
@@ -127,11 +129,9 @@ class GeneralTab(HelperFunctions):
                                          base_directory=self.base_directory)"""
             import qhy_ccd_take_image as qhy
             exposure_time = qhy.convert_to_us(self.exposure_time_input_gt.text())
-            import analyse_main as am
-            am.main_measure_new(working_dir, progress_signal=self.main.progress_signal, exp_time=exposure_time)
+            analysis.frd_analysis.main_measure_frd(working_dir, progress_signal=self.main.progress_signal, exp_time=exposure_time)
 
-            import fiber_frd_measurements as frd
-            frd.main_analyse_all_filters(working_dir, progress_signal=self.main.progress_signal)
+            analysis.frd_analysis.main_analyse_all_filters(working_dir, progress_signal=self.main.progress_signal)
 
         elif selected_function == "Make Throughput Calibration":
             import throughput_analysis as ta
@@ -142,12 +142,12 @@ class GeneralTab(HelperFunctions):
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("tiptilt", self.stop_event)
         elif selected_function == "Motor Controller: Reference":
-            import step_motor_control as smc
+            from core.hardware import motor_control as smc
             smc.open_connection()
             smc.make_reference_move()
             smc.close_connection()
         elif selected_function == "Motor Controller: Move to Position":
-            import step_motor_control as smc
+            from core.hardware import motor_control as smc
             smc.open_connection()
             position = float(self.number_input.text())
             smc.move_motor_to_position(position)
@@ -156,10 +156,8 @@ class GeneralTab(HelperFunctions):
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("eccentricity", self.stop_event)
         elif selected_function == "FF with each Filter":
-            import general_functions
-            general_functions.get_ff_with_all_filters(working_dir)
+            analysis.general_analysis.get_ff_with_all_filters(working_dir)
         elif selected_function == "Change Color Filter":
-            import move_to_filter
             filter_name = self.filter_input_combo.currentText()
             move_to_filter.move(filter_name)
         elif selected_function == "Change System F-ratio":
@@ -168,13 +166,11 @@ class GeneralTab(HelperFunctions):
                 f_ratio = self.fratio_input_combo.currentText()
                 self.filter_wheel.move_to_filter(f_ratio)
         elif selected_function == "Measure Fiber Size":
-            import fiber_frd_measurements as frd
             exposure_times = {
                 "exit_cam": self.exposure_time_input_gt.text()
             }
-            frd.measure_fiber_size(self.working_dir, exposure_times=exposure_times)
+            analysis.general_analysis.measure_fiber_size(self.working_dir, exposure_times=exposure_times)
         elif selected_function == "Near-Field, Far-Field Comparison":
-            import fiber_frd_measurements as frd
             exposure_times = {
                 "exit_cam": self.exposure_time_input_gt_2.text(),
                 "entrance_cam": self.exposure_time_input_gt.text()
@@ -184,10 +180,10 @@ class GeneralTab(HelperFunctions):
             else:
                 fiber_dimension = self.fiber_dimension
             # First capture the images
-            frd.nf_ff_capture(self.working_dir, fiber_diameter=fiber_dimension, exposure_times=exposure_times)
+            analysis.general_analysis.nf_ff_capture(self.working_dir, fiber_diameter=fiber_dimension, exposure_times=exposure_times)
             self.main.progress_signal.emit(f"Capture done, now processing...")
             # Then analyze the images
-            frd.nf_ff_process(self.working_dir, fiber_diameter=fiber_dimension)
+            analysis.general_analysis.nf_ff_process(self.working_dir, fiber_diameter=fiber_dimension)
 
         self.main.progress_signal.emit(f"{selected_function} complete.")
         self.main.experiment_running = False
