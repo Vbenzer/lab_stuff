@@ -11,6 +11,7 @@ from scipy.stats import linregress
 import core.data_processing
 import core.file_management
 import qhy_ccd_take_image
+import core.hardware.filter_wheel_fratio as qhycfw3_filter_wheel_control
 
 from analysis.visualization import plot_main
 
@@ -161,7 +162,7 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
         if progress_signal:
             progress_signal.emit(f"Starting analysis for: {folder}")
 
-        analysis.frd_analysis.run_from_existing_files(filter_folder, progress_signal)
+        run_from_existing_files(filter_folder, progress_signal)
 
         if progress_signal:
             progress_signal.emit(f"Analysis for {folder} complete!")
@@ -256,16 +257,14 @@ def calculate_f_number(radii: np.ndarray, ccd_positions: np.ndarray, plot_regres
 
 
 fw = None
-
-
 def init_filter_wheel():
     global fw
     fw = qhycfw3_filter_wheel_control.FilterWheel('COM5')
 
-
+cam = None
 def init_camera(exp_time:int):
     global cam
     cam = qhy_ccd_take_image.Camera(exp_time=exp_time)
 
 
-cam = None
+

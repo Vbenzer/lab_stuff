@@ -7,6 +7,7 @@ from PyQt6.QtGui import QRegularExpressionValidator
 
 from gui.tabs.helpers import HelperFunctions
 
+import os
 import threading
 
 class CameraTab(HelperFunctions):

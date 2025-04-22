@@ -28,15 +28,7 @@ elif sys.platform.startswith("win"):
 else:
     raise OSError("Unsupported OS")
 
-def save_recent_folders(recent_folders:str, file_path:str):
-    """
-    Save the recent folders to a JSON file.
-    Args:
-        recent_folders: Folder names to save.
-        file_path: Path of the JSON file to save to.
-    """
-    with open(file_path, 'w') as file:
-        json.dump(recent_folders, file)
+
 
 class MainWindow(QMainWindow, HelperFunctions, Widgets):
     progress_signal = pyqtSignal(str)

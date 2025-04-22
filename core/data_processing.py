@@ -693,25 +693,25 @@ def com_of_spot(image:np.ndarray, threshold=None, plot:bool=False):
         com (tuple): The (y, x) coordinates of the center of mass.
     """
     # Get Area of Interest
-    aoi = core.data_processing.area_of_interest(image, threshold=threshold)
+    aoi = area_of_interest(image, threshold=threshold)
 
     # Get the range of the AOI
-    y_range, x_range = core.data_processing.narrow_index(aoi)
+    y_range, x_range = narrow_index(aoi)
 
     # Cut the image to the AOI
-    cut_image = core.data_processing.cut_image(image, aoi=aoi, margin=10)
+    cut_image_data = cut_image(image, aoi=aoi, margin=10)
 
     # Get the center of mass of the cut image
-    com = core.data_processing.locate_focus(cut_image)
+    com = locate_focus(cut_image_data)
 
-    dim = cut_image.shape
+    dim = cut_image_data.shape
     size = [dim[1] / 100, dim[0] / 100]
 
 
     if plot:
         # noinspection PyTypeChecker
         plt.figure(figsize=size)
-        plt.imshow(cut_image, cmap='gray', origin='lower')
+        plt.imshow(cut_image_data, cmap='gray', origin='lower')
         plt.scatter(com[1], com[0], color='red', s=0.1, marker='.')  # Mark the COM with a red 'x'
         plt.title('Cut Image with Center of Mass')
         plt.axis('off')

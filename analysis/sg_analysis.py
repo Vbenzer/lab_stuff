@@ -11,6 +11,7 @@ from skimage.draw import disk, polygon
 import core.data_processing
 import core.file_management
 from core.data_processing import com_of_spot, png_to_numpy
+import core.hardware.filter_wheel_color as mtf
 
 
 def detect_circle(image:np.ndarray, fiber_px_radius:int):
@@ -868,7 +869,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
     os.makedirs(exit_light_folder, exist_ok=True)
 
     # Move to filter "none" for no light
-    move_to_filter.move("Closed")
+    mtf.move("Closed")
     print("Taking darks")
 
     # Send progress signal
@@ -883,7 +884,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
 
 
     # Move to filter "0" for light
-    move_to_filter.move("Open")
+    mtf.move("Open")
 
     # Make reference move
     #smc.make_reference_move()

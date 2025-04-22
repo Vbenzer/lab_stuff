@@ -9,6 +9,7 @@ import analysis.general_analysis
 from gui.tabs.helpers import HelperFunctions
 
 import threading
+import os
 
 class GeneralTab(HelperFunctions):
     def __init__(self, main, main_init):

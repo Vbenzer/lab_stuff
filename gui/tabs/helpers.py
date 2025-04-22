@@ -18,9 +18,9 @@ class HelperFunctions:
 
     def check_valid_exp_input(self):
         if not self.exposure_time_input.hasAcceptableInput():
-            self.show_message("Invalid exposure time input. Please enter a valid exposure time. E.g.: 1ms, 1s, 1us")
+            self.main_init.show_message("Invalid exposure time input. Please enter a valid exposure time. E.g.: 1ms, 1s, 1us")
         else:
-            self.show_message("")
+            self.main_init.show_message("")
 
     def access_comments_file(self):
         working_dir = self.working_dir_display.text()

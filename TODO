@@ -2,6 +2,8 @@ Bugs: (Sorted by priority)
 
 - Gui bugs:
     - fiber dimension sometimes resets to weird values (cant reproduce)
+    - Weird spacer behavior in general tab
+    - Update button accessibility
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
@@ -11,8 +13,9 @@ Bugs: (Sorted by priority)
 Additions: (Sorted by priority)
 - Group meeting:
     - Shake fiber input for sg improvement?
-    - Fiber size measurement
     - Cerium oxide for fiber polishing
+
+- test c_100_0001 and 0002 to improve sg code
 
 - Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
 
@@ -21,7 +24,7 @@ Additions: (Sorted by priority)
     - nf ff stuff (done, not tested)
     - fiber size measurement (done, not tested)
 
-- Rework sg com and comk plots
+- Rework sg com and comk plots (done mostly)
     - sg entrance spot position probably biased
 
 - try log scale for sg input images (not sure if that makes a difference for the image detection or differentiation of spot and fiber face)

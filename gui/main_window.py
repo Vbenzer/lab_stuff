@@ -44,6 +44,16 @@ def update_recent_folders(folder:str, recent_folders:list[str], max_recent=2, ba
         recent_folders.pop()
     save_recent_folders(recent_folders, file_path=base_directory + r'\recent_folders.json')
 
+def save_recent_folders(recent_folders:str, file_path:str):
+    """
+    Save the recent folders to a JSON file.
+    Args:
+        recent_folders: Folder names to save.
+        file_path: Path of the JSON file to save to.
+    """
+    with open(file_path, 'w') as file:
+        json.dump(recent_folders, file)
+
 class MainWindowInit(HelperFunctions, Widgets):
     def __init__(self, main_ctrl):
         self.main = main_ctrl
@@ -236,7 +246,7 @@ class MainWindowInit(HelperFunctions, Widgets):
             self.analyse_tab_init.run_analysis_button.setDisabled(True)
 
     def choose_folder(self):
-        dialog = QFileDialog(self)
+        dialog = QFileDialog(self.main)
         dialog.setWindowTitle("Select Folder")
         dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)

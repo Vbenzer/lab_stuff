@@ -9,7 +9,7 @@ import threading
 
 import analysis.frd_analysis
 import analysis.sg_analysis
-
+import os
 
 class MeasureTab:
     def __init__(self, main_ctrl, main_init_ctrl):
@@ -151,7 +151,7 @@ class MeasureTab:
         self.main_init.update_ui_state()
 
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
-        self.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
+        self.main_init.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
         import unused_sg_functions
         exposure_time_exit = self.exposure_time_input_mt_exit.text()
         exposure_time_entrance = self.exposure_time_input_mt_entrance.text()
@@ -163,7 +163,7 @@ class MeasureTab:
         import analyse_main_obs as am
         import qhy_ccd_take_image as qhy
 
-        self.show_message(f"Running FRD measurement with working dir: {working_dir}")
+        self.main_init.show_message(f"Running FRD measurement with working dir: {working_dir}")
 
         exposure_time = qhy.convert_to_us(self.exposure_time_input_mt.text())
         analysis.frd_analysis.main_measure_frd(working_dir, progress_signal=self.main.progress_signal, exp_time=exposure_time)
