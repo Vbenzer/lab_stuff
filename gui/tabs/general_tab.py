@@ -172,19 +172,25 @@ class GeneralTab(HelperFunctions):
             }
             analysis.general_analysis.measure_fiber_size(working_dir, exposure_times=exposure_times)
         elif selected_function == "Near-Field, Far-Field Comparison":
+            from qhy_ccd_take_image import convert_to_us
             exposure_times = {
-                "exit_cam": self.exposure_time_input_gt_2.text(),
+                "exit_cam": convert_to_us(self.exposure_time_input_gt_2.text()),
                 "entrance_cam": self.exposure_time_input_gt.text()
             }
-            if type(self.fiber_dimension) == "str":
-                fiber_dimension =  float(self.fiber_dimension)
+
+            if type(self.main.fiber_dimension) == "str":
+                fiber_dimension =  float(self.main.fiber_dimension)
             else:
-                fiber_dimension = self.fiber_dimension
+                fiber_dimension = float(self.main.fiber_dimension)
+
+            # Define wd
+            wdir = os.path.join(working_dir, "NF_FF_Comparison")
+
             # First capture the images
-            analysis.general_analysis.nf_ff_capture(self.working_dir, fiber_diameter=fiber_dimension, exposure_times=exposure_times)
+            analysis.general_analysis.nf_ff_capture(wdir, fiber_diameter=fiber_dimension, exposure_times=exposure_times)
             self.main.progress_signal.emit(f"Capture done, now processing...")
             # Then analyze the images
-            analysis.general_analysis.nf_ff_process(self.working_dir, fiber_diameter=fiber_dimension)
+            analysis.general_analysis.nf_ff_process(wdir, fiber_diameter=fiber_dimension)
 
         self.main.progress_signal.emit(f"{selected_function} complete.")
         self.main.experiment_running = False

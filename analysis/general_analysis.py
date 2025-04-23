@@ -7,6 +7,7 @@ from skimage import io, transform
 
 import core.data_processing
 import qhy_ccd_take_image
+import core.hardware.filter_wheel_fratio as qhycfw3_filter_wheel_control
 
 import thorlabs_cam_control as tcc
 
@@ -45,7 +46,7 @@ def init_filter_wheel():
     fw = qhycfw3_filter_wheel_control.FilterWheel('COM5')
 
 
-def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], exposure_times:dict[str, str]=None,
+def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], exposure_times:dict[str, int]=None,
                          progress_signal=None):
     from core.hardware import motor_control as smc
     from core.hardware import filter_wheel_color as mtf
@@ -55,7 +56,7 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
         raise ValueError("Exposure times must be provided.")
 
     # Create and check project folder
-    os.makedirs(project_folder)
+    os.makedirs(project_folder, exist_ok=True)
 
     # Connect filter wheel and cameras in thread
     fw_thread = threading.Thread(target=init_filter_wheel)
