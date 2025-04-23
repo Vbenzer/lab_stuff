@@ -4,10 +4,10 @@ Bugs: (Sorted by priority)
     - fiber dimension sometimes resets to weird values (cant reproduce)
     - Weird spacer behavior in general tab
     - Update button accessibility
+    - File name for measure system fratio, add standard and remove weird behavior
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
-
 
 
 Additions: (Sorted by priority)
@@ -15,7 +15,8 @@ Additions: (Sorted by priority)
     - Shake fiber input for sg improvement?
     - Cerium oxide for fiber polishing
 
-- test c_100_0001 and 0002 to improve sg code
+- test c_100_0001 and 0002 to improve sg code, circle detection could be better in frd also
+    - must check system measurements: Circles fits are bad
 
 - Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
 
