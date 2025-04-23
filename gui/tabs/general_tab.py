@@ -170,7 +170,7 @@ class GeneralTab(HelperFunctions):
             exposure_times = {
                 "exit_cam": self.exposure_time_input_gt.text()
             }
-            analysis.general_analysis.measure_fiber_size(self.working_dir, exposure_times=exposure_times)
+            analysis.general_analysis.measure_fiber_size(working_dir, exposure_times=exposure_times)
         elif selected_function == "Near-Field, Far-Field Comparison":
             exposure_times = {
                 "exit_cam": self.exposure_time_input_gt_2.text(),
