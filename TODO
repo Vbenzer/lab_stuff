@@ -19,6 +19,8 @@ Additions: (Sorted by priority)
     - must check system measurements: Circles fits are bad
 
 - Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
+    - Give options to change driving width for input spot
+    - Also give options if trim should be in log scale or not
 
 - Add functions to GUI:
     - Horizontal cuts (done, not tested)

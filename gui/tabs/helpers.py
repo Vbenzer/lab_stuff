@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
                              QSizePolicy, QDialog, QVBoxLayout, QMessageBox
                              )
-import os, json, sys
+import os, json, sys, subprocess
 
 class HelperFunctions:
     def create_hbox_layout(self, label, widget):
