@@ -1085,9 +1085,9 @@ def sg_new(main_folder:str, progress_signal=None):
     scrambling_gain = np.zeros(len(gauge_distance_entrance))
     for i in range(len(gauge_distance_entrance)):
         if i == reference_index:
-    continue
+            continue
 
-    scrambling_gain[i] = gauge_distance_entrance[i] / gauge_distance_exit[i]
+        scrambling_gain[i] = gauge_distance_entrance[i] / gauge_distance_exit[i]
 
     # Calculate sg_min
     sg_min = np.max(gauge_distance_entrance)/np.max(gauge_distance_exit)
