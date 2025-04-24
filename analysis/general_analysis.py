@@ -12,18 +12,27 @@ import core.hardware.filter_wheel_fratio as qhycfw3_filter_wheel_control
 import thorlabs_cam_control as tcc
 
 
-def measure_fiber_size(project_folder:str, exposure_times:dict[str, str]=None):
+def measure_fiber_size(project_folder: str, exposure_times: dict[str, str] = None, progress_signal=None):
     if exposure_times is None:
         raise ValueError("Exposure times must be provided.")
 
     os.makedirs(project_folder, exist_ok=True)
 
+    if progress_signal:
+        progress_signal.emit("Taking image with entrance camera")
+
     # Take entrance image
-    tcc.take_image("exit_cam", project_folder + "/exit_cam_image.fits",
-                   exposure_time=exposure_times["exit_cam"], save_fits=True)
+    tcc.take_image("exit_cam", project_folder + "/exit_cam_image.fits", exposure_time=exposure_times["exit_cam"],
+                   save_fits=True)
+
+    if progress_signal:
+        progress_signal.emit("Loading image")
 
     # Load the image
     exit_image = fits.open(project_folder + "/exit_cam_image.fits")[0].data.astype(np.float32)
+
+    if progress_signal:
+        progress_signal.emit("Processing image")
 
     # Get fiber dimension
     fiber_data = core.data_processing.measure_fiber_dimensions(exit_image)
@@ -58,6 +67,9 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
     # Create and check project folder
     os.makedirs(project_folder, exist_ok=True)
 
+    if progress_signal:
+        progress_signal.emit("Initializing filter wheel and cameras")
+
     # Connect filter wheel and cameras in thread
     fw_thread = threading.Thread(target=init_filter_wheel)
     cam_thread = threading.Thread(target=init_camera, args=([exposure_times["exit_cam"]]))
@@ -68,6 +80,9 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
     # Make sure everything is ready
     fw_thread.join()
     cam_thread.join()
+
+    if progress_signal:
+        progress_signal.emit("Moving to initial position (f/3.5)")
 
     # Set filter wheel to f/3.5
     fw.move_to_filter("3.5")
@@ -106,23 +121,50 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
 
     # Take images
     for i in range(number_of_positions):
+        if progress_signal:
+            progress_signal.emit(f"Starting image process {i + 1} of {number_of_positions}")
+
         print("Taking image:", i, ", at position:", pos_left + i * step_size)
+
+        if progress_signal:
+            progress_signal.emit(f"Moving Motor to position {pos_left + i * step_size}")
 
         # Move the motor to the next position
         smc.move_motor_to_position(pos_left + i * step_size)
 
         # Take darks
+        if progress_signal:
+            progress_signal.emit(f"Closing Shutter")
+
         mtf.move("Closed")
+
+        if progress_signal:
+            progress_signal.emit(f"Taking darks")
+
         tcc.take_image("entrance_cam", entrance_folder_dark + f"/entrance_cam_dark{i:03d}.fits",
-                   exposure_time=exposure_times["entrance_cam"], save_fits=True)
+                       exposure_time=exposure_times["entrance_cam"], save_fits=True)
         cam.take_single_frame(exit_folder_dark, f"exit_cam_dark{i:03d}.fits")
 
 
         # Take images
+        if progress_signal:
+            progress_signal.emit(f"Opening Shutter")
+
         mtf.move("Open")
+
+        if progress_signal:
+            progress_signal.emit(f"Taking images")
+
         tcc.take_image("entrance_cam", entrance_folder_light + f"/entrance_cam_image{i:03d}.fits",
                        exposure_time=exposure_times["entrance_cam"], save_fits=True)
         cam.take_single_frame(exit_folder_light, f"exit_cam_image{i:03d}.fits")
+
+        if progress_signal:
+            progress_signal.emit(f"Image process {i + 1} of {number_of_positions} done")
+
+    if progress_signal:
+        progress_signal.emit("Resetting motor position to 5mm")
+
     smc.move_motor_to_position(5)
     print("All images taken!")
 
@@ -158,6 +200,10 @@ def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], prog
     # Reduce the images
     for i in range(len(entrance_light_images)):
         print("Reducing image", i)
+
+        if progress_signal:
+            progress_signal.emit(f"Reducing images {i + 1} of {len(entrance_light_images)}")
+
         output_file_path_entrance = os.path.join(entrance_folder_reduced, f"entrance_cam_reduced{i:03d}.fits")
         # Load the entrance light and dark images
         with fits.open(os.path.join(entrance_folder_light, entrance_light_images[i])) as hdul:
@@ -179,6 +225,9 @@ def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], prog
         core.data_processing.reduce_image_with_dark(exit_light_data, exit_dark_data, output_file_path_exit, save=True)
     print("All images reduced!")
 
+    if progress_signal:
+        progress_signal.emit("Image reduction done")
+
     # Get list of reduced images
     entrance_reduced_images = sorted(os.listdir(entrance_folder_reduced))
     exit_reduced_images = sorted(os.listdir(exit_folder_reduced))
@@ -193,6 +242,10 @@ def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], prog
     # Cut the images to size
     for i in range(len(entrance_light_images)):
         print("Cutting image", i)
+
+        if progress_signal:
+            progress_signal.emit(f"Cutting images {i + 1} of {len(entrance_light_images)}")
+
         # Cut entrance images
         from analysis.sg_analysis import cut_image_around_comk
 
@@ -223,11 +276,15 @@ def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], prog
 
     print("All images reduced and cut!")
 
+    if progress_signal:
+        progress_signal.emit("Image cutting done")
 
-def get_ff_with_all_filters(working_directory):
+
+def get_ff_with_all_filters(working_directory, progress_signal=None):
     """
     Takes and reduces one far field image for each color filter
     Args:
+        progress_signal:
         working_directory: Working directory where the images will be saved
 
     Returns:
@@ -247,33 +304,61 @@ def get_ff_with_all_filters(working_directory):
     filters = ["400", "450", "500", "600", "700", "800"]
 
     # Initialize camera
+    if progress_signal:
+        progress_signal("Initializing camera")
+
     camera = qhy_ccd_take_image.Camera(exp_time=2000000)
 
     # Go to block filter and take darks
+    if progress_signal:
+        progress_signal("Closing Shutter")
     move_to_filter.move("none")
+
+    if progress_signal:
+        progress_signal("Taking darks")
+
     camera.take_multiple_frames(dark_folder, "dark", num_frames=5)
 
     for filter_name in filters:
+        if progress_signal:
+            progress_signal(f"Moving to filter {filter_name}")
+
         move_to_filter.move(filter_name)
+
+        if progress_signal:
+            progress_signal(f"Taking image with filter {filter_name}")
+
         camera.take_single_frame(science_folder, filter_name)
 
     # Close camera
     camera.close()
 
     # Return to no filter
+    if progress_signal:
+        progress_signal("Closing Shutter")
     move_to_filter.move("0")
 
     # Create master dark
+    if progress_signal:
+        progress_signal("Creating master dark")
     mdark = core.data_processing.create_master_dark(dark_folder)
 
     # Reduce all science images
+    if progress_signal:
+        progress_signal.emit("Starting image reduction")
+
     for image in os.listdir(science_folder):
         if image.endswith(".fits"):
+            if progress_signal:
+                progress_signal.emit(f"Reducing image {image}")
             image_path = os.path.join(science_folder, image)
             with fits.open(image_path) as hdul:
                 science_data = hdul[0].data.astype(np.float32)
                 reduced_path = os.path.join(reduced_folder, image)
                 core.data_processing.reduce_image_with_dark(science_data, mdark, output_file=reduced_path, save=True)
+
+    if progress_signal:
+        progress_signal.emit("Image reduction done")
 
 
 def inf_fiber_original_tp_plot(csv_file:str, show=False):

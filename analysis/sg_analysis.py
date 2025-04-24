@@ -680,7 +680,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     print("Exit radii:", exit_radii)
 
     if progress_signal:
-        progress_signal.emit("Exit images done. Calculating scrambling gain")
+        progress_signal.emit("Exit images done. Writing parameters to json file")
 
     # Todo: Most parameters outside of com and comk are probably obsolete
     # Calculate distance between entrance COMK and COM
@@ -878,8 +878,10 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
 
     # Take darks
     for i in range(5):
-        tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png", exposure_time=exposure_times["entrance"])
-        tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png", exposure_time=exposure_times["exit"])
+        tcc.take_image("entrance_cam", entrance_dark_image_folder + f"/entrance_cam_dark{i:03d}.png",
+                       exposure_time=exposure_times["entrance"])
+        tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png",
+                       exposure_time=exposure_times["exit"])
 
 
 
@@ -911,8 +913,10 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         smc.move_motor_to_position(pos_left + i * step_size)
 
         # Take images
-        tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png", exposure_time=exposure_times["entrance"])
-        tcc.take_image("exit_cam", exit_light_folder + f"/exit_cam_image{i:03d}.png", exposure_time=exposure_times["exit"])
+        tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png",
+                       exposure_time=exposure_times["entrance"])
+        tcc.take_image("exit_cam", exit_light_folder + f"/exit_cam_image{i:03d}.png",
+                       exposure_time=exposure_times["exit"])
 
         print(f"Image {i + 1} out of {number_of_positions} at Position {pos_left + i * step_size} done! "
               f"Move spot to next position")
@@ -1013,6 +1017,8 @@ def sg_new(main_folder:str, progress_signal=None):
 
     """
     # Read parameters from json file
+    if progress_signal:
+        progress_signal.emit("Loading parameters form json")
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
         parameters = json.load(f)
 
@@ -1079,9 +1085,9 @@ def sg_new(main_folder:str, progress_signal=None):
     scrambling_gain = np.zeros(len(gauge_distance_entrance))
     for i in range(len(gauge_distance_entrance)):
         if i == reference_index:
-            continue
+    continue
 
-        scrambling_gain[i] = gauge_distance_entrance[i] / gauge_distance_exit[i]
+    scrambling_gain[i] = gauge_distance_entrance[i] / gauge_distance_exit[i]
 
     # Calculate sg_min
     sg_min = np.max(gauge_distance_entrance)/np.max(gauge_distance_exit)

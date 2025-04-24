@@ -564,7 +564,7 @@ def plot_measurements(filename:str):
     plt.show()
 
 
-def make_comparison_video(main_folder:str, fiber_diameter):
+def make_comparison_video(main_folder:str, fiber_diameter, progress_signal=None):
     """
     Creates a video comparing the entrance and exit images.
     Args:
@@ -602,11 +602,16 @@ def make_comparison_video(main_folder:str, fiber_diameter):
     os.makedirs(video_prep_exit_folder, exist_ok=True)
 
     # Read entrance_comk and exit_comk from json file
+    if progress_signal:
+        progress_signal.emit("Reading parameters from json")
     with open(sg_parameters_file, 'r') as f:
         parameters = json.load(f)
 
     entrance_comk = parameters["entrance_comk"]
     exit_comk = parameters["exit_comk"]
+
+    if progress_signal:
+        progress_signal.emit("Cutting images")
 
     # Cut the images to the same size around the fiber
     for i in range(len(entrance_image_files)):
@@ -638,6 +643,8 @@ def make_comparison_video(main_folder:str, fiber_diameter):
     # No scaling needed, done in video creation
 
     # Create video #Todo: Enhance visuals of the video (looks kinda bad but works for now)
+    if progress_signal:
+        progress_signal.emit("Creating video")
     from moviepy import VideoFileClip, clips_array
     import imageio
 
@@ -706,6 +713,8 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
     exit_mask_files = sorted(exit_mask_files)
 
     # Read entrance coms from json file
+    if progress_signal:
+        progress_signal.emit("Reading parameters from json")
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
         parameters = json.load(f)
 
@@ -760,7 +769,7 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
 
     # Send progress signal
     if progress_signal:
-        progress_signal.emit("Entrance Masks plotted.")
+        progress_signal.emit("Entrance Masks plotted. Continuing with exit masks")
 
     # Same for exit masks
     for i in range(len(exit_mask_files)):
@@ -787,6 +796,8 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
         plt.axis('off')
         plt.savefig(os.path.join(exit_overlay_folder, exit_mask_files[i].replace(".png", "_overlay.png")), dpi="figure")
         plt.close()
+    if progress_signal:
+        progress_signal.emit("Exit Masks plotted.")
 
 
 def plot_coms(main_folder, progress_signal=None):
@@ -797,6 +808,9 @@ def plot_coms(main_folder, progress_signal=None):
         progress_signal: Progress signal to update the progress.
 
     """
+    if progress_signal:
+        progress_signal.emit("Reading parameters from json")
+
     # Read from json file
     with open(os.path.join(main_folder, "scrambling_gain_parameters.json"), 'r') as f:
         parameters = json.load(f)
@@ -840,7 +854,7 @@ def plot_coms(main_folder, progress_signal=None):
 
     # Send progress signal
     if progress_signal:
-        progress_signal.emit("Plotting COMs done!")
+        progress_signal.emit("Plotting COMs done")
 
 
 def plot_horizontal_cut_nf(project_folder):
@@ -885,7 +899,7 @@ def plot_horizontal_cut_nf(project_folder):
     plt.close()
 
 
-def plot_com_comk_on_image_cut(project_folder):
+def plot_com_comk_on_image_cut(project_folder, progress_signal=None):
     # Define folders
     video_prep_folder = os.path.join(project_folder, "video_prep")
     entrance_folder = os.path.join(video_prep_folder, "entrance")
@@ -900,10 +914,14 @@ def plot_com_comk_on_image_cut(project_folder):
 
     # Check if video_prep folder exists
     if not os.path.exists(video_prep_folder):
+        if progress_signal:
+            progress_signal.emit("Video prep folder does not exist, exiting...")
         print(f"Video prep folder does not exist: {video_prep_folder}")
         return
 
     # Read sg parameter json
+    if progress_signal:
+        progress_signal.emit("Reading parameters from json")
     with open(os.path.join(project_folder, "scrambling_gain_parameters.json"), 'r') as f:
         parameters = json.load(f)
 
@@ -933,6 +951,8 @@ def plot_com_comk_on_image_cut(project_folder):
     exit_comk_list_cut = exit_comk_list - np.array([int(exit_comk_list[0][0]), int(exit_comk_list[0][1])]) + np.array([exit_img_h_size, exit_img_h_size])
 
     # Plot entrance COMs and COMKs
+    if progress_signal:
+        progress_signal.emit("Starting plots")
     for i in range(len(entrance_coms_list)):
         entrance_image = io.imread(os.path.join(entrance_folder, f"entrance_cam_image{i:03d}_reduced_cut.png"))
         entrance_com = entrance_coms_list_cut[i]

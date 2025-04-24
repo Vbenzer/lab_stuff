@@ -88,21 +88,24 @@ class CameraTab(HelperFunctions):
                 cam_type = "entrance_cam"
                 exp_time = self.exposure_time_input.text()
                 image_name_path = os.path.join(working_dir, "entrance_image.fits")
-                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True, save_fits=True)
+                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True,
+                                                save_fits=True, progress_signal=self.main.progress_signal)
             elif self.camera_chooser_combo.currentText() == "Exit Cam":
                 cam_type = "exit_cam"
                 exp_time = self.exposure_time_input.text()
                 image_name_path = os.path.join(working_dir, "exit_image.fits")
-                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True, save_fits=True)
+                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True,
+                                                save_fits=True, progress_signal=self.main.progress_signal)
 
         elif selected_function == "Qhyccd Camera Single":
             import qhy_ccd_take_image
             self.qhyccd_cam = qhy_ccd_take_image.Camera(1000)
 
             exposure_time_us = qhy_ccd_take_image.convert_to_us(self.exposure_time_input.text())
-            self.qhyccd_cam.change_exposure_time(exposure_time_us)
+            self.qhyccd_cam.change_exposure_time(exposure_time_us, progress_signal=self.main.progress_signal)
             image_name = "qhyccd_image"
-            self.qhyccd_cam.take_single_frame(working_dir, image_name, show=True)
+            self.qhyccd_cam.take_single_frame(working_dir, image_name, show=True,
+                                              progress_signal=self.main.progress_signal)
             self.qhyccd_cam.close()
 
         self.main.progress_signal.emit(f"{selected_function} complete.")

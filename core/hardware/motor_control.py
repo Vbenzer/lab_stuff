@@ -93,13 +93,19 @@ def check_motion_status():
         return None, None, None
 
 
-def make_reference_move():
+def make_reference_move(progress_signal=None):
     """
     Perform a reference move to establish a known position. Also resolves error that sometimes appears when initially
     using the controller.
 
+    Args:
+        progress_signal: Signal to emit progress.
+
     """
     open_connection()
+
+    if progress_signal:
+        progress_signal.emit("Making reference move")
 
     # Find Reference
     send_command("FPL")
@@ -108,23 +114,38 @@ def make_reference_move():
 
     if ref == "5":
         print("Error 5, try move and reference again")
+
+        if progress_signal:
+            progress_signal.emit("Error 5, sending move signal and referencing again")
+
         move_motor_to_position(5)
         ref = send_command("FPL")
-        print("Second reference move: ", ref)
+        if ref == "0":
+            print("Reference move successful")
+            if progress_signal:
+                progress_signal.emit("Reference move successful")
+        else:
+            print("Reference move failed")
+            if progress_signal:
+                progress_signal.emit("Reference move failed")
 
     check_error()
     time.sleep(0.1)
+
     while not check_motion_status():
         print("Referencing in progress...")
+        if progress_signal:
+            progress_signal.emit("Referencing in progress...")
         check_error()
         time.sleep(1)  # Check every second
 
 
 # Example of moving the motor by a small step
-def move_motor_to_position(position:float):
+def move_motor_to_position(position: float, progress_signal=None):
     """
     Move the motor to a specified position
     Args:
+        progress_signal:
         position: Float value of the position to move to. Must be within 0 and 9.9 mm.
 
 
@@ -134,16 +155,22 @@ def move_motor_to_position(position:float):
 
     # Enable the motor if not already enabled
     print("Enabling motor...")
+    if progress_signal:
+        progress_signal.emit("Enabling motor...")
     send_command(f"SVO 1 1")
     check_error()
 
     # Move by a specified step size (step_size in motor units, check manual for units)
     print(f"Moving motor by to position {position} mm")
+    if progress_signal:
+        progress_signal.emit(f"Moving motor to position {position} mm")
     send_command(f"MOV 1 {position}")
     check_error()
 
     while not check_motion_status():
         print("Movement in progress...")
+        if progress_signal:
+            progress_signal.emit("Movement in progress...")
         check_error()
         time.sleep(1)  # Check every second
 
@@ -151,6 +178,8 @@ def move_motor_to_position(position:float):
     position_new = send_command("POS?")
     check_error()
     print(f"New position: {position_new}")
+    if progress_signal:
+        progress_signal.emit(f"New position: {position_new}")
 
 def close_connection():
     """

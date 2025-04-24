@@ -21,11 +21,13 @@ else:
     print("No input provided")
 
 
-def move(filter:str):
+def move(filter: str, progress_signal=None):
     controller = elliptec.Controller('COM4')
     ro = elliptec.Rotator(controller)
     try:
         angle = filter_to_angle_dict[filter]
+        if progress_signal:
+            progress_signal.emit(f"Moving filter to {filter}")
         ro.set_angle(angle)
         sleep(2)
     except Exception as e:

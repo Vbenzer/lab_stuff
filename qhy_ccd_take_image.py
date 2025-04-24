@@ -240,8 +240,11 @@ class Camera:
         self.imgdata_raw8 = (ctypes.c_uint8 * length)()
         #print(imgdata_raw8, imgdata)
 
-    def change_exposure_time(self, exp_time):
-        print(exp_time)
+    def change_exposure_time(self, exp_time, progress_signal=None):
+        print(f"Changing exposure time to {exp_time} us")
+        if progress_signal:
+            progress_signal.emit(f"Changing exposure time to {exp_time} us")
+
         ret = self.qhyccddll.SetQHYCCDParam(self.camhandle, self.CONTROL_ID.CONTROL_EXPOSURE.value, exp_time)
         print("SetQHYCCDParam() ret =", ret)
 
@@ -250,18 +253,24 @@ class Camera:
         ret = self.qhyccddll.ReleaseQHYCCDResource()
         cv2.destroyAllWindows()
 
-    def take_frame(self, working_dir:str, image_name:str, show:bool=False, save:bool=True):
+    def take_frame(self, working_dir: str, image_name: str, show: bool = False, save: bool = True,
+                   progress_signal=None):
         self.qhyccddll.ExpQHYCCDSingleFrame(self.camhandle)
         ret = self.qhyccddll.GetQHYCCDSingleFrame(self.camhandle, byref(self.w), byref(self.h), byref(self.b), byref(self.c), self.imgdata)     # This takes long if not live, longer if live...
         #print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,)
         if ret != 0:
             print("Failed to capture image.")
+            if progress_signal:
+                progress_signal.emit("Failed to capture image.")
             exit()
         #qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
         img = np.frombuffer(self.imgdata, dtype=np.uint16).reshape((self.h.value, self.w.value))
 
         # Print max pixel value
         print("Max pixel value:", np.max(img), "Mean pixel value: ", np.mean(img))
+        if progress_signal:
+            progress_signal.emit("Max pixel value: ", np.max(img))
+            progress_signal.emit("Mean pixel value: ", np.mean(img))
 
         if show:
             show_img = img / np.max(img) * 255
@@ -278,8 +287,8 @@ class Camera:
                 image_name += ".fits"
             fits.writeto(os.path.join(working_dir, image_name), img, overwrite=True)
 
-    def take_single_frame(self, working_dir:str, image_name:str, show:bool=False):
-        self.take_frame(working_dir, image_name, show=show)
+    def take_single_frame(self, working_dir: str, image_name: str, show: bool = False, progress_signal=None):
+        self.take_frame(working_dir, image_name, show=show, progress_signal=progress_signal)
 
     def take_multiple_frames(self, working_dir:str, image_name:str, num_frames:int):
         for i in range(num_frames):

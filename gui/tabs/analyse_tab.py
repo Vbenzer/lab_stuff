@@ -119,16 +119,17 @@ class AnalyseTab:
         self.main.progress_signal.emit("Starting analysis...")
         if analysis_type == "SG":
             directory = os.path.join(working_dir, "SG")
-            import unused_sg_functions
             if self.get_params_checkbox.isChecked():
                 print("Getting SG parameters with fiber diameter:", fiber_diameter, "and fiber shape:", fiber_shape)
                 analysis.sg_analysis.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.main.progress_signal)
 
             if self.plot_sg_checkbox.isChecked():
-                sg_pipeline.plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.main.progress_signal)
+                from unused_sg_functions import plot_sg_cool_like
+                plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.main.progress_signal)
 
             if self.calc_sg_checkbox.isChecked():
-                sg_pipeline.calc_sg(directory, progress_signal=self.main.progress_signal)
+                from unused_sg_functions import calc_sg
+                calc_sg(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_coms_checkbox.isChecked():
                 analysis.visualization.plot_coms(directory, progress_signal=self.main.progress_signal)
@@ -137,11 +138,12 @@ class AnalyseTab:
                 analysis.visualization.plot_masks(directory, fiber_diameter, progress_signal=self.main.progress_signal)
 
             if self.make_video_checkbox.isChecked():
-                analysis.visualization.make_comparison_video(directory, fiber_diameter)
+                analysis.visualization.make_comparison_video(directory, fiber_diameter,
+                                                             progress_signal=self.main.progress_signal)
 
             if self.plot_com_comk_on_image_cut_checkbox.isChecked():
                 self.main.progress_signal.emit("Running plot_com_comk_on_image_cut...")
-                analysis.visualization.plot_com_comk_on_image_cut(directory)
+                analysis.visualization.plot_com_comk_on_image_cut(directory, progress_signal=self.main.progress_signal)
 
             if self.sg_new_checkbox.isChecked():
                 analysis.sg_analysis.sg_new(directory, progress_signal=self.main.progress_signal)

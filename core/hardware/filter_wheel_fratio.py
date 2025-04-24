@@ -19,7 +19,7 @@ class FilterWheel():
             time.sleep(1)
         print("Filter wheel ready!")
 
-    def move_to_filter(self, filter: str):
+    def move_to_filter(self, filter: str, progress_signal=None):
         name_to_filter_dict = {'2.5': b"0", '6.0': b"1", '5.0': b"2", '4.5': b"3", '4.0': b"4", '3.5': b"5"}
         reverse_dict = {v: k for k, v in name_to_filter_dict.items()}
 
@@ -30,6 +30,8 @@ class FilterWheel():
             data = self.ser.readline()
             current_filter = reverse_dict[data]
             print("Current Filter:", current_filter)
+            if progress_signal:
+                progress_signal.emit(f"F-ratio changed to {current_filter}")
         except:
             print(filter, "is not a valid input")
             print("Please provide a valid filter name.\n")

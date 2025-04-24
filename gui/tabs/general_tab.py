@@ -145,32 +145,34 @@ class GeneralTab(HelperFunctions):
         elif selected_function == "Motor Controller: Reference":
             from core.hardware import motor_control as smc
             smc.open_connection()
-            smc.make_reference_move()
+            smc.make_reference_move(progress_signal=self.main.progress_signal)
             smc.close_connection()
         elif selected_function == "Motor Controller: Move to Position":
             from core.hardware import motor_control as smc
             smc.open_connection()
             position = float(self.number_input.text())
-            smc.move_motor_to_position(position)
+            smc.move_motor_to_position(position, progress_signal=self.main.progress_signal)
             smc.close_connection()
         elif selected_function == "Measure Eccentricity":
             import qhyccd_cam_control
             qhyccd_cam_control.use_camera("eccentricity", self.stop_event)
         elif selected_function == "FF with each Filter":
-            analysis.general_analysis.get_ff_with_all_filters(working_dir)
+            analysis.general_analysis.get_ff_with_all_filters(working_dir, progress_signal=self.main.progress_signal)
         elif selected_function == "Change Color Filter":
+            from core.hardware import filter_wheel_color as fwc
             filter_name = self.filter_input_combo.currentText()
-            move_to_filter.move(filter_name)
+            fwc.move(filter_name, progress_signal=self.main.progress_signal)
         elif selected_function == "Change System F-ratio":
             # Check if the filter wheel is available
-            if self.filter_wheel:
+            if self.main_init.filter_wheel:
                 f_ratio = self.fratio_input_combo.currentText()
-                self.filter_wheel.move_to_filter(f_ratio)
+                self.main_init.filter_wheel.move_to_filter(f_ratio, progress_signal=self.main.progress_signal)
         elif selected_function == "Measure Fiber Size":
             exposure_times = {
                 "exit_cam": self.exposure_time_input_gt.text()
             }
-            analysis.general_analysis.measure_fiber_size(working_dir, exposure_times=exposure_times)
+            analysis.general_analysis.measure_fiber_size(working_dir, exposure_times=exposure_times,
+                                                         progress_signal=self.main.progress_signal)
         elif selected_function == "Near-Field, Far-Field Comparison":
             from qhy_ccd_take_image import convert_to_us
             exposure_times = {
@@ -187,10 +189,12 @@ class GeneralTab(HelperFunctions):
             wdir = os.path.join(working_dir, "NF_FF_Comparison")
 
             # First capture the images
-            analysis.general_analysis.nf_ff_capture(wdir, fiber_diameter=fiber_dimension, exposure_times=exposure_times)
+            analysis.general_analysis.nf_ff_capture(wdir, fiber_diameter=fiber_dimension, exposure_times=exposure_times,
+                                                    progress_signal=self.main.progress_signal)
             self.main.progress_signal.emit(f"Capture done, now processing...")
             # Then analyze the images
-            analysis.general_analysis.nf_ff_process(wdir, fiber_diameter=fiber_dimension)
+            analysis.general_analysis.nf_ff_process(wdir, fiber_diameter=fiber_dimension,
+                                                    progress_signal=self.main.progress_signal)
 
         self.main.progress_signal.emit(f"{selected_function} complete.")
         self.main.experiment_running = False

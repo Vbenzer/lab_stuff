@@ -22,7 +22,7 @@ def main_measure_frd(project_folder:str, progress_signal=None, exp_time:int=7000
     from core.hardware import motor_control as smc
 
     if progress_signal:
-        progress_signal.emit("Starting measurement pipeline, initializing devices...")
+        progress_signal.emit("Initializing devices")
 
     # Connect filter wheel and camera in thread, also reference motor
     fw_thread = threading.Thread(target=init_filter_wheel)
@@ -45,7 +45,7 @@ def main_measure_frd(project_folder:str, progress_signal=None, exp_time:int=7000
     # Iterate over f-ratios and positions
     for f_ratio in f_ratios:
         if progress_signal:
-            progress_signal.emit(f"Measuring f-ratio {f_ratio}...")
+            progress_signal.emit(f"Measuring f-ratio {f_ratio}")
 
         # Create folders for each f-ratio
         current_dark_folder = project_folder + f"/filter_{f_ratio}/DARK"
@@ -55,28 +55,45 @@ def main_measure_frd(project_folder:str, progress_signal=None, exp_time:int=7000
         os.makedirs(current_light_folder)
 
         # Move filter wheel
+        if progress_signal:
+            progress_signal.emit(f"Moving filter wheel to f-ratio {f_ratio}")
         fw.move_to_filter(f_ratio)
 
         for pos in pos_values:
             # Move stepper motor
-            smc.move_motor_to_position(pos) # Idea for minmax: start at 0, move to 5, move to 9.9, move to 5, move to 0 etc.
+            if progress_signal:
+                progress_signal.emit(f"Moving stepper motor to position {pos}")
+
+            smc.move_motor_to_position(
+                pos)  # Idea for minmax: start at 0, move to 5, move to 9.9, move to 5, move to 0 etc.
 
             # Close shutter
+            if progress_signal:
+                progress_signal.emit("Closing shutter")
+
             mtf.move("Closed")
             time.sleep(0.5) # Just to make sure it's not moving
 
             # Take dark
+            if progress_signal:
+                progress_signal.emit(f"Taking dark image at {f_ratio} and {pos}")
+
             cam.take_single_frame(current_dark_folder, f"filter_{f_ratio}_pos_{pos}_dark.fits")
 
             # Open shutter
+            if progress_signal:
+                progress_signal.emit("Opening shutter")
+
             mtf.move("Open")
             time.sleep(0.5)
 
             # Take image
+            if progress_signal:
+                progress_signal.emit(f"Taking light image at {f_ratio} and {pos}")
             cam.take_single_frame(current_light_folder, f"filter_{f_ratio}_pos_{pos}_light.fits")
 
     if progress_signal:
-        progress_signal.emit("All measurements completed!")
+        progress_signal.emit("All measurements completed")
 
 
 def run_from_existing_files(project_folder:str, progress_signal=None):
@@ -84,11 +101,9 @@ def run_from_existing_files(project_folder:str, progress_signal=None):
     Run the analysis pipeline using existing files in the project folder.
     Args:
         project_folder: Path of the project folder.
+        progress_signal: Signal to update progress.
+
     """
-
-    # Write progress to file
-    core.file_management.write_progress("Creating analysis folders")
-
     # Define folders
     dark_folder = project_folder + "/DARK"  # DARK is the standard Nina output folder name for darks
     light_folder = project_folder + "/LIGHT"  # LIGHT is the standard Nina output folder name for lights
@@ -165,7 +180,7 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
         run_from_existing_files(filter_folder, progress_signal)
 
         if progress_signal:
-            progress_signal.emit(f"Analysis for {folder} complete!")
+            progress_signal.emit(f"Analysis for {folder} complete")
 
         # Load the f-number and its error from the JSON file
         with open(filter_folder + "/Measurements/f_number.json") as f:
@@ -173,15 +188,15 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
             f_num[i] = data["f_number"]
             f_num_err[i] = data["f_number_err"]
 
-        if progress_signal:
-            progress_signal.emit(f"Result: {folder} with f-number: {f_num[i]}")
-
     if progress_signal:
-        progress_signal.emit("All filters complete! Starting final plot.")
+        progress_signal.emit("All filters complete")
 
     # Save the output f-numbers to a json
     with open(project_folder + "/f_number.json", "w") as f:
         json.dump({"f_number": f_num.tolist(), "f_number_err": f_num_err.tolist()}, f)
+
+    if progress_signal:
+        progress_signal.emit("Plotting results")
 
     plot_main(project_folder)
 

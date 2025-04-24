@@ -5,7 +5,8 @@ from astropy.io import fits
 #from instrumental.drivers.cameras import uc480
 
 
-def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=None, info:bool=False, save_fits:bool=False):
+def take_image(cam_name: str, save_file_name: str, wait: bool = False, exposure_time=None, info: bool = False,
+               save_fits: bool = False, progress_signal=None):
     cam = instrumental.instrument(cam_name, reopen_policy="new")
 
     cam.open()
@@ -43,8 +44,15 @@ def take_image(cam_name:str, save_file_name:str, wait:bool=False, exposure_time=
             print(f"Max pixel value: {max_pixel}")
             print(f"Min pixel value: {min_pixel}")
             print(f"Mean pixel value: {mean_pixel}")
+            if progress_signal:
+                progress_signal.emit(f"Max pixel value: {max_pixel}")
+                progress_signal.emit(f"Min pixel value: {min_pixel}")
+                progress_signal.emit(f"Mean pixel value: {mean_pixel}")
     else:
         print("Failed to capture image.")
+        if progress_signal:
+            progress_signal.emit("Failed to capture image.")
+
     cam.close()
     cv2.destroyAllWindows()
 
