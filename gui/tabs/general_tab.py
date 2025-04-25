@@ -128,19 +128,18 @@ class GeneralTab(HelperFunctions):
             """import fiber_frd_measurements as frd
             frd.main_measure_all_filters(working_dir, progress_signal=self.progress_signal,
                                          base_directory=self.base_directory)"""
-            import qhy_ccd_take_image as qhy
+            from core.hardware.cameras import qhyccd_control as qhy
             exposure_time = qhy.convert_to_us(self.exposure_time_input_gt.text())
             analysis.frd_analysis.main_measure_frd(working_dir, progress_signal=self.main.progress_signal, exp_time=exposure_time)
 
             analysis.frd_analysis.main_analyse_all_filters(working_dir, progress_signal=self.main.progress_signal)
 
         elif selected_function == "Make Throughput Calibration":
-            import throughput_analysis as ta
+            from analysis import throughput_analysis as ta
             calibration_folder_name = os.path.basename(working_dir)
             ta.measure_all_filters(working_dir, progress_signal=self.main.progress_signal, calibration=calibration_folder_name,
                                    base_directory=self.main.base_directory)
         elif selected_function == "Adjust Tip/Tilt":
-            import qhyccd_cam_control
             qhyccd_cam_control.use_camera("tiptilt", self.stop_event)
         elif selected_function == "Motor Controller: Reference":
             from core.hardware import motor_control as smc
@@ -154,7 +153,6 @@ class GeneralTab(HelperFunctions):
             smc.move_motor_to_position(position, progress_signal=self.main.progress_signal)
             smc.close_connection()
         elif selected_function == "Measure Eccentricity":
-            import qhyccd_cam_control
             qhyccd_cam_control.use_camera("eccentricity", self.stop_event)
         elif selected_function == "FF with each Filter":
             analysis.general_analysis.get_ff_with_all_filters(working_dir, progress_signal=self.main.progress_signal)
@@ -174,7 +172,7 @@ class GeneralTab(HelperFunctions):
             analysis.general_analysis.measure_fiber_size(working_dir, exposure_times=exposure_times,
                                                          progress_signal=self.main.progress_signal)
         elif selected_function == "Near-Field, Far-Field Comparison":
-            from qhy_ccd_take_image import convert_to_us
+            from core.hardware.cameras.qhyccd_control import convert_to_us
             exposure_times = {
                 "exit_cam": convert_to_us(self.exposure_time_input_gt_2.text()),
                 "entrance_cam": self.exposure_time_input_gt.text()

@@ -1,8 +1,7 @@
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
-                             QSizePolicy, QDialog, QVBoxLayout, QMessageBox
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QLabel, QLineEdit,
+                             QPushButton, QComboBox, QVBoxLayout
                              )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
+from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
 from gui.tabs.helpers import HelperFunctions
@@ -80,10 +79,10 @@ class CameraTab(HelperFunctions):
     def run_camera_function_thread(self, selected_function, working_dir):
         self.main.progress_signal.emit(f"Running {selected_function}...")
         if selected_function == "Thorlabs Camera Live":
-            import thorlabs_cam_control
+            from core.hardware.cameras import thorlabs_cam_control
             thorlabs_cam_control.open_thorcam()
         elif selected_function == "Thorlabs Camera Single":
-            import thorlabs_cam_control
+            from core.hardware.cameras import thorlabs_cam_control
             if self.camera_chooser_combo.currentText() == "Entrance Cam":
                 cam_type = "entrance_cam"
                 exp_time = self.exposure_time_input.text()
@@ -98,7 +97,6 @@ class CameraTab(HelperFunctions):
                                                 save_fits=True, progress_signal=self.main.progress_signal)
 
         elif selected_function == "Qhyccd Camera Single":
-            import qhy_ccd_take_image
             self.qhyccd_cam = qhy_ccd_take_image.Camera(1000)
 
             exposure_time_us = qhy_ccd_take_image.convert_to_us(self.exposure_time_input.text())

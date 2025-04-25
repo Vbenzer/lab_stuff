@@ -10,7 +10,6 @@ from scipy.stats import linregress
 
 import core.data_processing
 import core.file_management
-import qhy_ccd_take_image
 import core.hardware.filter_wheel_fratio as qhycfw3_filter_wheel_control
 
 from analysis.visualization import plot_main

@@ -432,7 +432,7 @@ def calc_px_to_mu(image_folder, fiber_diameter, plot=False):
     return px_to_mu_list
 
 def capture_px_mu_calib_images(main_folder, number_of_images):
-    import thorlabs_cam_control as tcc
+    from core.hardware.cameras import thorlabs_cam_control as tcc
     os.makedirs(main_folder, exist_ok=False)
     exit_folder = os.path.join(main_folder, "exit")
     os.makedirs(exit_folder, exist_ok=True)

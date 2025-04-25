@@ -1,8 +1,7 @@
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
-                             QSizePolicy, QDialog, QVBoxLayout, QMessageBox
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QLabel, QLineEdit,
+                             QPushButton, QComboBox, QCheckBox, QVBoxLayout
                              )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
+from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
 import threading
@@ -152,7 +151,6 @@ class MeasureTab:
 
     def measure_sg(self, working_dir, fiber_diameter, fiber_shape):
         self.main_init.show_message(f"Running SG measurement with working dir: {working_dir}, fiber diameter: {fiber_diameter}, and fiber shape: {fiber_shape}")
-        import unused_sg_functions
         exposure_time_exit = self.exposure_time_input_mt_exit.text()
         exposure_time_entrance = self.exposure_time_input_mt_entrance.text()
         exp_times = {"exit": exposure_time_exit, "entrance": exposure_time_entrance}
@@ -160,8 +158,7 @@ class MeasureTab:
         analysis.sg_analysis.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.main.progress_signal, exposure_times=exp_times)
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
-        import analyse_main_obs as am
-        import qhy_ccd_take_image as qhy
+        from core.hardware.cameras import qhyccd_control as qhy
 
         self.main_init.show_message(f"Running FRD measurement with working dir: {working_dir}")
 
@@ -170,7 +167,7 @@ class MeasureTab:
 
     def measure_throughput(self, working_dir, fiber_diameter, fiber_shape):
         self.show_message(f"Running Throughput measurement with working dir: {working_dir}")
-        import throughput_analysis
+        from analysis import throughput_analysis
         throughput_analysis.measure_all_filters(working_dir, progress_signal=self.main.progress_signal, base_directory=self.main.base_directory)
 
     def update_measurement_button_state(self):

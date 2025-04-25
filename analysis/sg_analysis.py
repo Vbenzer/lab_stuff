@@ -838,7 +838,7 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         # Raise an error if the exposure times are not given
         raise ValueError("Exposure times must be given.")
 
-    import thorlabs_cam_control as tcc
+    from core.hardware.cameras import thorlabs_cam_control as tcc
     import time
     from core.hardware import motor_control as smc
 

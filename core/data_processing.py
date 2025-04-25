@@ -729,3 +729,75 @@ def com_of_spot(image:np.ndarray, threshold=None, plot:bool=False):
         plt.show()
 
     return com
+
+
+def analyse_f_number(image:np.ndarray, measurements_folder:str):
+    """
+    Analyse the f-number of the image and save it to a json
+    Args:
+        image: Image to analyse
+        measurements_folder: Path to the folder where the measurements are saved
+
+    Returns:
+
+    """
+    # Calculate radius
+    trimmed_data = core.data_processing.cut_image(image, margin=500)  # Margin at 500 good for now
+
+    # Locate center of mass within trimmed image (array)
+    com = core.data_processing.locate_focus(trimmed_data)
+
+    # Swap x and y
+    com = (com[1], com[0])
+
+    print("Calculating radius...")
+
+    # Find aperture with encircled energy
+    os.makedirs(measurements_folder, exist_ok=True)
+    radius = core.data_processing.find_circle_radius(trimmed_data, com, ee_value=0.98, plot=True, save_data=False)
+
+    print(f"Radius: {radius}")
+
+    # Add the radius to existing json file
+    # Path to the JSON file
+    json_file_path = measurements_folder + "radii.json"
+
+    # Check if the file exists
+    if os.path.exists(json_file_path):
+        # Load existing data
+        with open(json_file_path, 'r') as file:
+            existing_data = json.load(file)
+    else:
+        # Initialize an empty list if the file does not exist
+        existing_data = {"radius": []}
+
+    # Append new data
+    radii = existing_data["radius"]
+
+    # Delete old measurements if too many
+    if len(radii) > 200:
+        radii = radii[-200:]
+
+    # Don't append if radius deviates too much from the mean
+    if len(radii) > 0:
+        mean_radius = np.mean(radii)
+        if abs(radius - mean_radius) > 200:
+            print("Radius deviates too much from mean. Not appending.")
+        else:
+            radii.append(radius)
+    else:
+        radii.append(radius)
+
+    new_data = {"radius": radii}
+
+    # Write the updated data back to the file
+    with open(json_file_path, 'w') as file:
+        json.dump(new_data, file, indent=4)
+
+    # Plot radius vs number of measurements
+    plt.plot(radii)
+    plt.xlabel("Number of measurements")
+    plt.ylabel("Radius")
+    plt.title("Radius vs Number of Measurements")
+    plt.savefig(measurements_folder + "radius_vs_measurements.png")
+    plt.close()

@@ -5,28 +5,6 @@ import time
 import h5py
 import numpy as np
 
-
-def write_progress(step:str):
-    """
-    Writes the progress of the experiment to a file to be read by the GUI.
-    Args:
-        step: Description of the current step.
-    """
-    with open("progress.txt", "a") as f:
-        f.write(f"{step}\n")
-
-
-def progress_file_remove():
-    """
-    Removes the progress file after the experiment is complete
-    """
-    with open("progress.txt", "a") as f:
-        f.write("Experiment Complete\n")
-    time.sleep(2)
-    if os.path.exists("progress.txt"):
-        os.remove("progress.txt")
-
-
 def create_new_hdf5(file_path:str):
     # Create a new HDF5 file
     h5py.File(file_path, 'a')

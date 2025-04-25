@@ -1,11 +1,8 @@
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
-                             QSizePolicy, QDialog, QVBoxLayout, QMessageBox
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QLabel, QLineEdit,
+                             QPushButton, QComboBox, QCheckBox, QVBoxLayout
                              )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
-from PyQt6.QtGui import QRegularExpressionValidator
 
-import threading, os, json
+import threading, os
 
 import analysis.frd_analysis
 import analysis.sg_analysis
@@ -124,11 +121,11 @@ class AnalyseTab:
                 analysis.sg_analysis.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.main.progress_signal)
 
             if self.plot_sg_checkbox.isChecked():
-                from unused_sg_functions import plot_sg_cool_like
+                from unused_functions.unused_sg_functions import plot_sg_cool_like
                 plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.main.progress_signal)
 
             if self.calc_sg_checkbox.isChecked():
-                from unused_sg_functions import calc_sg
+                from unused_functions.unused_sg_functions import calc_sg
                 calc_sg(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_coms_checkbox.isChecked():
@@ -153,7 +150,6 @@ class AnalyseTab:
 
         elif analysis_type == "FRD":
             directory = os.path.join(working_dir, "FRD")
-            import fiber_frd_measurements_obs as frd
             if self.calc_frd_checkbox.isChecked():
                 analysis.frd_analysis.main_analyse_all_filters(directory, progress_signal=self.main.progress_signal)
             if self.plot_sutherland_checkbox.isChecked():
@@ -165,7 +161,7 @@ class AnalyseTab:
 
         elif analysis_type == "Throughput":
             directory = os.path.join(working_dir, "Throughput")
-            import throughput_analysis
+            from analysis import throughput_analysis
             throughput_analysis.main(directory, calibration_folder)
 
         self.main.progress_signal.emit("Analysis complete.")

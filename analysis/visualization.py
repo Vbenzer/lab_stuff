@@ -200,7 +200,6 @@ def sutherland_plot(project_folder:str):
         with fits.open(reduced_image_path) as hdul:
             reduced_image = hdul[0].data.astype(np.float32)
 
-        import image_analysation_obs as ia
         # Trim data to area of interest
         trimmed_data = core.data_processing.cut_image(reduced_image, margin=1000)  # If margin too low mask won't fit in image
 
@@ -232,7 +231,6 @@ def sutherland_plot(project_folder:str):
             aperture_radius = int(round(aperture_radius_pix))
 
             # Create a circle mask
-            import unused_sg_functions
             mask = analysis.sg_analysis.create_circular_mask(trimmed_data, (com[0], com[1]), aperture_radius, plot_mask=False)
 
             # Calculate the flux within the mask
@@ -329,8 +327,6 @@ def sutherland_plot(project_folder:str):
 
 
 def plot_f_ratio_circles_on_raw(project_folder):
-        import unused_sg_functions
-        import image_analysation_obs as ia
         from skimage import measure
         from matplotlib.colors import LogNorm
 
@@ -472,7 +468,6 @@ def plot_horizontal_cut_ff(project_folder):
             reduced_image = hdul[0].data.astype(np.float32)
 
         # Trim data to area of interest
-        import image_analysation_obs as ia
         trimmed_data = core.data_processing.cut_image(reduced_image, margin=500)
 
         # Locate center of mass within trimmed image (array)

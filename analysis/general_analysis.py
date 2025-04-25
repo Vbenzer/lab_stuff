@@ -6,10 +6,9 @@ from matplotlib import pyplot as plt
 from skimage import io, transform
 
 import core.data_processing
-import qhy_ccd_take_image
 import core.hardware.filter_wheel_fratio as qhycfw3_filter_wheel_control
 
-import thorlabs_cam_control as tcc
+from core.hardware.cameras import thorlabs_cam_control as tcc
 
 
 def measure_fiber_size(project_folder: str, exposure_times: dict[str, str] = None, progress_signal=None):
@@ -45,7 +44,6 @@ cam = None
 
 
 def init_camera(exp_time:int):
-    import qhy_ccd_take_image
     global cam
     cam = qhy_ccd_take_image.Camera(exp_time=exp_time)
 

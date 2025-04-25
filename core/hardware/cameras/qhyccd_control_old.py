@@ -8,6 +8,8 @@ import warnings
 
 import core.data_processing
 
+# Old functions, should be reworked
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 qhyccddll = cdll.LoadLibrary('.\\qhyccd.dll')
@@ -281,8 +283,7 @@ def measure_ongoing_radius(measure:bool=False, stop_signal:bool=False):
                 fits.writeto("D:/Vincent/tip_tilt/image.fits", img, overwrite=True)
 
             measurements_folder = "D:/Vincent/tip_tilt/"
-            import tip_tilt_adjustment as tta
-            tta.analyse_f_number(img, measurements_folder)
+            core.data_processing.analyse_f_number(img, measurements_folder)
 
             # Run check_tiptilt_image.bat
             import os
@@ -352,7 +353,6 @@ def measure_eccentricity(measure:bool=True, stop_signal:bool=False):
                 fits.writeto("D:/Vincent/eccentricity/image.fits", img, overwrite=True)
 
             #measurements_folder = "D:/Vincent/eccentricity/"
-            import image_analysation_obs as ia
             ecc = core.data_processing.measure_eccentricity(img, plot=False)
 
             print(f"Eccentricity: {ecc}")
