@@ -15,6 +15,7 @@ class GeneralTab(HelperFunctions):
     def __init__(self, main, main_init):
         self.main = main
         self.main_init = main_init
+        self.main_init.log_data("GeneralTab initialized.")  # Log initialization
         layout = QVBoxLayout()
 
         self.general_function_label = QLabel("Select Function:")
@@ -109,20 +110,24 @@ class GeneralTab(HelperFunctions):
 
     def run_general_function(self):
         selected_function = self.general_function_combo.currentText()
+        self.main_init.log_data(f"Run general function started: {selected_function}.")  # Log function start
 
         if (selected_function in ["Measure Eccentricity", "Adjust Tip/Tilt", "FF with each Filter", "Measure Fiber Size"]
                 and self.main.folder_name != ""):
+            self.main_init.log_data(f"Run general function failed: Folder name not entered for {selected_function}.")  # Log failure
             self.show_message("Please enter folder name before running the function.")
             return
 
         self.main.experiment_running = True
         self.main_init.update_ui_state()
+        self.main_init.log_data("Experiment running state set to True.")  # Log state change
 
         working_dir = self.main_init.working_dir_display.text()
         threading.Thread(target=self.run_general_function_thread, args=(selected_function, working_dir)).start()
 
     def run_general_function_thread(self, selected_function, working_dir):
         self.main.progress_signal.emit(f"Running {selected_function}...")
+        self.main_init.log_data(f"General function thread started: {selected_function}.")  # Log thread start
         self.stop_event = threading.Event()
         if selected_function == "Measure System F-ratio":
             """import fiber_frd_measurements as frd
@@ -197,12 +202,14 @@ class GeneralTab(HelperFunctions):
         self.main.progress_signal.emit(f"{selected_function} complete.")
         self.main.experiment_running = False
         self.main_init.update_ui_state()
+        self.main_init.log_data(f"General function completed: {selected_function}.")  # Log function completion
 
     def update_general_tab_buttons(self):
         if self.main_init.tabs.currentWidget() != self.main_init.general_tab:
             return
 
         selected_function = self.general_function_combo.currentText()
+        self.main_init.log_data(f"General tab buttons updated for function: {selected_function}.")  # Log button update
 
         # Spacer management
         spacer_height = (

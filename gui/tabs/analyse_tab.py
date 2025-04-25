@@ -13,6 +13,7 @@ class AnalyseTab:
     def __init__(self, main, main_init):
         self.main = main
         self.main_init = main_init
+        self.main_init.log_data("AnalyseTab initialized.")  # Log initialization
         layout = QVBoxLayout()
 
         self.analysis_type_label = QLabel("Analysis Type:")
@@ -92,10 +93,12 @@ class AnalyseTab:
 
     def run_analysis(self):
         if not self.main.folder_name and self.main.fiber_dimension and self.main.fiber_shape != "":
+            self.main_init.log_data("Run analysis failed: Inputs not locked.")  # Log failure
             self.show_message("Please lock the inputs before running the analysis.")
             return
 
         analysis_type = self.analysis_type_combo.currentText()
+        self.main_init.log_data(f"Run analysis started for type: {analysis_type}")  # Log analysis type
         working_dir = self.main_init.working_dir_display.text()
         fiber_shape = self.main.fiber_shape
 
@@ -108,68 +111,98 @@ class AnalyseTab:
 
         self.main.experiment_running = True
         self.main_init.update_ui_state()
+        self.main_init.log_data("Experiment running state set to True.")  # Log state change
 
         threading.Thread(target=self.run_analysis_thread,
                          args=(analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_folder)).start()
 
     def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_folder):
         self.main.progress_signal.emit("Starting analysis...")
+        self.main_init.log_data(f"Analysis thread started for type: {analysis_type}")  # Log thread start
         if analysis_type == "SG":
             directory = os.path.join(working_dir, "SG")
             if self.get_params_checkbox.isChecked():
-                print("Getting SG parameters with fiber diameter:", fiber_diameter, "and fiber shape:", fiber_shape)
+                self.main_init.log_data("Getting SG parameters.")  # Log SG parameters
+                self.main.progress_signal.emit("Getting SG parameters.")
                 analysis.sg_analysis.get_sg_params(directory, fiber_diameter, fiber_shape, progress_signal=self.main.progress_signal)
 
             if self.plot_sg_checkbox.isChecked():
+                self.main_init.log_data("Plotting SG.")  # Log SG plotting
+                self.main.progress_signal.emit("Plotting SG.")
                 from unused_functions.unused_sg_functions import plot_sg_cool_like
                 plot_sg_cool_like(directory, fiber_diameter, progress_signal=self.main.progress_signal)
 
             if self.calc_sg_checkbox.isChecked():
+                self.main_init.log_data("Calculating SG.")  # Log SG calculation
+                self.main.progress_signal.emit("Calculating SG.")
                 from unused_functions.unused_sg_functions import calc_sg
                 calc_sg(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_coms_checkbox.isChecked():
+                self.main_init.log_data("Plotting COMs.")  # Log COMs plotting
+                self.main.progress_signal.emit("Plotting COMs.")
                 analysis.visualization.plot_coms(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_masks_checkbox.isChecked():
+                self.main_init.log_data("Plotting masks.")  # Log mask plotting
+                self.main.progress_signal.emit("Plotting masks.")
                 analysis.visualization.plot_masks(directory, fiber_diameter, progress_signal=self.main.progress_signal)
 
             if self.make_video_checkbox.isChecked():
+                self.main_init.log_data("Making comparison video.")  # Log video creation
+                self.main.progress_signal.emit("Making comparison video.")
                 analysis.visualization.make_comparison_video(directory, fiber_diameter,
                                                              progress_signal=self.main.progress_signal)
 
             if self.plot_com_comk_on_image_cut_checkbox.isChecked():
-                self.main.progress_signal.emit("Running plot_com_comk_on_image_cut...")
+                self.main_init.log_data("Plotting COM and COMK on image cut.")  # Log COM/COMK plotting
+                self.main.progress_signal.emit("Plotting COM and COMK on image cut.")
                 analysis.visualization.plot_com_comk_on_image_cut(directory, progress_signal=self.main.progress_signal)
 
             if self.sg_new_checkbox.isChecked():
+                self.main_init.log_data("Running SG new analysis.")  # Log SG new analysis
+                self.main.progress_signal.emit("Running SG new analysis.")
                 analysis.sg_analysis.sg_new(directory, progress_signal=self.main.progress_signal)
 
             if self.plot_nf_horizontal_cut_checkbox.isChecked():
+                self.main_init.log_data("Plotting NF horizontal cut.")  # Log NF horizontal cut
+                self.main.progress_signal.emit("Plotting NF horizontal cut.")
                 analysis.visualization.plot_horizontal_cut_nf(directory)
 
         elif analysis_type == "FRD":
             directory = os.path.join(working_dir, "FRD")
             if self.calc_frd_checkbox.isChecked():
+                self.main_init.log_data("Calculating FRD.")  # Log FRD calculation
+                self.main.progress_signal.emit("Calculating FRD.")
                 analysis.frd_analysis.main_analyse_all_filters(directory, progress_signal=self.main.progress_signal)
             if self.plot_sutherland_checkbox.isChecked():
+                self.main_init.log_data("Plotting Sutherland plot.")  # Log Sutherland plot
+                self.main.progress_signal.emit("Plotting Sutherland plot.")
                 analysis.visualization.sutherland_plot(directory)
             if self.plot_f_ratio_circles_on_raw_checkbox.isChecked():
+                self.main_init.log_data("Plotting F-ratio circles on raw image.")  # Log F-ratio circles
+                self.main.progress_signal.emit("Plotting F-ratio circles on raw image.")
                 analysis.visualization.plot_f_ratio_circles_on_raw(directory)
             if self.plot_nf_horizontal_cut_checkbox.isChecked():
+                self.main_init.log_data("Plotting NF horizontal cut for FRD.")  # Log NF horizontal cut for FRD
+                self.main.progress_signal.emit("Plotting NF horizontal cut for FRD.")
                 analysis.visualization.plot_horizontal_cut_ff(directory)
 
         elif analysis_type == "Throughput":
             directory = os.path.join(working_dir, "Throughput")
+            self.main_init.log_data("Running throughput analysis.")  # Log throughput analysis
             from analysis import throughput_analysis
             throughput_analysis.main(directory, calibration_folder)
 
         self.main.progress_signal.emit("Analysis complete.")
+        self.main_init.log_data("Analysis complete.")  # Log analysis completion
         self.main.experiment_running = False
         self.main_init.update_ui_state()
+        self.main_init.log_data("Experiment running state set to False.")  # Log state change
 
     def update_analysis_tab(self):
         analysis_type = self.analysis_type_combo.currentText()
+        self.main_init.log_data(f"Analysis tab updated for type: {analysis_type}")  # Log tab update
 
         # Reset all checkboxes
         for checkbox in [self.plot_sg_checkbox, self.calc_sg_checkbox, self.plot_coms_checkbox,
@@ -232,4 +265,3 @@ class AnalyseTab:
             self.calibration_folder_input.show()
             self.calibration_folder_button.show()
             self.plot_ff_horizontal_cut_checkbox.hide()
-

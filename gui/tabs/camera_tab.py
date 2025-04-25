@@ -14,6 +14,7 @@ class CameraTab(HelperFunctions):
         self.main = main
         self.main_init = main_init
         self.main_init.update_input_visibility()
+        self.main_init.log_data("CameraTab initialized.")  # Log initialization
 
         layout = QVBoxLayout()
 
@@ -61,14 +62,17 @@ class CameraTab(HelperFunctions):
         folder_name = self.main.folder_name
 
         if selected_function in ["Thorlabs Camera", "Qhyccd Camera"] and folder_name != "":
+            self.main_init.log_data(f"Run camera function failed: Folder name not entered for {selected_function}.")  # Log failure
             self.show_message("Please enter folder name before running the function.")
             return
 
         if not self.exposure_time_input.hasAcceptableInput():
+            self.main_init.log_data("Run camera function failed: Invalid exposure time input.")  # Log invalid input
             return
 
         self.main.experiment_running = True
         self.main_init.update_ui_state()
+        self.main_init.log_data(f"Run camera function started: {selected_function}.")  # Log start
 
         working_dir = self.main_init.working_dir_display.text()
 
@@ -78,9 +82,13 @@ class CameraTab(HelperFunctions):
 
     def run_camera_function_thread(self, selected_function, working_dir):
         self.main.progress_signal.emit(f"Running {selected_function}...")
+        self.main_init.log_data(f"Camera function thread started: {selected_function}.")  # Log thread start
+
         if selected_function == "Thorlabs Camera Live":
             from core.hardware.cameras import thorlabs_cam_control
             thorlabs_cam_control.open_thorcam()
+            self.main_init.log_data("Thorlabs Camera Live function executed.")  # Log execution
+
         elif selected_function == "Thorlabs Camera Single":
             from core.hardware.cameras import thorlabs_cam_control
             if self.camera_chooser_combo.currentText() == "Entrance Cam":
@@ -95,6 +103,7 @@ class CameraTab(HelperFunctions):
                 image_name_path = os.path.join(working_dir, "exit_image.fits")
                 thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True,
                                                 save_fits=True, progress_signal=self.main.progress_signal)
+            self.main_init.log_data(f"Thorlabs Camera Single function executed for {cam_type}.")  # Log execution
 
         elif selected_function == "Qhyccd Camera Single":
             self.qhyccd_cam = qhy_ccd_take_image.Camera(1000)
@@ -105,10 +114,12 @@ class CameraTab(HelperFunctions):
             self.qhyccd_cam.take_single_frame(working_dir, image_name, show=True,
                                               progress_signal=self.main.progress_signal)
             self.qhyccd_cam.close()
+            self.main_init.log_data("Qhyccd Camera Single function executed.")  # Log execution
 
         self.main.progress_signal.emit(f"{selected_function} complete.")
         self.main.experiment_running = False
         self.main_init.update_ui_state()
+        self.main_init.log_data(f"Camera function completed: {selected_function}.")  # Log completion
 
     def update_camera_tab_buttons(self):
         if self.main_init.tabs.currentWidget() != self.main_init.camera_tab:
@@ -117,6 +128,7 @@ class CameraTab(HelperFunctions):
         self.main_init.update_run_button_state()
 
         selected_function = self.camera_function_combo.currentText()
+        self.main_init.log_data(f"Camera tab buttons updated for function: {selected_function}.")  # Log button update
 
         if selected_function == "Thorlabs Camera Live":
             self.main_init.folder_name_input.hide()
@@ -138,6 +150,8 @@ class CameraTab(HelperFunctions):
             else:
                 self.main.insert_spacer(162)
 
+            self.main_init.log_data("UI updated for Thorlabs Camera Live.")  # Log UI update
+
         else:
             if hasattr(self.main, 'placeholder_spacer'):
                 self.main.layout.removeItem(self.main.placeholder_spacer)
@@ -158,10 +172,11 @@ class CameraTab(HelperFunctions):
             self.exposure_time_input.show()
             self.run_button_ct.setDisabled(self.main_init.folder_name_input.text() == "")
 
+            self.main_init.log_data("UI updated for other camera functions.")  # Log UI update
+
         if selected_function == "Thorlabs Camera Single":
             self.camera_chooser_label.show()
             self.camera_chooser_combo.show()
         else:
             self.camera_chooser_label.hide()
             self.camera_chooser_combo.hide()
-

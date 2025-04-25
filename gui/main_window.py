@@ -1,3 +1,7 @@
+import socket
+import threading
+
+import serial.tools
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
                              QSizePolicy, QDialog, QVBoxLayout, QMessageBox
@@ -5,7 +9,9 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
-import os
+import os, sys, json, subprocess, time
+
+from core.hardware.filter_wheel_fratio import FilterWheel
 
 from gui.tabs.helpers import HelperFunctions
 from gui.tabs.analyse_tab import AnalyseTab
@@ -13,6 +19,8 @@ from gui.tabs.camera_tab import CameraTab
 from gui.tabs.measure_tab import MeasureTab
 from gui.tabs.general_tab import GeneralTab
 from widgets import *
+
+
 
 def load_recent_folders(file_path:str):
     import os, json
@@ -58,6 +66,13 @@ class MainWindowInit(HelperFunctions, Widgets):
     def __init__(self, main_ctrl):
         self.main = main_ctrl
         self.main_init = self  # Define reference to self as main_init
+
+        # Create log file
+        self.create_log_file()
+        self.log_data("MainWindowInit initialized.")  # Log initialization
+
+        self.log_data(f"Base directory: {self.main.base_directory}")  # Log base directory
+        self.log_data(f"OS name: {self.main.os_name}")  # Log OS name
 
         self.folder_name_label = QLabel("Fiber Name:")
         self.folder_name_input = QLineEdit()
@@ -257,6 +272,7 @@ class MainWindowInit(HelperFunctions, Widgets):
             return
 
         if folder:
+            self.log_data(f"Folder chosen: {folder}")  # Log folder selection
             self.working_dir_display.setText(folder)
             self.folder_name_input.setText(os.path.basename(folder))
 
@@ -266,10 +282,12 @@ class MainWindowInit(HelperFunctions, Widgets):
             self.update_comments_button()
             update_recent_folders(folder, self.recent_folders, base_directory=self.main.base_directory)
             self.update_recent_folders_combo()
+            self.log_data(f"Recent folders updated with: {folder}")  # Log recent folder update
 
     def select_recent_folder(self, index):
         if 0 < index <= len(self.recent_folders):
             folder = self.recent_folders[index - 1]
+            self.log_data(f"Recent folder selected: {folder}")  # Log recent folder selection
             self.working_dir_display.setText(folder)
             self.folder_name_input.setText(os.path.basename(folder))
             self.main.open_fiber_data_window()
@@ -285,49 +303,35 @@ class MainWindowInit(HelperFunctions, Widgets):
     def show_message(self, message):
         self.main.message_label.setText(message)
 
-    def update_progress(self, message):
-        if not self.progress_text_edit.isVisible():
-            self.progress_text_edit.show()
-        self.progress_text_edit.append(message)
+    def create_log_file(self):
+        # Create log file in log folder to log all actions
+        log_folder = os.path.join(self.main.base_directory, "logs")
+        os.makedirs(log_folder, exist_ok=True)
+        current_time = time.strftime("%Y-%m-%d_%H-%M-%S")
+        log_name = f"log_{current_time}.txt"
+        self.log_name = log_name
+        log_file_path = os.path.join(log_folder, log_name)
+        # Create the log file
+        with open(log_file_path, "w") as log_file:
+            log_file.write(f"{current_time}: Log file created.\n")
 
-        # Calculate the height based on the number of lines
-        line_height = self.progress_text_edit.fontMetrics().height()
-        num_lines = self.progress_text_edit.document().blockCount()
-        max_lines = 10
-        new_height = min(num_lines, max_lines) * line_height + 10  # Add some padding
-
-        # Set the new height
-        self.progress_text_edit.setFixedHeight(new_height)
-
-    def update_working_dir(self):
-        fiber_name = self.folder_name_input.text()
-        if fiber_name:
-            working_dir = os.path.join(self.main.base_directory, fiber_name)
-            self.working_dir_display.setText(working_dir)
-        else:
-            self.working_dir_display.setText("")
-
-    def check_existing_measurements(self, folder):
-        measurements = []
-        if os.path.exists(os.path.join(folder, "FRD")):
-            measurements.append("FRD")
-        if os.path.exists(os.path.join(folder, "SG")):
-            measurements.append("SG")
-        if os.path.exists(os.path.join(folder, "Throughput")):
-            measurements.append("Throughput")
-
-        if measurements:
-            self.measure_tab_init.existing_measurements_label.setText(f"Measurements already done: {', '.join(measurements)}")
-        else:
-            self.measure_tab_init.existing_measurements_label.setText("No measurements done yet.")
+    def log_data(self, message):
+        # Append the message to the log file
+        log_folder = os.path.join(self.main.base_directory, "logs")
+        current_time = time.strftime("%H-%M-%S")
+        log_file_path = os.path.join(log_folder, self.log_name)
+        with open(log_file_path, "a") as log_file:
+            log_file.write(f"{current_time}: {message}\n")
 
     def create_datasheet(self):
         working_dir = self.working_dir_display.text()
         fiber_folder = self.folder_name_input.text()
         if working_dir == "":
+            self.log_data("Datasheet creation failed: No working directory selected.")  # Log failure
             self.show_message("Please select a working directory first.")
             return
         if not os.path.exists(working_dir):
+            self.log_data("Datasheet creation failed: Working directory does not exist.")  # Log failure
             self.show_message("Working directory does not exist.")
             return
 
@@ -357,9 +361,11 @@ class MainWindowInit(HelperFunctions, Widgets):
         env = os.environ.copy()
         env["QUARTO_PYTHON"] = "/usr/bin/python3"
         try:
+            self.log_data("Datasheet creation started.")  # Log start
             self.show_message("Creating datasheet...")
             result = subprocess.run(" ".join(command), env=env, shell=True, check=True, capture_output=True, text=True)
             print("Command output:", result.stdout)
+            self.log_data("Datasheet created successfully.")  # Log success
             self.show_message("Datasheet created successfully.")
             # Copy the datasheet to the working directory
             datasheet_path = os.path.join("fiber_datasheet", "fiber_datasheet_template.pdf")
@@ -367,9 +373,152 @@ class MainWindowInit(HelperFunctions, Widgets):
             self.show_message("Datasheet copied to working directory.")
 
         except subprocess.CalledProcessError as e:
+            self.log_data(f"Datasheet creation failed: {e.stderr}")  # Log error
             print("Error:", e.stderr)
             self.show_message("Error creating datasheet.")
+
+    def update_progress(self, message):
+        if not self.progress_text_edit.isVisible():
+            self.progress_text_edit.show()
+        self.progress_text_edit.append(message)
+
+        self.log_data(f"Progress updated: {message}")  # Log progress updates
+
+        # Calculate the height based on the number of lines
+        line_height = self.progress_text_edit.fontMetrics().height()
+        num_lines = self.progress_text_edit.document().blockCount()
+        max_lines = 10
+        new_height = min(num_lines, max_lines) * line_height + 10  # Add some padding
+
+        # Set the new height
+        self.progress_text_edit.setFixedHeight(new_height)
+
+    def update_working_dir(self):
+        fiber_name = self.folder_name_input.text()
+        if fiber_name:
+            working_dir = os.path.join(self.main.base_directory, fiber_name)
+            self.log_data(f"Working directory updated: {working_dir}")  # Log working directory update
+            self.working_dir_display.setText(working_dir)
+        else:
+            self.log_data("Working directory cleared.")  # Log clearing of working directory
+            self.working_dir_display.setText("")
+
+    def check_existing_measurements(self, folder):
+        measurements = []
+        if os.path.exists(os.path.join(folder, "FRD")):
+            measurements.append("FRD")
+        if os.path.exists(os.path.join(folder, "SG")):
+            measurements.append("SG")
+        if os.path.exists(os.path.join(folder, "Throughput")):
+            measurements.append("Throughput")
+
+        self.log_data(f"Existing measurements checked: {', '.join(measurements) if measurements else 'None'}")  # Log measurements
+
+        if measurements:
+            self.measure_tab_init.existing_measurements_label.setText(f"Measurements already done: {', '.join(measurements)}")
+        else:
+            self.measure_tab_init.existing_measurements_label.setText("No measurements done yet.")
 
     def stop_general_function(self):
         self.stop_event.set()
         self.progress_signal.emit("Stopping function...")
+
+
+
+class MainWindow(QMainWindow, HelperFunctions, Widgets):
+    progress_signal = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+
+        self.stop_event = threading.Event()
+        self.choose_base_path()
+        #print(self.base_directory)
+        self.inputs_locked = False
+        self.experiment_running = False
+
+        self.setWindowTitle("Fiber Measurement and Analysis")
+        self.setGeometry(100, 100, 800, 600)
+
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+
+        self.layout = QVBoxLayout(self.central_widget)
+
+        self.fiber_diameter = ""
+        self.fiber_width = ""
+        self.fiber_height = ""
+        self.fiber_shape = ""
+        self.folder_name = ""
+        self.fiber_dimension = ""
+
+        self.message_label = QLabel("")
+        self.message_label.setStyleSheet("color: red; font-weight: bold;")
+
+        self.filter_wheel_ready = False
+        self.filter_wheel_initiated = False
+
+        self.main_window_init = MainWindowInit(self)
+
+        self.fiber_data_window = FiberDataWindow(self)
+
+    def choose_base_path(self):
+        if sys.platform.startswith("linux"):
+            os_name = "Linux"
+            base_path = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements"
+        elif sys.platform.startswith("win"):
+            os_name = "Windows"
+            hostname = socket.gethostname()
+            if hostname == "DESKTOP-HEBN59N":
+                base_path = r"D:\Vincent"
+            else:
+                base_path = r"\\srv4\labshare\raw_data\fibers\Measurements"
+        else:
+            raise OSError("Unsupported OS")
+        self.base_directory = base_path
+        self.os_name = os_name
+
+    def initialize_filter_wheel(self):
+        import serial.tools.list_ports
+        available_ports = [port.device for port in serial.tools.list_ports.comports()]
+        if 'COM5' in available_ports:
+            self.main_window_init.log_data("Filter wheel initialization started.")  # Log initialization start
+            self.filter_wheel_initiated = True
+            self.filter_wheel = FilterWheel('COM5')
+            self.filter_wheel_ready = True
+            self.main_window_init.log_data("Filter wheel initialized successfully.")  # Log success
+            self.main_window_init.general_tab_init.update_general_tab_buttons()
+        else:
+            self.log_data("Filter wheel initialization failed: COM5 not available.")  # Log failure
+            self.main_window_init.show_message("COM5 is not available.")
+
+    def update_fiber_shape_inputs(self):
+        fiber_shape = self.fiber_shape_combo.currentText()
+        if fiber_shape == "rectangular":
+            self.fiber_diameter_label.hide()
+            self.fiber_diameter_input.hide()
+            self.fiber_width_label.show()
+            self.fiber_width_input.show()
+            self.fiber_height_label.show()
+            self.fiber_height_input.show()
+        else:
+            self.fiber_diameter_label.show()
+            self.fiber_diameter_input.show()
+            self.fiber_width_label.hide()
+            self.fiber_width_input.hide()
+            self.fiber_height_label.hide()
+            self.fiber_height_input.hide()
+
+    def choose_calibration_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Calibration Folder",
+                                                       self.base_directory + "/Calibration")
+        if folder_path:
+            self.calibration_folder_input.setText(folder_path)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    sys.exit(app.exec())
+
