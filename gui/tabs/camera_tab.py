@@ -5,6 +5,7 @@ from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
 from gui.tabs.helpers import HelperFunctions
+import core.hardware.cameras.qhyccd_control as qhy_ccd_take_image
 
 import os
 import threading

@@ -269,8 +269,8 @@ class Camera:
         # Print max pixel value
         print("Max pixel value:", np.max(img), "Mean pixel value: ", np.mean(img))
         if progress_signal:
-            progress_signal.emit("Max pixel value: ", np.max(img))
-            progress_signal.emit("Mean pixel value: ", np.mean(img))
+            progress_signal.emit(f"Max pixel value: {np.max(img)}")
+            progress_signal.emit(f"Mean pixel value: {np.mean(img)}")
 
         if show:
             show_img = img / np.max(img) * 255
