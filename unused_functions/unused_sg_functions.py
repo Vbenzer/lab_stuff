@@ -11,8 +11,9 @@ from skimage import io, filters, morphology
 from skimage.draw import circle_perimeter
 from scipy import ndimage as ndi
 
-from analysis.sg_analysis import detect_circle, get_sg_params, \
+from analysis.sg_analysis import get_sg_params, \
     check_mask_flux_single, capture_images_and_reduce
+from core.data_processing import detect_circle
 from analysis.visualization import plot_com_comk_on_image_cut
 
 

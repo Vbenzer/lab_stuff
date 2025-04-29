@@ -5,46 +5,13 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy import ndimage as ndi
-from skimage import color, feature, transform, morphology, measure, io
+from skimage import feature, transform, morphology, measure, io
 from skimage.draw import disk, polygon
 
 import core.data_processing
 import core.file_management
-from core.data_processing import com_of_spot, png_to_numpy
+from core.data_processing import com_of_spot, png_to_numpy, detect_circle
 import core.hardware.filter_wheel_color as mtf
-
-
-def detect_circle(image:np.ndarray, fiber_px_radius:int):
-    """
-    Detects a circle in the given image using Hough Circle Transform.
-
-    Parameters:
-        image (np.ndarray): The input image as a NumPy array.
-        fiber_px_radius (int): The radius of the fiber in pixels.
-
-    Returns:
-        tuple: (center_y, center_x, radius) of the detected circle.
-    """
-    # Convert the image to grayscale if it is not already
-    if len(image.shape) == 3:
-        image_gray = color.rgb2gray(image)
-    else:
-        image_gray = image
-
-    # Detect edges using Canny edge detector
-    edges = feature.canny(image_gray, sigma=1.6, low_threshold=7, high_threshold=20)
-
-    """plt.imshow(edges)
-    plt.show()"""
-
-    # Perform Hough Circle Transform
-    hough_radii = np.arange(fiber_px_radius - 5, fiber_px_radius + 5, 1)
-    hough_res = transform.hough_circle(edges, hough_radii)
-
-    # Select the most prominent circle
-    accums, cx, cy, radii = transform.hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1, normalize=False)
-
-    return cy[0], cx[0], radii[0]
 
 
 def make_shape(shape:str, radius:[int, tuple[int, int]]):
@@ -504,6 +471,12 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     # Set best_params to None
     best_params = None
 
+    # Get the middle image to get the center of mass of the spot, only once because spot doesn't change
+    middle_image = entrance_image_files[len(entrance_image_files) // 2]
+    image_path = os.path.join(entrance_image_folder_reduced, entrance_image_files[middle_image])
+    image = io.imread(image_path)
+    com_spot = com_of_spot(image, threshold=10, plot=False)
+
     # Process entrance images
     for image_file in entrance_image_files:
         image_path = os.path.join(entrance_image_folder_reduced, image_file)
@@ -517,7 +490,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         image = io.imread(image_path)
 
         # Get the center of mass of the spot. Threshold important to ensure correct spot detection
-        com = com_of_spot(image, threshold=10, plot=False)
+        com = com_spot
 
         # Append the center of mass to the list
         entrance_coms.append(com)

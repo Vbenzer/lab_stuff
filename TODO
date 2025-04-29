@@ -2,9 +2,8 @@ Bugs: (Sorted by priority)
 
 - Gui bugs:
     - fiber dimension sometimes resets to weird values (cant reproduce)
-    - Weird spacer behavior in general tab
-    - Update button accessibility
-    - File name for measure system fratio, add standard and remove weird behavior
+    - Weird spacer behavior in general tab (cant reproduce)
+    - Update button accessibility (?)
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
@@ -16,7 +15,18 @@ Additions: (Sorted by priority)
     - Cerium oxide for fiber polishing
 
 - test c_100_0001 and 0002 to improve sg code, circle detection could be better in frd also
-    - must check system measurements: Circles fits are bad
+    - must check system measurements: Circles fits are bad (this is done)
+    - c_100 frds are influenced by background light
+
+- Have a look at modal noise
+
+- For sg: Check if motor precision for displacement of fiber face is acceptable to use as base for entrance fiber position values
+    - For this there would have to be one calibration image so maybe not feasible...
+    - But perhaps useful for better precision of the sg input image
+
+    - maybe work with region props and lowes eccentricity or so
+
+    - Also for this, let com of spot be constant, shouldnt move in the first place
 
 - Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
     - Give options to change driving width for input spot

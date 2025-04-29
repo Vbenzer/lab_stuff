@@ -1,12 +1,13 @@
 import json
 import os
+from tkinter.constants import RAISED
 
 import cv2
 import numpy as np
 from PIL import Image
 from astropy.io import fits
 from matplotlib import pyplot as plt
-from skimage import measure
+from skimage import measure, color, feature, transform
 from skimage.filters import threshold_otsu
 
 
@@ -21,7 +22,7 @@ def fits_to_arr(filename: str) -> np.ndarray:
 
     """
     with fits.open(filename) as hdul:
-        data = hdul[0].data
+        data = hdul[0].data.astype(np.float32)
     return data
 
 
@@ -91,7 +92,7 @@ def fit_circular(binary, **kwargs):
     radi_modi = kwargs.get("radi_modification", 0)
 
     edges = canny(binary)
-    rmin = kwargs.get("rmin", 10);
+    rmin = kwargs.get("rmin", 10)
     rmax = kwargs.get("rmax", 500)
     hough = hough_circle(edges, np.arange(rmin, rmax, 1))
     rid, y, x = np.unravel_index(np.argmax(hough), hough.shape)
@@ -157,10 +158,9 @@ def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float
     #image_data = np.nan_to_num(image_data)
 
     # Read the center of mass
-    if com:
-        center_x, center_y = com
-    else:
-        center_y, center_x = int(com[0]), int(com[1])
+
+    center_x, center_y = com
+
 
     # Create a radial profile centered on the center of mass
     y, x = np.indices(image_data.shape)
@@ -177,7 +177,7 @@ def find_circle_radius(image_data, com: tuple[float] | None=None, ee_value:float
     total_energy = cumulative_energy[-1]
     encircled_energy_fraction = cumulative_energy / total_energy
 
-    # Find the radius where 95% (or other if changed) of the encircled energy is reached
+    # Find the radius where xx% of the encircled energy is reached
     radius = int(np.argmax(encircled_energy_fraction >= ee_value))
 
     if plot or save_data:
@@ -296,7 +296,7 @@ def narrow_index(binary: np.ndarray[bool]) -> tuple[list[int], list[int]]:
     return y_range, x_range
 
 
-def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder: str) -> list[int]:
+def calculate_multiple_radii_ex(reduced_data: list[np.ndarray], measurements_folder: str) -> list[int]:
     """
     Calculate the radii of multiple reduced data files.
     Args:
@@ -322,6 +322,108 @@ def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder
         radii.append(radius)
     return radii
 
+def calculate_multiple_radii(reduced_data: list[np.ndarray], measurements_folder: str, debug: bool = False) -> list[int]:
+    radii = []
+    for n, red in enumerate(reduced_data):
+        # Trim data to area of interest (perhaps not necessary with better background reduction)
+        trimmed_data = cut_image(red, margin=500)
+
+        if debug:
+            # Show image
+            plt.imshow(trimmed_data, cmap='gray')
+            plt.title("Trimmed Image")
+            plt.show()
+
+        """threshold = threshold_otsu(trimmed_data)
+        thresholded_image = trimmed_data > 4000
+        # Show thresholded image
+        plt.imshow(thresholded_image, cmap='gray')
+        plt.show()"""
+
+        # Detect edges using Canny edge detector
+        thresh = threshold_otsu(trimmed_data)
+        thresh = thresh * 0.6
+        thresholded_image = trimmed_data > thresh
+
+        if debug:
+            plt.imshow(thresholded_image, cmap='gray')
+            plt.title("Thresholded Image")
+            plt.show()
+
+        """print("Threshold:", thresh / np.max(trimmed_data))
+        quant_thresh = thresh / np.max(trimmed_data)
+        quant_thresh_low = quant_thresh * 0.5
+        edges = feature.canny(trimmed_data, sigma=1, low_threshold=quant_thresh_low, high_threshold=quant_thresh, use_quantiles=True)
+"""
+        """if debug:
+            # Show edges image
+            plt.figure(figsize=(trimmed_data.shape[1] / 100, trimmed_data.shape[0] / 100)) # Adjust figure size for details
+            plt.title("Trimmed Image")
+            plt.imshow(edges)
+            plt.show()
+
+        # Fill in within the edges
+        from scipy import ndimage as ndi
+        edges_filled = ndi.binary_fill_holes(edges)
+
+        if debug:
+            # Show filled image
+            plt.imshow(edges_filled, cmap='gray')
+            plt.title("Filled Edges")
+            plt.show()"""
+
+        # Label connected regions
+        labeled_image, num = measure.label(thresholded_image, return_num=True)
+
+        if debug:
+            print("Number of regions labeled", num)
+
+        if debug:
+            # Plot the labeled image
+            plt.imshow(labeled_image, cmap='gray')
+            plt.title("Labeled Image")
+            plt.show()
+
+
+        # Measure properties of labeled regions
+        properties = measure.regionprops(labeled_image)
+
+        properties = [prop for prop in properties if prop.area >= 300]
+
+        # Print the centroid
+        if len(properties) == 1:
+            prop = properties[0]
+            if debug:
+                print(f"Centroid: {prop.centroid}")
+                print(f"Eccentricity: {prop.eccentricity}")
+                print(f"Area: {prop.area}")
+                print(f"Equivalent Diameter: {prop.equivalent_diameter}")
+                print(f"Major Axis Length: {prop.major_axis_length}")
+                print(f"Minor Axis Length: {prop.minor_axis_length}")
+
+            # Get the center of mass
+            coc = [prop.centroid[1], prop.centroid[0]]  # Swap x and y
+
+            if prop.eccentricity > 0.2:
+                raise Warning("Eccentricity is too high (>0.2), please check the image.")
+        else:
+            # Raise an error
+            raise ValueError("Multiple regions found, please check the image.")
+
+
+        # Find aperture with encircled energy
+        os.makedirs(measurements_folder + f"/Radius", exist_ok=True)
+        radius = find_circle_radius(trimmed_data, coc, ee_value=0.98, plot=False,
+                                    save_file=measurements_folder + f"/Radius/datapoint{n}")
+        radii.append(radius)
+
+        with open(measurements_folder + f"/Radius/datapoint{n}" + "props.json", "w") as f:
+            json.dump({"Centroid": prop.centroid, "Eccentricity": prop.eccentricity, "Area": prop.area,
+                       "Equivalent Diameter": prop.equivalent_diameter,
+                       "Major Axis Length": prop.major_axis_length, "Minor Axis Length": prop.minor_axis_length,
+                       }, f)
+
+    return radii
 
 def measure_eccentricity(data:np.ndarray, plot: bool = False):
     """
@@ -801,3 +903,59 @@ def analyse_f_number(image:np.ndarray, measurements_folder:str):
     plt.title("Radius vs Number of Measurements")
     plt.savefig(measurements_folder + "radius_vs_measurements.png")
     plt.close()
+
+
+def detect_circle(image:np.ndarray, fiber_px_radius:int, fiber_px_radius_max:int=None) -> tuple[int, int, int]:
+    """
+    Detects a circle in the given image using Hough Circle Transform.
+
+    Parameters:
+        image (np.ndarray): The input image as a NumPy array.
+        fiber_px_radius (int): The radius of the fiber in pixels.
+        fiber_px_radius_max (int, optional): The maximum radius of the fiber in pixels. If set fiber_px_radius will
+        be used as min.
+
+    Returns:
+        tuple: (center_y, center_x, radius) of the detected circle.
+    """
+    # Convert the image to grayscale if it is not already
+    if len(image.shape) == 3:
+        image_gray = color.rgb2gray(image)
+    else:
+        image_gray = image
+
+    # Detect edges using Canny edge detector
+    edges = feature.canny(image_gray, sigma=1.6, low_threshold=7, high_threshold=20)
+
+    plt.imshow(edges)
+    plt.show()
+
+    if fiber_px_radius_max is not None:
+        # Define the range of radii to search for
+        hough_radii = np.arange(fiber_px_radius, fiber_px_radius_max, 10)
+        print("hough_radii", hough_radii)
+    else:
+        hough_radii = np.arange(fiber_px_radius - 5, fiber_px_radius + 5, 1)
+
+    # Perform Hough Circle Transform
+    hough_res = transform.hough_circle(edges, hough_radii)
+
+    # Select the most prominent circle
+    accums, cx, cy, radii = transform.hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1, normalize=False)
+
+    return cy[0], cx[0], radii[0]
+
+
+if __name__ == "__main__":
+    # Example usage
+    filter = "3.5"
+    main_folder = rf"D:\Vincent\O_50_0000_0000\FRD\filter_{filter}\REDUCED"
+    reduced_data_1 = main_folder + rf"\filter_{filter}_pos_0_light_reduced.fits"
+    reduced_data_2 = main_folder + rf"\filter_{filter}_pos_5_light_reduced.fits"
+    reduced_data_3 = main_folder + rf"\filter_{filter}_pos_9.9_light_reduced.fits"
+    data1 = fits_to_arr(reduced_data_1)
+    data2 = fits_to_arr(reduced_data_2)
+    data3 = fits_to_arr(reduced_data_3)
+    data = [data1, data2, data3]
+    measurements_folder = r"D:\Vincent\test"
+    print(calculate_multiple_radii(data, measurements_folder, debug=True))

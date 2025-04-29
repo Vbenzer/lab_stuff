@@ -489,7 +489,7 @@ class MainWindow(QMainWindow, HelperFunctions, Widgets):
             self.main_window_init.log_data("Filter wheel initialized successfully.")  # Log success
             self.main_window_init.general_tab_init.update_general_tab_buttons()
         else:
-            self.log_data("Filter wheel initialization failed: COM5 not available.")  # Log failure
+            self.main_window_init.log_data("Filter wheel initialization failed: COM5 not available.")  # Log failure
             self.main_window_init.show_message("COM5 is not available.")
 
     def update_fiber_shape_inputs(self):

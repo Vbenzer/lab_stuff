@@ -218,10 +218,10 @@ class GeneralTab(HelperFunctions):
                                          "Change Color Filter",
                                          "Change System F-ratio"
                                          ]
-            else 82 if selected_function in ["Measure System F-ratio", "Make Throughput Calibration",
+            else 82 if selected_function in ["Make Throughput Calibration",
                                              "FF with each Filter", "Measure Fiber Size",
                                              ]
-            else 0 if selected_function in ["Near-Field, Far-Field Comparison"]
+            else 0 if selected_function in ["Measure System F-ratio", "Near-Field, Far-Field Comparison"]
             else 200
         )
 
@@ -265,6 +265,10 @@ class GeneralTab(HelperFunctions):
             self.main_init.comments_button.show()
             self.exposure_time_label_gt.show()
             self.exposure_time_input_gt.show()
+            self.main_init.open_fiber_data_button.show()
+            self.main_init.recent_folders_combo.show()
+            self.main_init.recent_folders_label.show()
+            self.main_init.choose_folder_button.show()
 
         elif selected_function in ["Adjust Tip/Tilt", "Measure Eccentricity"]:
             self.stop_button.show()
