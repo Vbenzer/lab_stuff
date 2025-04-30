@@ -14,7 +14,7 @@ Additions: (Sorted by priority)
     - Shake fiber input for sg improvement?
     - Cerium oxide for fiber polishing
 
-- test c_100_0001 and 0002 to improve sg code, circle detection could be better in frd also
+- test c_100_0001 and 0002 to improve sg code, circle detection could be better in frd also (done)
     - must check system measurements: Circles fits are bad (this is done)
     - c_100 frds are influenced by background light
 
@@ -24,21 +24,24 @@ Additions: (Sorted by priority)
     - For this there would have to be one calibration image so maybe not feasible...
     - But perhaps useful for better precision of the sg input image
 
-    - maybe work with region props and lowes eccentricity or so
+    - maybe work with region props and lowest eccentricity or so (not really possible i think basically only edge
+        detection really works, or at least something else based on gradients)
 
-    - Also for this, let com of spot be constant, shouldnt move in the first place
+    - Also for this, let com of spot be constant, shouldn't move in the first place (done, well set to median)
+        - Also for comk of exit
+
+    - Also reworked circle detection for entrance images (should be better now)
+        - Changed params for circle detection
 
 - Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
     - Give options to change driving width for input spot
     - Also give options if trim should be in log scale or not
 
 - Add functions to GUI:
-    - Horizontal cuts (done, not tested)
-    - nf ff stuff (done, not tested)
-    - fiber size measurement (done, not tested)
+   -
 
-- Rework sg com and comk plots (done mostly)
-    - sg entrance spot position probably biased
+- Rework sg com and comk plots (done)
+    - sg entrance spot position probably biased (fixed i guess, set to use median)
 
 - try log scale for sg input images (not sure if that makes a difference for the image detection or differentiation of spot and fiber face)
 

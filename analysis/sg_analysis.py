@@ -471,12 +471,6 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     # Set best_params to None
     best_params = None
 
-    # Get the middle image to get the center of mass of the spot, only once because spot doesn't change
-    middle_image = entrance_image_files[len(entrance_image_files) // 2]
-    image_path = os.path.join(entrance_image_folder_reduced, entrance_image_files[middle_image])
-    image = io.imread(image_path)
-    com_spot = com_of_spot(image, threshold=10, plot=False)
-
     # Process entrance images
     for image_file in entrance_image_files:
         image_path = os.path.join(entrance_image_folder_reduced, image_file)
@@ -490,7 +484,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         image = io.imread(image_path)
 
         # Get the center of mass of the spot. Threshold important to ensure correct spot detection
-        com = com_spot
+        com = com_of_spot(image, threshold=10, plot=False)
 
         # Append the center of mass to the list
         entrance_coms.append(com)
@@ -576,6 +570,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     # Set best_params to None
     best_params = None
 
+    com = None
     mask = None
     comk = None
     radius = None
@@ -597,7 +592,7 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         if mask is None:
             # Find center of fiber
             if fiber_shape == "circular":
-                center_y, center_x, radius = detect_circle(image, fiber_px_radius_exit)
+                center_y, center_x, radius = detect_circle(image, fiber_px_radius_exit, sigma=3)
                 comk = [center_y, center_x]
 
                 mask_margin_circ = grow_mask(image, comk, radius, "circular")
@@ -1007,10 +1002,14 @@ def sg_new(main_folder:str, progress_signal=None):
     exit_coms = np.array(exit_coms)
     exit_comk = np.array(exit_comk)
 
+    # Calculate median of entrance coms and exit comk, because fiber should always be in the same position
+    entrance_coms_median = np.median(entrance_coms, axis=0)
+    exit_comk_median = np.median(exit_comk, axis=0)
+
     # Calculate the distance of the com to the comk
     dist_to_comk = np.zeros(len(entrance_coms))
     for i in range(len(entrance_coms)):
-        dist_to_comk[i] = np.sqrt((entrance_coms[i][0] - entrance_comk[i][0]) ** 2 + (entrance_coms[i][1] - entrance_comk[i][1]) ** 2)
+        dist_to_comk[i] = np.sqrt((entrance_coms_median[0] - entrance_comk[i][0]) ** 2 + (entrance_coms_median[1] - entrance_comk[i][1]) ** 2)
 
     # Get reference index by finding the minimum distance to the comk
     reference_index = np.argmin(dist_to_comk)
@@ -1019,8 +1018,8 @@ def sg_new(main_folder:str, progress_signal=None):
     com_pos_on_mask_entrance = np.zeros((len(entrance_coms), 2))
     com_pos_on_mask_exit = np.zeros((len(entrance_coms), 2))
     for i in range(len(entrance_coms)):
-        com_pos_on_mask_entrance[i] = (entrance_coms[i][0] - entrance_comk[i][0], entrance_coms[i][1] - entrance_comk[i][1])
-        com_pos_on_mask_exit[i] = (exit_coms[i][0] - exit_comk[i][0], exit_coms[i][1] - exit_comk[i][1])
+        com_pos_on_mask_entrance[i] = (entrance_coms_median[0] - entrance_comk[i][0], entrance_coms_median[1] - entrance_comk[i][1])
+        com_pos_on_mask_exit[i] = (exit_coms[i][0] - exit_comk_median[0], exit_coms[i][1] - exit_comk_median[1])
 
     # Rescale values with reference index as zero
     gauge_points_entrance = np.zeros((len(entrance_coms), 2))

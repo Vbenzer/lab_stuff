@@ -905,7 +905,8 @@ def analyse_f_number(image:np.ndarray, measurements_folder:str):
     plt.close()
 
 
-def detect_circle(image:np.ndarray, fiber_px_radius:int, fiber_px_radius_max:int=None) -> tuple[int, int, int]:
+def detect_circle(image: np.ndarray, fiber_px_radius: int, fiber_px_radius_max: int = None, debug: bool = False,
+                  sigma: float = None) -> tuple[int, int, int]:
     """
     Detects a circle in the given image using Hough Circle Transform.
 
@@ -914,6 +915,9 @@ def detect_circle(image:np.ndarray, fiber_px_radius:int, fiber_px_radius_max:int
         fiber_px_radius (int): The radius of the fiber in pixels.
         fiber_px_radius_max (int, optional): The maximum radius of the fiber in pixels. If set fiber_px_radius will
         be used as min.
+        debug (bool, optional): If True, show the edges image.
+        sigma: (float, optional): The standard deviation of the Gaussian filter used in Canny edge detection.
+        If None, a default value of 1.6 is used.
 
     Returns:
         tuple: (center_y, center_x, radius) of the detected circle.
@@ -925,17 +929,24 @@ def detect_circle(image:np.ndarray, fiber_px_radius:int, fiber_px_radius_max:int
         image_gray = image
 
     # Detect edges using Canny edge detector
-    edges = feature.canny(image_gray, sigma=1.6, low_threshold=7, high_threshold=20)
+    if sigma is None:
+        sigma = 1.6
 
-    plt.imshow(edges)
-    plt.show()
+    edges = feature.canny(image_gray, sigma=sigma, low_threshold=0.9, high_threshold=0.99, use_quantiles=True)
+    # These parameters are highly sensitive, change with care
+
+    if debug:
+        # Show edges image, set size to original
+        plt.figure(figsize=(image.shape[1] / 100, image.shape[0] / 100))  # Adjust figure size for details
+        plt.imshow(edges)
+        plt.show()
 
     if fiber_px_radius_max is not None:
         # Define the range of radii to search for
         hough_radii = np.arange(fiber_px_radius, fiber_px_radius_max, 10)
         print("hough_radii", hough_radii)
     else:
-        hough_radii = np.arange(fiber_px_radius - 5, fiber_px_radius + 5, 1)
+        hough_radii = np.arange(int(fiber_px_radius * 0.9), int(fiber_px_radius * 1.1), 1)
 
     # Perform Hough Circle Transform
     hough_res = transform.hough_circle(edges, hough_radii)
@@ -945,6 +956,117 @@ def detect_circle(image:np.ndarray, fiber_px_radius:int, fiber_px_radius_max:int
 
     return cy[0], cx[0], radii[0]
 
+def detect_circle_with_region_props(image:np.ndarray, fiber_px_radius:int):
+    """
+    Detects a circle in the given image using region properties. Not used, not reliable.
+    Args:
+        image: np.ndarray of the image
+        fiber_px_radius: fiber radius in pixels
+
+    Returns:
+
+    """
+    # Show original image
+    plt.imshow(image, cmap='gray')
+    plt.title("Original Image")
+    plt.show()
+
+    img = image.copy()
+
+    """# Mask out overexposed area
+    bright_spot_mask = img > 150
+    img_masked = cv2.inpaint(img, bright_spot_mask.astype(np.uint8), inpaintRadius=fiber_px_radius, flags=cv2.INPAINT_TELEA)
+
+    # Show masked image
+    plt.imshow(img_masked, cmap='gray')
+    plt.title("Masked Image")
+    plt.show()"""
+
+    """# Heavy Gaussian to suppress small structures like spot
+    blurred = cv2.GaussianBlur(img_masked, (51, 51), 0)
+
+    # Show blurred image
+    plt.imshow(blurred, cmap='gray')
+    plt.title("Blurred Image")
+    plt.show()"""
+
+    """# Normalize illumination
+    clahe = cv2.createCLAHE(clipLimit=1.0, tileGridSize=(16, 16))
+    equalized = clahe.apply(img_masked)
+
+    # Show equalized image
+    plt.imshow(equalized, cmap='gray')
+    plt.title("Equalized Image")
+    plt.show()"""
+
+    dangerous_thres = 10
+    img[img <= dangerous_thres] = 0
+
+    thresh = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                   cv2.THRESH_BINARY, 51, 0)
+
+    # Show thresholded image
+    plt.figure(figsize=(image.shape[1] / 100, image.shape[0] / 100))
+    plt.imshow(thresh, cmap='gray')
+    plt.title("Thresholded Image")
+    plt.show()
+
+    # Label connected regions
+    labeled_image, num = measure.label(thresh, return_num=True)
+    print("Number of regions labeled", num)
+
+    # Plot the labeled image
+    plt.imshow(labeled_image, cmap='gray')
+    plt.title("Labeled Image")
+    plt.show()
+
+    # Measure properties of labeled regions
+    properties = measure.regionprops(labeled_image)
+
+    print("Number of properties found:", len(properties))
+
+    # Filter properties based on area
+    area = np.pi*(fiber_px_radius**2)*0.8 # 80% of the area of the circle, to be sure to be below
+    properties = [prop for prop in properties if prop.area >= area]
+
+    # Print the centroid
+    if len(properties) == 1:
+        prop = properties[0]
+        print(f"Centroid: {prop.centroid}")
+        print(f"Eccentricity: {prop.eccentricity}")
+        print(f"Area: {prop.area}")
+        print(f"Equivalent Diameter: {prop.equivalent_diameter}")
+        print(f"Major Axis Length: {prop.major_axis_length}")
+        print(f"Minor Axis Length: {prop.minor_axis_length}")
+
+        # Get the center of mass
+        coc = [prop.centroid[1], prop.centroid[0]]  # Swap x and y
+        if prop.eccentricity > 0.2:
+            raise Warning("Eccentricity is too high (>0.2), please check the image.")
+    else:
+        print("Multiple regions found")
+        # Sort regions by eccentricity
+        properties = sorted(properties, key=lambda x: x.eccentricity)
+        # Give the region with the lowest eccentricity
+        prop = properties[0]
+        print(f"Centroid: {prop.centroid}")
+        print(f"Eccentricity: {prop.eccentricity}")
+        print(f"Area: {prop.area}")
+        print(f"Equivalent Diameter: {prop.equivalent_diameter}")
+        print(f"Major Axis Length: {prop.major_axis_length}")
+        print(f"Minor Axis Length: {prop.minor_axis_length}")
+
+        # Get the center of mass
+        coc = [prop.centroid[1], prop.centroid[0]]  # Swap x and y
+
+    # Show image with detected circle
+    plt.imshow(image, cmap='gray')
+    circle_radius = int(prop.equivalent_diameter // 2)
+    circle = plt.Circle((coc[0], coc[1]), circle_radius, color='red', fill=False)
+    plt.gca().add_artist(circle)
+    plt.title("Detected Circle")
+    plt.axis('off')
+    plt.show()
 
 if __name__ == "__main__":
     # Example usage
@@ -958,4 +1080,28 @@ if __name__ == "__main__":
     data3 = fits_to_arr(reduced_data_3)
     data = [data1, data2, data3]
     measurements_folder = r"D:\Vincent\test"
-    print(calculate_multiple_radii(data, measurements_folder, debug=True))
+    #print(calculate_multiple_radii(data, measurements_folder, debug=True))
+
+
+    fiber_diameter = 100
+    px_radius = int(fiber_diameter / 0.5169363821005045 / 2)
+    px_radius_exit = int(fiber_diameter / 0.439453125 / 2)
+    print("Input px entrance radius:", px_radius)
+    print("Input px exit radius:", px_radius_exit)
+
+    folder_path = r"D:\Vincent\C_100_0000_0001_test\SG\exit\reduced"
+    imgs = os.listdir(folder_path)
+    imgs = [os.path.join(folder_path, img) for img in imgs if img.endswith("reduced.png")]
+
+    for img in imgs:
+        data = png_to_numpy(img)
+        y, x, radius = detect_circle(data, px_radius_exit, debug=True, sigma=3)
+        print("Radius:", radius)
+
+        # Show circle on original image
+        plt.imshow(data, cmap='gray')
+        circle = plt.Circle((x, y), radius, color='red', fill=False)
+        plt.gca().add_artist(circle)
+        plt.title("Detected Circle")
+        plt.axis('off')
+        plt.show()

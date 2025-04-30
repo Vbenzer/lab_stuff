@@ -604,6 +604,9 @@ def make_comparison_video(main_folder:str, fiber_diameter, progress_signal=None)
 
     entrance_comk = parameters["entrance_comk"]
     exit_comk = parameters["exit_comk"]
+    exit_comk = np.array(exit_comk)
+    exit_comk_median = np.median(exit_comk, axis=0)
+
 
     if progress_signal:
         progress_signal.emit("Cutting images")
@@ -627,7 +630,7 @@ def make_comparison_video(main_folder:str, fiber_diameter, progress_signal=None)
         io.imsave(os.path.join(video_prep_entrance_folder, image_file.replace(".png","_cut.png")), image)
 
     for i in range(len(exit_image_files)):
-        comk = exit_comk[i]
+        comk = exit_comk_median
         image_file = exit_image_files[i]
 
         image_path = os.path.join(exit_image_folder, image_file)
@@ -718,13 +721,19 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
     entrance_comk = parameters["entrance_comk"]
     exit_comk = parameters["exit_comk"]
 
+    # Calculate the median of entrance_coms and exit_comk
+    entrance_coms = np.array(entrance_coms)
+    exit_comk = np.array(exit_comk)
+    entrance_com_median = np.median(entrance_coms, axis=0)
+    exit_comk_median = np.median(exit_comk, axis=0)
+
     # Margin for better visuals
     margin = 50
 
     # Plot Mask outline overlaid on the image
     for i in range(len(entrance_mask_files)):
         # Get the center of mass and center of mask
-        com = entrance_coms[i]
+        com = entrance_com_median
         comk = entrance_comk[i]
 
         # Read the mask and image
@@ -768,7 +777,7 @@ def plot_masks(main_folder:str, fiber_diameter:int, progress_signal=None):
 
     # Same for exit masks
     for i in range(len(exit_mask_files)):
-        comk = exit_comk[i]
+        comk = exit_comk_median
         exit_mask = io.imread(os.path.join(exit_mask_folder, exit_mask_files[i]))
         exit_image = io.imread(os.path.join(main_folder, "exit/reduced", exit_mask_files[i].replace("_mask", "")))
 
@@ -920,6 +929,7 @@ def plot_com_comk_on_image_cut(project_folder, progress_signal=None):
     with open(os.path.join(project_folder, "scrambling_gain_parameters.json"), 'r') as f:
         parameters = json.load(f)
 
+    exit_radii = parameters["exit_radii"]
     entrance_coms_list = parameters["entrance_coms"]
     entrance_comk_list = parameters["entrance_comk"]
     exit_coms_list = parameters["exit_coms"]
@@ -936,14 +946,37 @@ def plot_com_comk_on_image_cut(project_folder, progress_signal=None):
     exit_image = io.imread(os.path.join(exit_folder, f"exit_cam_image000_reduced_cut.png"))
     exit_img_h_size = exit_image.shape[0] // 2
 
+    # Calculate entrance com median
+    entrance_coms_median = np.median(entrance_coms_list, axis=0)
+
     # Translate coms and comk to cut image system by referencing it to the int(comk) of the first image which then is the center of the cut image
     entrance_comk_list_cut = [tuple([entr_img_h_size, entr_img_h_size]) for _ in range(len(entrance_coms_list))]
-    entrance_norm = entrance_comk_list - entrance_coms_list
+    entrance_norm = entrance_comk_list - entrance_coms_median
     entrance_coms_list_cut = entrance_comk_list_cut - entrance_norm
 
+    # Exit calculations
     exit_norm = exit_coms_list - np.array([int(exit_comk_list[0][0]), int(exit_comk_list[0][1])])
-    exit_coms_list_cut = exit_norm * 20 + np.array([exit_img_h_size, exit_img_h_size])
+
+    # Calculate the maximum distance between COM and COMK
+    distances = np.sqrt((exit_norm[:, 0] ** 2) + (exit_norm[:, 1] ** 2))
+    max_distance = np.max(distances)
+
+    # Define the target distance for visualization
+    exit_radii = np.array(exit_radii)
+    exit_radii_mean = np.mean(exit_radii)
+    target_distance = exit_radii_mean * 0.8
+
+    # Compute the visualization factor
+    visualization_factor = int(max(target_distance / max_distance, 1))
+    print(f"Target distance: {target_distance}")
+    print(f"Max distance: {max_distance}")
+    print(f"Visualization factor: {visualization_factor}")
+
+    exit_coms_list_cut = exit_norm * visualization_factor + np.array([exit_img_h_size, exit_img_h_size])
     exit_comk_list_cut = exit_comk_list - np.array([int(exit_comk_list[0][0]), int(exit_comk_list[0][1])]) + np.array([exit_img_h_size, exit_img_h_size])
+
+    # Calculate median of exit comks
+    exit_comk_median_cut = np.median(exit_comk_list_cut, axis=0)
 
     # Plot entrance COMs and COMKs
     if progress_signal:
@@ -976,7 +1009,7 @@ def plot_com_comk_on_image_cut(project_folder, progress_signal=None):
     for i in range(len(exit_coms_list)):
         exit_image = io.imread(os.path.join(exit_folder, f"exit_cam_image{i:03d}_reduced_cut.png"))
         exit_com = exit_coms_list_cut[i]
-        exit_comk = exit_comk_list_cut[i]
+        exit_comk = exit_comk_median_cut
 
         # Plot the image with the COM and COMK
         plt.imshow(exit_image, cmap='gray')
@@ -985,11 +1018,11 @@ def plot_com_comk_on_image_cut(project_folder, progress_signal=None):
 
         # Draw a line between the COM and COMK
         plt.plot([exit_com[1], exit_comk[1]], [exit_com[0], exit_comk[0]], color='blue', linestyle='--', linewidth=0.5,
-                 label='Distance')
+                 label=f'Distance (visually exaggerated by a factor of {visualization_factor})')
 
         # Annotate the distance between the dots
         distance = np.sqrt(exit_norm[i][0] ** 2 + exit_norm[i][1] ** 2)
-        plt.text((exit_com[1] + exit_comk[1]) / 2, (exit_com[0] + exit_comk[0]) / 2, f"{distance:.2f} (* 20) px", color='blue',
+        plt.text((exit_com[1] + exit_comk[1]) / 2, (exit_com[0] + exit_comk[0]) / 2, f"{distance:.2f} (* {visualization_factor}) px", color='blue',
                  fontsize=6)
 
         plt.title(f"Exit Image {i}")
