@@ -54,7 +54,23 @@ def init_filter_wheel():
 
 
 def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], exposure_times:dict[str, int]=None,
-                         progress_signal=None):
+                         progress_signal=None, driving_width:float=None, number_of_positions:int=11):
+    """
+    Takes far field and near field images with the entrance and exit cameras. The images are taken at different
+    positions of the input spot.
+    Args:
+        project_folder: Project folder where the images will be saved
+        fiber_diameter: Fiber diameter in microns. If a tuple is provided, the first element is the width and the
+                        second element is the height.
+        exposure_times: Exposure times for the cameras in seconds. The keys are "entrance_cam" and "exit_cam".
+        progress_signal: Signal to update the progress of the process. If None, no progress signal is emitted.
+        driving_width: Distance to be set between first and last image. If None, the fiber diameter is used.
+                        When analyzing effects of outer layers carrying light, this should be set.
+        number_of_positions: Number of positions to take images at. Default is 11.
+
+    Returns:
+
+    """
     from core.hardware import motor_control as smc
     from core.hardware import filter_wheel_color as mtf
     import threading
@@ -106,8 +122,9 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
     os.makedirs(entrance_folder_reduced, exist_ok=True)
     os.makedirs(exit_folder_reduced, exist_ok=True)
 
+    if driving_width is not None:
+        fiber_diameter = driving_width
 
-    number_of_positions = 11
     # Calculate the step size and leftmost position. Also handle rectangular case
     if isinstance(fiber_diameter, (tuple, list)):
         max_size = max(fiber_diameter)
@@ -167,7 +184,19 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
     print("All images taken!")
 
 
-def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None):
+def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None, output_scale:str="lin"):
+    """
+    Processes the images taken with the entrance and exit cameras. The images are reduced and cut to size.
+    Args:
+        project_folder: Folder where the images are saved
+        fiber_diameter: Diameter of the fiber in microns. If a tuple is provided, the first element is the width and the second
+                        element is the height.
+        progress_signal: Signal to update the progress of the process. If None, no progress signal is emitted.
+        output_scale: Scale of the output images. Can be either "lin" or "log". Default is "lin".
+
+    Returns:
+
+    """
     # Define folders
     entrance_folder = os.path.join(project_folder, "entrance")
     exit_folder = os.path.join(project_folder, "exit")
@@ -268,9 +297,16 @@ def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], prog
         # Resize the image to 1/10
         trimmed_data = transform.resize(trimmed_data, (trimmed_data.shape[0] // 10, trimmed_data.shape[1] // 10),
                                         anti_aliasing=True)
+        if output_scale == "lin":
+            scaled_data = trimmed_data
+        elif output_scale == "log":
+            # Scale the data to 0-255 using logarithmic scaling
+            scaled_data = (np.log1p(trimmed_data) / np.log1p(np.max(trimmed_data)) * 255)
+        else:
+            print("Output scale must be either 'lin' or 'log'")
+            scaled_data = trimmed_data
 
-
-        io.imsave(os.path.join(exit_folder_cut, f"exit_cam_cut{i:03d}.png"), trimmed_data.astype(np.uint8))
+        io.imsave(os.path.join(exit_folder_cut, f"exit_cam_cut{i:03d}.png"), scaled_data.astype(np.uint8))
 
     print("All images reduced and cut!")
 

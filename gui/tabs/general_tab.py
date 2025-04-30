@@ -87,6 +87,39 @@ class GeneralTab(HelperFunctions):
         self.fratio_input_label.hide()
         self.fratio_input_combo.hide()
 
+        # Input field for choosing the driving width
+        self.driving_width_label = QLabel("Driving Width in µm:")
+        self.driving_width_input = QLineEdit()
+        self.driving_width_input.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"^\d+(\.\d+)?$")))
+        self.driving_width_input.setFixedWidth(100)
+        self.driving_width_input.setText("0")
+        layout.addLayout(self.create_hbox_layout(self.driving_width_label, self.driving_width_input))
+        # Initially hidden
+        self.driving_width_label.hide()
+        self.driving_width_input.hide()
+
+        # Input field for number of positions
+        self.number_pos_input_label = QLabel("Number of Positions:")
+        self.number_pos_input = QLineEdit()
+        self.number_pos_input.setValidator(
+            QRegularExpressionValidator(QRegularExpression(r"^\d+$")))
+        self.number_pos_input.setFixedWidth(100)
+        self.number_pos_input.setText("11")
+        layout.addLayout(self.create_hbox_layout(self.number_pos_input_label, self.number_pos_input))
+        # Initially hidden
+        self.number_pos_input_label.hide()
+        self.number_pos_input.hide()
+
+        # Scale chooser
+        self.scale_label = QLabel("Scale:")
+        self.scale_combo = QComboBox()
+        self.scale_combo.addItems(["Linear", "Logarithmic"])
+        layout.addLayout(self.create_hbox_layout(self.scale_label, self.scale_combo))
+        # Initially hidden
+        self.scale_label.hide()
+        self.scale_combo.hide()
+
         # Add a spacer item to push the button to the bottom
         layout.addStretch()
 
@@ -191,13 +224,29 @@ class GeneralTab(HelperFunctions):
             # Define wd
             wdir = os.path.join(working_dir, "NF_FF_Comparison")
 
+            # Define driving width
+            driving_width = float(self.driving_width_input.text())
+
+            # Define number of positions
+            number_of_positions = int(self.number_pos_input.text())
+
+            if number_of_positions == 0:
+                self.main_init.show_message("Number of positions must be greater than 0...")
+                return
+
+            # Define scale
+            scale_dict = {"Linear": "lin", "Logarithmic": "log"}
+            scale = scale_dict[self.scale_combo.currentText()]
+
             # First capture the images
             analysis.general_analysis.nf_ff_capture(wdir, fiber_diameter=fiber_dimension, exposure_times=exposure_times,
-                                                    progress_signal=self.main.progress_signal)
+                                                    progress_signal=self.main.progress_signal,
+                                                    driving_width=driving_width, number_of_positions=number_of_positions
+                                                    )
             self.main.progress_signal.emit(f"Capture done, now processing...")
             # Then analyze the images
             analysis.general_analysis.nf_ff_process(wdir, fiber_diameter=fiber_dimension,
-                                                    progress_signal=self.main.progress_signal)
+                                                    progress_signal=self.main.progress_signal, output_scale=scale)
 
         self.main.progress_signal.emit(f"{selected_function} complete.")
         self.main.experiment_running = False
@@ -252,6 +301,12 @@ class GeneralTab(HelperFunctions):
         self.main_init.working_dir_label.hide()
         self.main_init.working_dir_display.hide()
         self.main_init.comments_button.hide()
+        self.driving_width_input.hide()
+        self.driving_width_label.hide()
+        self.number_pos_input.hide()
+        self.number_pos_input_label.hide()
+        self.scale_label.hide()
+        self.scale_combo.hide()
         self.main_init.folder_name_label.setText("Folder Name:")
         self.main_init.show_message("")
         self.run_button_gt.setDisabled(True)
@@ -320,9 +375,27 @@ class GeneralTab(HelperFunctions):
             self.exposure_time_input_gt.show()
             self.exposure_time_label_gt_2.show()
             self.exposure_time_input_gt_2.show()
+            self.driving_width_input.show()
+            self.driving_width_label.show()
+            self.number_pos_input.show()
+            self.number_pos_input_label.show()
+            self.scale_label.show()
+            self.scale_combo.show()
             if not self.main.fiber_dimension:
                 self.main_init.show_message("Please enter fiber dimension before running the function.")
                 return
+
+            if type(self.main.fiber_dimension) == "str":
+                fiber_dimension =  float(self.main.fiber_dimension)
+            else:
+                fiber_dimension = float(self.main.fiber_dimension)
+
+            if isinstance(fiber_dimension, (list, tuple)):
+                fiber_radius = max(fiber_dimension[0], fiber_dimension[1])
+            else:
+                fiber_radius = fiber_dimension
+
+            self.driving_width_input.setText(str(fiber_radius))
 
         elif selected_function == "Make Throughput Calibration":
             self.main_init.folder_name_input.show()

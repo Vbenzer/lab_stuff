@@ -34,7 +34,7 @@ Additions: (Sorted by priority)
         - Changed params for circle detection
 
 - Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
-    - Give options to change driving width for input spot
+    - Give options to change driving width for input spot (done, not completely tested)
     - Also give options if trim should be in log scale or not
 
 - Add functions to GUI:
@@ -49,12 +49,12 @@ Additions: (Sorted by priority)
 
 - Add to gui:
     - qol stuff:
-        - add general way to choose frd calibration da
+        - add general way to choose frd calibration data
         - make sure that analysis dependencies are enforced (visually also with indentations)
 
 
 Ideas:
-- Add logs to the GUI (to better reproduce bugs)
+- Add logs to the GUI (to better reproduce bugs)(done)
 
 - Option to set expo time to recommended value for the measurement
 
