@@ -4,6 +4,8 @@ Bugs: (Sorted by priority)
     - fiber dimension sometimes resets to weird values (cant reproduce)
     - Weird spacer behavior in general tab (cant reproduce)
     - Update button accessibility (?)
+    - spacer behavior in general tab, motor controller ref
+    - measure system fratio function folder input weird
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab

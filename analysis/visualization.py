@@ -98,8 +98,8 @@ def plot_main(project_folder:str):
 
     # Input f-numbers
     input_f_num = np.array(
-        [6.152, 5.103, 4.57, 4.089, 3.578])  # These are from the setup_F#_EE_98_Measurement_2 file, 31.3.25
-    input_f_num_err = np.array([0.003, 0.007, 0.03, 0.01, 0.021])
+        [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
+    input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
 
     # Sort the f-numbers in descending order
     f_num = np.sort(f_num)[::-1]
@@ -149,8 +149,8 @@ def sutherland_plot(project_folder:str):
     """
     # Input f-numbers
     input_f_num = np.array(
-        [6.152, 5.103, 4.57, 4.089, 3.578])  # These are from the setup_F#_EE_98_Measurement_2 file, 31.3.25
-    input_f_num_err = np.array([0.003, 0.007, 0.03, 0.01, 0.021])
+        [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
+    input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
 
     # Load the distance to chip from the JSON file
     dist = np.zeros(5)
@@ -332,8 +332,8 @@ def plot_f_ratio_circles_on_raw(project_folder):
 
         # Input f-numbers
         input_f_num = np.array(
-            [6.152, 5.103, 4.57, 4.089, 3.578])  # These are from the setup_F#_EE_98_Measurement_2 file, 31.3.25
-        input_f_num_err = np.array([0.003, 0.007, 0.03, 0.01, 0.021])
+            [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
+        input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
 
         # Read NA from fiber_data.json
         with open(os.path.join(os.path.dirname(project_folder), 'fiber_data.json')) as f:
@@ -501,8 +501,8 @@ def plot_measurements(filename:str):
     """
     # Constant input f-number (the same for all measurements)
     input_f_num = np.array(
-        [6.152, 5.103, 4.57, 4.089, 3.578])  # These are from the setup_F#_EE_98_Measurement_2 file, 31.3.25
-    input_f_num_err = np.array([0.003, 0.007, 0.03, 0.01, 0.021])
+        [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
+    input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
 
     # Read data from the HDF5 file
     with h5py.File(filename, 'r') as file:
