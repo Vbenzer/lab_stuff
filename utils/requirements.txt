@@ -16,3 +16,4 @@ instrumental-lib~=0.8
 imageio~=2.37.0
 imageio-ffmpeg~=0.6.0
 moviepy~=2.1.1
+pylablib~=1.4.3

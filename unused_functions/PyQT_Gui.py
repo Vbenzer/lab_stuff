@@ -382,12 +382,14 @@ class MainWindow(QMainWindow):
                 cam_type = "entrance_cam"
                 exp_time = self.exposure_time_input.text()
                 image_name_path = os.path.join(working_dir, "entrance_image.fits")
-                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True, save_fits=True)
+                thorlabs_cam_control.take_image(cam_type, image_name_path, show=True, exposure_time=exp_time, info=True,
+                                                save_fits=True)
             elif self.camera_chooser_combo.currentText() == "Exit Cam":
                 cam_type = "exit_cam"
                 exp_time = self.exposure_time_input.text()
                 image_name_path = os.path.join(working_dir, "exit_image.fits")
-                thorlabs_cam_control.take_image(cam_type, image_name_path, wait=True, exposure_time=exp_time, info=True, save_fits=True)
+                thorlabs_cam_control.take_image(cam_type, image_name_path, show=True, exposure_time=exp_time, info=True,
+                                                save_fits=True)
 
         elif selected_function == "Qhyccd Camera Single":
             import qhy_ccd_take_image
