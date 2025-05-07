@@ -43,7 +43,7 @@ def take_image(cam_name: str, save_file_name: str, show: bool = False, exposure_
     cam = uc480.UC480Camera(cam_id=cam_dict[cam_name])  # Set camera ID based on name
 
     # Set settings
-    cam.set_pixel_rate(35000000)  # Set pixel rate to 5 MHz (min)
+    cam.set_pixel_rate(5000000)  # Set pixel rate to 5 MHz (min)
     cam.set_frame_period(1)  # Set frame period to 1 s (max), these let the cam get the highest limit to exposure time
     cam.set_gains(0,0,0,0)
     cam.set_gain_boost(0)
@@ -66,19 +66,16 @@ def take_image(cam_name: str, save_file_name: str, show: bool = False, exposure_
     print(f"Exposure time set to {cam.get_exposure()} seconds.")
 
     # Grab image
-    cam.clear_acquisition()
+    #cam.clear_acquisition()
     cam.setup_acquisition(1)  # Set number of images to 1
-    print(f"Exposure time set to {cam.get_exposure()} seconds.")
-    print(cam.is_acquisition_setup())
+    #print(cam.get_settings())
+    #print(cam.is_acquisition_setup())
     cam.start_acquisition()
-    cam.wait_for_frame()
-    print(cam.get_frames_status())
-    print(f"Exposure time set to {cam.get_exposure()} seconds.")
+    cam.wait_for_frame(since="start")
+    time.sleep(1)
+    #print(cam.get_frames_status())
     frame = cam.read_newest_image(return_info=True)
-    print(f"Exposure time set to {cam.get_exposure()} seconds.")
     cam.stop_acquisition()
-    print(f"Exposure time set to {cam.get_exposure()} seconds.")
-    print(cam.get_frames_status())
     #frame = cam.grab(1, return_info=True)
     print(frame[1])
     if frame is not None:
@@ -138,6 +135,6 @@ def open_thorcam():
 if __name__ == "__main__":
     #take_image("entrance_cam", "image_test.png", wait=True, exposure_time="10000s")
     #take_image("entrance_cam", "entrance_image_test.png", wait=True)
-    take_image("entrance_cam", "entrance_image_test.png",show=True, exposure_time="1ms", info=True)
+    #take_image("entrance_cam", "entrance_image_test.png",show=True, exposure_time="10ms", info=True)
     #test()
-    #many_images_test()
+    many_images_test()

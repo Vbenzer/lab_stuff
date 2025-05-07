@@ -7,6 +7,7 @@ from skimage import io, transform
 
 import core.data_processing
 import core.hardware.filter_wheel_fratio as qhycfw3_filter_wheel_control
+import core.hardware.cameras.qhyccd_control as qhy_ccd_take_image
 
 from core.hardware.cameras import thorlabs_cam_control as tcc
 
