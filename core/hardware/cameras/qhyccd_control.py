@@ -39,6 +39,7 @@ def convert_to_us(time_str):
 
 class Camera:
     def __init__(self, exp_time):
+        # Based on https://github.com/JiangXL/qhyccd-python
         self.qhyccddll = cdll.LoadLibrary('.\\qhyccd.dll')
 
         qhyccddll = self.qhyccddll

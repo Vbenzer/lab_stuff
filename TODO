@@ -11,6 +11,8 @@ Bugs: (Sorted by priority)
         - Gui layout doesnt stay still... but only in lab
 
 
+- center of mass calculation utilizes binary as input (sensible???)
+
 Additions: (Sorted by priority)
 - Group meeting:
     - Shake fiber input for sg improvement?
