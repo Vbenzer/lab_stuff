@@ -5,7 +5,7 @@ from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
 
 import analysis.frd_analysis
-import analysis.general_analysis
+
 from gui.tabs.helpers import HelperFunctions
 
 import threading
@@ -159,6 +159,7 @@ class GeneralTab(HelperFunctions):
         threading.Thread(target=self.run_general_function_thread, args=(selected_function, working_dir)).start()
 
     def run_general_function_thread(self, selected_function, working_dir):
+        import analysis.general_analysis
         self.main.progress_signal.emit(f"Running {selected_function}...")
         self.main_init.log_data(f"General function thread started: {selected_function}.")  # Log thread start
         self.stop_event = threading.Event()

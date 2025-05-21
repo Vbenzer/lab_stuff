@@ -58,7 +58,7 @@ def locate_focus(array, **kwargs):
     binary = array > threshold
 
     filter = median(binary, disk(10))
-    com = center_of_mass(binary)
+    com = center_of_mass(array)
     # temp1   = convex_hull_image(filter)
     # rmin = 1
     # rmax = 100

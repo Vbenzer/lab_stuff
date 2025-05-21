@@ -148,6 +148,7 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
     filled_mask = ndi.binary_fill_holes(mask_2)
 
     if plot_all:
+        plt.figure(figsize=(12.80, 10.24))
         # Plot the filled mask
         plt.imshow(filled_mask)
         plt.title("Filled Mask")

@@ -481,9 +481,9 @@ def get_px_to_mu(main_folder, fiber_diameter):
 
 
 if __name__ == '__main__':
-
-    image_path = 'D:/Vincent/40x120_300A_test/SG/exit/dark/exit_cam_dark000.png'
-    #image = io.imread(image_path)
+    from analysis.sg_analysis import match_shape
+    image_path = 'D:/Vincent/oct_89_good_test2/SG/entrance/reduced/entrance_cam_image000_reduced.png'
+    image = io.imread(image_path)
     #print(com_of_spot(image, plot=True))
 
     #cy, cx, rad = detect_circle(image, 55)
@@ -535,15 +535,16 @@ if __name__ == '__main__':
     #angle, position, radius = match_shape(image, 96, "octagon", plot_all=False, plot_best=False)
     #grow_mask(image, position, radius, "octagon", angle)
 
-    #match_shape(image, 89, "octagon", plot_all=True, plot_best=True)
+    match_shape(image, 89, "octagonal", plot_all=True)
 
     #plot_coms(main_folder)
 
     #image_path = "D:/Vincent/oct_89_good/SG/exit/reduced/exit_cam_image000_reduced.png"
     #image_to_fits(image_path)
 
-    project_folder = "D:/Vincent/oct_89_good/SG"
-    plot_com_comk_on_image_cut(project_folder)
+    project_folder = "D:/Vincent/oct_89_good_test2/SG"
+
+    #plot_com_comk_on_image_cut(project_folder)
 
     """calib_folder = "D:/Vincent/fiber_size_calibration2"
     capture_px_mu_calib_images(calib_folder, 10)
