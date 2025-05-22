@@ -10,6 +10,8 @@ Bugs: (Sorted by priority)
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
 
+- input beam profile doesnt look great with pinholes
+    - maybe move pinhole back for better fratio filterwheel coverage and more space at fiber input
 - better sg_min calculation, compare sg c_100 and o_89
 - for sg exit plot instead of dot exaggeration maybe just an arrow doing the same thing
 - center of mass calculation utilizes binary as input (sensible???)
