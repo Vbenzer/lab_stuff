@@ -78,7 +78,7 @@ class MainWindowInit(HelperFunctions, Widgets):
         self.folder_name_input = QLineEdit()
         self.folder_name_input.setFixedWidth(700)
         self.folder_name_input.setReadOnly(True)
-        self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.folder_name_input.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.folder_name_input.textChanged.connect(self.update_working_dir)
         self.folder_name_input.textChanged.connect(self.update_run_button_state)
 

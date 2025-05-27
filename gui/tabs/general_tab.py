@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QVBoxLayout
                              )
-from PyQt6.QtCore import QRegularExpression
+from PyQt6.QtCore import QRegularExpression, Qt
 from PyQt6.QtGui import QRegularExpressionValidator
 
 import analysis.frd_analysis
@@ -138,7 +138,7 @@ class GeneralTab(HelperFunctions):
 
         # Connect the signal and update the stop button visibility
         self.general_function_combo.currentIndexChanged.connect(self.update_general_tab_buttons)
-        self.main_init.folder_name_input.textChanged.connect(self.update_general_tab_buttons)
+        #self.main_init.folder_name_input.textChanged.connect(self.update_general_tab_buttons)
         self.update_general_tab_buttons()
 
     def run_general_function(self):
@@ -314,6 +314,7 @@ class GeneralTab(HelperFunctions):
 
         # Handle specific functions
         if selected_function == "Measure System F-ratio":
+            print("Setting focus policy to StrongFocus for folder name input.")
             self.main_init.folder_name_input.show()
             self.main_init.folder_name_label.show()
             self.main_init.working_dir_label.show()

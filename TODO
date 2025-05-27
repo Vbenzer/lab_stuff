@@ -1,20 +1,21 @@
 Bugs: (Sorted by priority)
 
 - Gui bugs:
-    - fiber dimension sometimes resets to weird values (cant reproduce)
-    - Weird spacer behavior in general tab (cant reproduce)
-    - Update button accessibility (?)
-    - spacer behavior in general tab, motor controller ref
-    - measure system fratio function folder input weird
 
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
+
+- implement check that counts are in linear regime ~35k counts
 
 - input beam profile doesnt look great with pinholes
     - maybe move pinhole back for better fratio filterwheel coverage and more space at fiber input
 - better sg_min calculation, compare sg c_100 and o_89
 - for sg exit plot instead of dot exaggeration maybe just an arrow doing the same thing
 - center of mass calculation utilizes binary as input (sensible???)
+
+- theoretically possible to do all measurements without changing the fiber position
+    - throughput with combination of photodiode and camera (like in that one paper)
+    - far and near field at output beamsplitter
 
 Additions: (Sorted by priority)
 - Group meeting:
@@ -31,26 +32,11 @@ Additions: (Sorted by priority)
     - For this there would have to be one calibration image so maybe not feasible...
     - But perhaps useful for better precision of the sg input image
 
-    - maybe work with region props and lowest eccentricity or so (not really possible i think basically only edge
-        detection really works, or at least something else based on gradients)
-
-    - Also for this, let com of spot be constant, shouldn't move in the first place (done, well set to median)
-        - Also for comk of exit
-
-    - Also reworked circle detection for entrance images (should be better now)
-        - Changed params for circle detection
 
 - Change nf_ff to constant trim for both entrance and exit (not sure if necessary)
     - Give options to change driving width for input spot (done, not completely tested)
     - Also give options if trim should be in log scale or not
 
-- Add functions to GUI:
-   -
-
-- Rework sg com and comk plots (done)
-    - sg entrance spot position probably biased (fixed i guess, set to use median)
-
-- try log scale for sg input images (not sure if that makes a difference for the image detection or differentiation of spot and fiber face)
 
 - Rethink the plot all option for all measurements... maybe add a way to select which measurements to plot
 
@@ -61,6 +47,8 @@ Additions: (Sorted by priority)
 
 
 Ideas:
+- try log scale for sg input images (not sure if that makes a difference for the image detection or differentiation of spot and fiber face)
+
 - Add logs to the GUI (to better reproduce bugs)(done)
 
 - Option to set expo time to recommended value for the measurement
@@ -73,3 +61,14 @@ Ideas:
     the mask can then be scaled and used for the calculations
 - Potentially change position handling on images for pixels to float, pixel grid to center of pixel
 - Add number of positions as input for the measurements in the GUI for sg
+
+Done:
+- For sg:
+    - maybe work with region props and lowest eccentricity or so (not really possible i think basically only edge
+        detection really works, or at least something else based on gradients)
+
+    - Also for this, let com of spot be constant, shouldn't move in the first place (done, well set to median)
+        - Also for comk of exit
+
+    - Also reworked circle detection for entrance images (should be better now)
+            - Changed params for circle detection

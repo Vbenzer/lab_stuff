@@ -761,23 +761,38 @@ def png_to_numpy(image_path):
         return np.array(img)
 
 
-def image_to_fits(image_path:str):
+def image_to_fits(image:str, image_path:str=None):
     """
-    Converts an image array to a FITS file. Saves the image with the same name.
+    Converts an image array to a FITS file. Can be provided as a path to a PNG file or as a NumPy array.
 
     Parameters:
-        image_path: The path to the image file.
+        image: Path or array of the image to convert.
+        image_path: Path to save the FITS file. If None, it will be saved with the same name as the image but with .fits extension.
+                    If image is an array, this parameter must be provided.
     """
-    # Convert the image to a NumPy array
-    image_array = png_to_numpy(image_path)
+    if isinstance(image, str):
+        if image.endswith(".png"):
+            # Convert the image to a NumPy array
+            image_array = png_to_numpy(image)
+        else:
+            raise ValueError("Filetype not supported.")
+
+        if image_path is None:
+            fits_path = image.replace('.png', '.fits')
+        else:
+            fits_path = image_path
+    else:
+        image_array = image
+        if image_path is None:
+            raise ValueError("'image_path' must be provided if 'image' is array")
+
+        else: fits_path = image_path if '.' in os.path.basename(image_path) else image_path + '.fits'
 
     # Create a PrimaryHDU object from the image array
     hdu = fits.PrimaryHDU(image_array)
 
     # Create an HDUList to contain the HDU
     hdul = fits.HDUList([hdu])
-
-    fits_path = image_path.replace('.png', '.fits')
 
     # Write the HDUList to a FITS file
     hdul.writeto(fits_path, overwrite=True)
