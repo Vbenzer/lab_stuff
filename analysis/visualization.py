@@ -100,6 +100,9 @@ def plot_main(project_folder:str):
     input_f_num = np.array(
         [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
     input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
+    # Change order of input f-numbers
+    input_f_num = np.flip(input_f_num)
+    input_f_num_err = np.flip(input_f_num_err)
 
     # Sort the f-numbers in descending order
     f_num = np.sort(f_num)[::-1]
@@ -151,6 +154,9 @@ def sutherland_plot(project_folder:str):
     input_f_num = np.array(
         [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
     input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
+    # Change order of input f-numbers
+    input_f_num = np.flip(input_f_num)
+    input_f_num_err = np.flip(input_f_num_err)
 
     # Load the distance to chip from the JSON file
     dist = np.zeros(5)
@@ -334,6 +340,9 @@ def plot_f_ratio_circles_on_raw(project_folder):
         input_f_num = np.array(
             [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
         input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
+        # Change order of input f-numbers
+        input_f_num = np.flip(input_f_num)
+        input_f_num_err = np.flip(input_f_num_err)
 
         # Read NA from fiber_data.json
         with open(os.path.join(os.path.dirname(project_folder), 'fiber_data.json')) as f:
@@ -503,6 +512,9 @@ def plot_measurements(filename:str):
     input_f_num = np.array(
         [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
     input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
+    # Change order of input f-numbers
+    input_f_num = np.flip(input_f_num)
+    input_f_num_err = np.flip(input_f_num_err)
 
     # Read data from the HDF5 file
     with h5py.File(filename, 'r') as file:

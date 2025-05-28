@@ -49,13 +49,16 @@ def create_test_image(plot:bool=False):
     return image
 
 
-def pipeline(image, cut_image_par:bool=False, debug:bool=False):
+def pipeline(image, cut_image_par:bool=False, save:bool=False ,debug:bool=False):
     from core.data_processing import png_to_numpy
     from matplotlib import pyplot as plt
     from core.data_processing import cut_image
+    import os
 
     if isinstance(image, str):
         image_path = image
+        basepath = os.path.abspath(os.path.join(os.path.dirname(image_path), "..", "..")) + "/results"
+        os.makedirs(basepath, exist_ok=True)
         if image_path.endswith('.png'):
             # Load the png image and convert it to a numpy array
             image = png_to_numpy(image_path)
@@ -65,6 +68,9 @@ def pipeline(image, cut_image_par:bool=False, debug:bool=False):
             image = np.array(image)  # Convert to grayscale
         else:
             raise ValueError("Unsupported image format. Please provide a .png or .gif file.")
+    else:
+        if save:
+            raise ValueError("If 'image' is not a string, 'save' must be False.")
 
     if cut_image_par:
         cut_image = cut_image(image)
@@ -75,14 +81,22 @@ def pipeline(image, cut_image_par:bool=False, debug:bool=False):
     plt.imshow(cut_image, cmap='gray')
     plt.title("Cut Image")
     plt.colorbar()
-    plt.show()
+    if save:
+        plt.savefig(basepath + "/cut_image.png")
+        plt.close()
+    else:
+        plt.show()
 
     transformed_image = fast_fourier_transform(cut_image)
 
     plt.imshow(np.log1p(np.abs(transformed_image)), cmap='gray')
     plt.title("Fourier Transform Magnitude")
     plt.colorbar()
-    plt.show()
+    if save:
+        plt.savefig(basepath + "/fourier_trans_2d.png")
+        plt.close()
+    else:
+        plt.show()
 
     power_spectrum = np.abs(transformed_image) ** 2
 
@@ -124,7 +138,11 @@ def pipeline(image, cut_image_par:bool=False, debug:bool=False):
 
     plt.xticks(ticks=[i for i in indices_x], labels=[int(targets[i]/1000) for i in range(len(targets))], rotation=45)
     plt.yticks(ticks=[i for i in indices_y], labels=[int(targets[i]/1000) for i in range(len(targets))])
-    plt.show()
+    if save:
+        plt.savefig(basepath + "/fourier_trans_2d_physical_units.png")
+        plt.close()
+    else:
+        plt.show()
 
     # Radial average of the power spectrum
     u, v = np.meshgrid(frequency_x, frequency_y)
@@ -165,16 +183,21 @@ def pipeline(image, cut_image_par:bool=False, debug:bool=False):
     plt.ylabel("Radial‐averaged power")
     plt.yscale('log')
     plt.title("1D Power Spectrum")
-    plt.show()
+    if save:
+        plt.savefig(basepath + "/fourier_plot.png")
+        plt.close()
+    else:
+        plt.show()
 
     return power_spectrum
 
 
 
 if __name__ == "__main__":
-    image = r"D:\Vincent\C_100_0000_0003\SG1\exit\reduced\exit_cam_image000_reduced.png"
+    #image = r"D:\Vincent\C_100_0000_0003\SG1\exit\reduced\exit_cam_image000_reduced.png"
+    image = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/C_100_0000_0003/SG3/exit/reduced/exit_cam_image000_reduced.png"
 
-    power_spectrum = pipeline(image, cut_image_par=True, debug=True)
+    power_spectrum = pipeline(image, cut_image_par=True, debug=False, save=True)
 
     # Plot the power spectrum
     #from matplotlib import pyplot as plt
