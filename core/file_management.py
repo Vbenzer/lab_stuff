@@ -142,22 +142,6 @@ def synchronize_directories(source_folder: str, destination_folder: str):
                 print(f"Deleting folder: {item}")
                 shutil.rmtree(destination_path)
 
-if __name__ == "__main__":
-    hdf_file = "test.hdf5"
-    test_data = np.array([1, 2, 3, 4, 5])
-    create_new_hdf5(hdf_file)
-    create_hdf5_group(hdf_file, "test_group")
-    add_data_to_hdf(hdf_file, test_data, "test_data")
-
-    r'''source_folder = r"D:\Vincent"
-    destination_folder = r"\\srv4\labshare\raw_data\fibers\Measurements"
-
-    # Ensure the destination folder exists
-    # os.makedirs(destination_folder, exist_ok=True)
-    # copy_files_and_folders(source_folder, destination_folder)
-    synchronize_directories(source_folder, destination_folder)'''
-
-
 def run_batch_file(batch_file_path:str):
     """
     Runs a batch file using subprocess
@@ -170,3 +154,37 @@ def run_batch_file(batch_file_path:str):
         print(f"Batch file executed successfully with return code {result.returncode}")
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while running the batch file: {e}")
+
+def load_frd_calibration_data(folder_path:str):
+    """
+    Load FRD calibration data from a specified folder.
+    Args:
+        folder_path: Path of the folder containing the calibration data.
+    Returns:
+        A dictionary with calibration data.
+    """
+    import json
+    calibration_data = {}
+    calibration_file = "f_number.json"
+    calibration_path = os.path.join(folder_path, calibration_file)
+    if not os.path.exists(calibration_path):
+        print(f"Calibration file {calibration_file} not found in {folder_path}.")
+        return None
+    try:
+        with open(calibration_path, 'r') as file:
+            calibration_data = json.load(file)
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON from {calibration_file}: {e}")
+        return None
+
+    f_number = calibration_data.get("f_number")
+    f_number_err = calibration_data.get("f_number_err")
+
+    return f_number, f_number_err
+
+
+if __name__ == "__main__":
+    calibration_folder = r"/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/setup_F#_EE_98_Measurement_3"
+    f_number, f_number_err = load_frd_calibration_data(calibration_folder)
+    print("F-number:", f_number)
+    print("F-number error:", f_number_err)

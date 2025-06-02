@@ -16,6 +16,7 @@ import core.hardware.cameras.qhyccd_control as qhy_ccd_take_image
 from analysis.visualization import plot_main
 
 
+
 def main_measure_frd(project_folder:str, progress_signal=None, exp_time:int=70000):
 
     from core.hardware import filter_wheel_color as mtf
@@ -156,7 +157,7 @@ def run_from_existing_files(project_folder:str, progress_signal=None):
     print(f"Calculated F-number (f/#): {f_number:.3f} ± {f_number_err:.3f}")
 
 
-def main_analyse_all_filters(project_folder:str, progress_signal=None):
+def main_analyse_all_filters(project_folder:str, calibration_folder:str, progress_signal=None):
     """
     Run the frd analysis pipeline for all filters/f_number and plot the output f-numbers vs input f-numbers.
     Args:
@@ -198,7 +199,7 @@ def main_analyse_all_filters(project_folder:str, progress_signal=None):
     if progress_signal:
         progress_signal.emit("Plotting results")
 
-    plot_main(project_folder)
+    plot_main(project_folder, calibration_folder)
 
     # Set measurement name to last folder name of project folder
     #measurement_name = project_folder.split("/")[-1]

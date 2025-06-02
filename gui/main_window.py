@@ -1,66 +1,17 @@
 import socket
 import threading
 
-import serial.tools
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
-                             QSizePolicy, QDialog, QVBoxLayout, QMessageBox
-                             )
-from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt, QUrl, QRegularExpression
-from PyQt6.QtGui import QRegularExpressionValidator
-
-import os, sys, json, subprocess, time
+import sys, subprocess, time
 
 from core.hardware.filter_wheel_fratio import FilterWheel
 
-from gui.tabs.helpers import HelperFunctions
+from gui.tabs.helpers import HelperFunctions, load_recent_folders, update_recent_folders
 from gui.tabs.analyse_tab import AnalyseTab
 from gui.tabs.camera_tab import CameraTab
 from gui.tabs.measure_tab import MeasureTab
 from gui.tabs.general_tab import GeneralTab
 from widgets import *
 
-
-
-def load_recent_folders(file_path:str):
-    import os, json
-    """
-    Load the recent folders from a JSON file.
-    Args:
-        file_path: Path of the JSON file to load from.
-
-    Returns: List of recent folders.
-    """
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as file:
-            return json.load(file)
-    return []
-
-def update_recent_folders(folder:str, recent_folders:list[str], max_recent=2, base_directory:str=None):
-    """
-    Update the list of recent folders.
-    Args:
-        folder: New folder to add.
-        recent_folders: List of recent folders.
-        max_recent: Maximum number of recent folders to keep.
-        base_directory: Base directory to save the recent folders file.
-    """
-    if folder in recent_folders:
-        recent_folders.remove(folder)
-    recent_folders.insert(0, folder)
-    if len(recent_folders) > max_recent:
-        recent_folders.pop()
-    save_recent_folders(recent_folders, file_path=base_directory + r'\recent_folders.json')
-
-def save_recent_folders(recent_folders:str, file_path:str):
-    """
-    Save the recent folders to a JSON file.
-    Args:
-        recent_folders: Folder names to save.
-        file_path: Path of the JSON file to save to.
-    """
-    with open(file_path, 'w') as file:
-        json.dump(recent_folders, file)
 
 class MainWindowInit(HelperFunctions, Widgets):
     def __init__(self, main_ctrl):
@@ -272,15 +223,16 @@ class MainWindowInit(HelperFunctions, Widgets):
             return
 
         if folder:
+            folder = os.path.basename(folder)
             self.log_data(f"Folder chosen: {folder}")  # Log folder selection
             self.working_dir_display.setText(folder)
-            self.folder_name_input.setText(os.path.basename(folder))
+            self.folder_name_input.setText(folder)
 
             self.main.open_fiber_data_window()
-            self.main.fiber_data_window.load_fiber_data(folder)
+            self.main.fiber_data_window.load_fiber_data(os.path.join(self.main.base_directory, folder))
 
             self.update_comments_button()
-            update_recent_folders(folder, self.recent_folders, base_directory=self.main.base_directory)
+            update_recent_folders(folder, self.recent_folders, file_path=self.main.base_directory + r'\recent_folders.json')
             self.update_recent_folders_combo()
             self.log_data(f"Recent folders updated with: {folder}")  # Log recent folder update
 
@@ -289,9 +241,9 @@ class MainWindowInit(HelperFunctions, Widgets):
             folder = self.recent_folders[index - 1]
             self.log_data(f"Recent folder selected: {folder}")  # Log recent folder selection
             self.working_dir_display.setText(folder)
-            self.folder_name_input.setText(os.path.basename(folder))
+            self.folder_name_input.setText(folder)
             self.main.open_fiber_data_window()
-            self.main.fiber_data_window.load_fiber_data(folder)
+            self.main.fiber_data_window.load_fiber_data(os.path.join(self.main.base_directory, folder))
             self.update_comments_button()
 
     def update_recent_folders_combo(self):
@@ -509,11 +461,7 @@ class MainWindow(QMainWindow, HelperFunctions, Widgets):
             self.fiber_height_label.hide()
             self.fiber_height_input.hide()
 
-    def choose_calibration_folder(self):
-        folder_path = QFileDialog.getExistingDirectory(self, "Select Calibration Folder",
-                                                       self.base_directory + "/Calibration")
-        if folder_path:
-            self.calibration_folder_input.setText(folder_path)
+
 
 
 if __name__ == "__main__":

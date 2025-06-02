@@ -4,6 +4,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              )
 import os, json, sys, subprocess
 
+
+
 class HelperFunctions:
     def create_hbox_layout(self, label, widget):
         hbox = QHBoxLayout()
@@ -47,3 +49,46 @@ class HelperFunctions:
             self.comments_button.setText("Access Comments")
         else:
             self.comments_button.setText("Add Comments")
+
+
+def load_recent_folders(file_path:str):
+    import os, json
+    """
+    Load the recent folders from a JSON file.
+    Args:
+        file_path: Path of the JSON file to load from.
+
+    Returns: List of recent folders.
+    """
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            return json.load(file)
+    return []
+
+
+def update_recent_folders(folder:str, recent_folders:list[str], file_path:str, max_recent=3):
+    """
+    Update the list of recent folders.
+    Args:
+        folder: New folder to add.
+        recent_folders: List of recent folders.
+        file_path: Path of the JSON file to save to.
+        max_recent: Maximum number of recent folders to keep.
+    """
+    if folder in recent_folders:
+        recent_folders.remove(folder)
+    recent_folders.insert(0, folder)
+    if len(recent_folders) > max_recent:
+        recent_folders.pop()
+    save_recent_folders(recent_folders, file_path=file_path)
+
+
+def save_recent_folders(recent_folders:str, file_path:str):
+    """
+    Save the recent folders to a JSON file.
+    Args:
+        recent_folders: Folder names to save.
+        file_path: Path of the JSON file to save to.
+    """
+    with open(file_path, 'w') as file:
+        json.dump(recent_folders, file)

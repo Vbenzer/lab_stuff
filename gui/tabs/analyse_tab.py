@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QComboBox, QCheckBox, QVBoxLayout
+                             QPushButton, QComboBox, QCheckBox, QVBoxLayout, QFileDialog
                              )
 
 import threading, os
@@ -7,6 +7,7 @@ import threading, os
 import analysis.frd_analysis
 import analysis.sg_analysis
 import analysis.visualization
+from gui.tabs.helpers import load_recent_folders, update_recent_folders
 
 
 class AnalyseTab:
@@ -61,7 +62,8 @@ class AnalyseTab:
         self.calibration_folder_input = QLineEdit()
         self.calibration_folder_input.textChanged.connect(self.main_init.update_run_button_state)
         self.calibration_folder_button = QPushButton("Choose Calibration Folder")
-        self.calibration_folder_button.clicked.connect(self.main.choose_calibration_folder)
+        self.calibration_folder_button.clicked.connect(lambda: self.choose_calibration_folder(mode="FRD"))
+
 
         layout.addWidget(self.get_params_checkbox)
         layout.addWidget(self.plot_sg_checkbox)
@@ -91,6 +93,30 @@ class AnalyseTab:
         self.main_init.analyse_tab.setLayout(layout)
         self.update_analysis_tab()
 
+    def choose_calibration_folder(self, mode:str):
+        if mode not in ["FRD", "Throughput"]:
+            raise ValueError("Mode must be either 'FRD' or 'Throughput'.")
+        if mode == "FRD":
+            folder_path = QFileDialog.getExistingDirectory(self.main, "Select FRD Calibration Folder",
+                                                           self.main.base_directory + "/FRD_Calibrations")
+            if folder_path:
+                folder_name = os.path.basename(folder_path)
+                self.calibration_folder_input.setText(folder_name)
+                recent_folders = load_recent_folders(self.main.base_directory + "/recent_frd_calibration_folders.json")
+                update_recent_folders(folder_name, recent_folders,
+                                      file_path=self.main.base_directory + "/recent_frd_calibration_folders.json")
+
+        elif mode == "Throughput":
+            folder_path = QFileDialog.getExistingDirectory(self.main, "Select SG Calibration Folder",
+                                                           self.main.base_directory + "/Throughput_Calibrations")
+            if folder_path:
+                folder_name = os.path.basename(folder_path)
+                self.calibration_folder_input.setText(folder_name)
+
+                recent_folders = load_recent_folders(self.main.base_directory + "/recent_throughput_calibration_folders.json")
+                update_recent_folders(folder_name, recent_folders,
+                                      file_path=self.main.base_directory + "/recent_throughput_calibration_folders.json")
+
     def run_analysis(self):
         if not self.main.folder_name and self.main.fiber_dimension and self.main.fiber_shape != "":
             self.main_init.log_data("Run analysis failed: Inputs not locked.")  # Log failure
@@ -115,6 +141,42 @@ class AnalyseTab:
 
         threading.Thread(target=self.run_analysis_thread,
                          args=(analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_folder)).start()
+
+    def get_latest_calibration_folder(self, mode:str):
+        """
+        Get the latest calibration folder from the main instance.
+        Returns:
+            str: Path to the latest calibration folder.
+            mode: The type of calibration folder to look for, either "FRD" or "Throughput".
+        """
+
+        if mode == "FRD":
+            # Find the latest folder containing 'FRD_Calibration' in its name
+            calibration_folder = self.main.base_directory + "/FRD_Calibrations"
+            folders = [f for f in os.listdir(calibration_folder) if
+                       "FRD_Calibration" in f and os.path.isdir(os.path.join(calibration_folder, f))]
+            if not folders:
+                return None
+            latest_folder = max(folders, key=lambda f: os.path.getmtime(os.path.join(calibration_folder, f)))
+            self.main_init.log_data(f"Latest FRD calibration folder: {latest_folder}")  # Log latest folder
+            self.main.progress_signal.emit(f"Using latest FRD calibration folder: {latest_folder}")
+            return latest_folder
+
+        elif mode == "Throughput":
+            # Find the latest folder containing 'Throughput_Calibration' in its name
+            calibration_folder = self.main.base_directory + "/Throughput_Calibrations"
+            folders = [f for f in os.listdir(calibration_folder) if
+                       "Throughput_Calibration" in f and os.path.isdir(os.path.join(calibration_folder, f))]
+            if not folders:
+                return None
+            latest_folder = max(folders, key=lambda f: os.path.getmtime(os.path.join(calibration_folder, f)))
+            self.main_init.log_data(f"Latest Throughput calibration folder: {latest_folder}")
+            self.main.progress_signal.emit(f"Using latest Throughput calibration folder: {latest_folder}")
+            return latest_folder
+
+        else:
+            return None
+
 
     def run_analysis_thread(self, analysis_type, working_dir, fiber_diameter, fiber_shape, calibration_folder):
         self.main.progress_signal.emit("Starting analysis...")
@@ -171,10 +233,11 @@ class AnalyseTab:
 
         elif analysis_type == "FRD":
             directory = os.path.join(working_dir, "FRD")
+            calibration_folder = self.main.base_directory + "/FRD_Calibrations/" + self.calibration_folder_input.text()
             if self.calc_frd_checkbox.isChecked():
                 self.main_init.log_data("Calculating FRD.")  # Log FRD calculation
                 self.main.progress_signal.emit("Calculating FRD.")
-                analysis.frd_analysis.main_analyse_all_filters(directory, progress_signal=self.main.progress_signal)
+                analysis.frd_analysis.main_analyse_all_filters(directory, calibration_folder, progress_signal=self.main.progress_signal)
             if self.plot_sutherland_checkbox.isChecked():
                 self.main_init.log_data("Plotting Sutherland plot.")  # Log Sutherland plot
                 self.main.progress_signal.emit("Plotting Sutherland plot.")
@@ -244,10 +307,15 @@ class AnalyseTab:
             self.calc_frd_checkbox.show()
             self.plot_sutherland_checkbox.show()
             self.plot_f_ratio_circles_on_raw_checkbox.show()
-            self.calibration_folder_label.hide()
-            self.calibration_folder_input.hide()
-            self.calibration_folder_button.hide()
+            self.calibration_folder_label.show()
+            self.calibration_folder_input.show()
+            self.calibration_folder_button.show()
             self.plot_ff_horizontal_cut_checkbox.show()
+            self.calibration_folder_button.clicked.disconnect()
+            self.calibration_folder_button.clicked.connect(lambda: self.choose_calibration_folder(mode="FRD"))
+            recent_folders = load_recent_folders(self.main.base_directory + "/recent_frd_calibration_folders.json")
+            self.calibration_folder_input.setText(recent_folders[0] if recent_folders else "")
+
         elif analysis_type == "Throughput":
             self.plot_sg_checkbox.hide()
             self.calc_sg_checkbox.hide()
@@ -265,3 +333,7 @@ class AnalyseTab:
             self.calibration_folder_input.show()
             self.calibration_folder_button.show()
             self.plot_ff_horizontal_cut_checkbox.hide()
+            self.calibration_folder_button.clicked.disconnect()
+            self.calibration_folder_button.clicked.connect(lambda: self.choose_calibration_folder(mode="Throughput"))
+            recent_folders = load_recent_folders(self.main.base_directory + "/recent_throughput_calibration_folders.json")
+            self.calibration_folder_input.setText(recent_folders[0] if recent_folders else "")

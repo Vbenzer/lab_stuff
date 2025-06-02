@@ -41,8 +41,6 @@ Additions: (Sorted by priority)
 - Add to gui:
     - qol stuff:
         - add general way to choose frd calibration data
-        - add buttons to set motor positions for measurements (0,5,9.9)
-        - add functionality to change number of positions for sg measurements
         - make sure that analysis dependencies are enforced (visually also with indentations)
 
 

@@ -11,7 +11,7 @@ from skimage import io, measure
 import analysis.sg_analysis
 import core.data_processing
 from analysis.sg_analysis import cut_image_around_comk
-
+from core.file_management import load_frd_calibration_data
 
 def plot_cones(project_folder:str):
     """
@@ -81,7 +81,7 @@ def plot_cones(project_folder:str):
     plt.show()
 
 
-def plot_main(project_folder:str):
+def plot_main(project_folder:str, calibration_folder:str):
     """
     Plot the output f-numbers vs input f-numbers.
     Args:
@@ -97,9 +97,14 @@ def plot_main(project_folder:str):
         f_num_err = np.array(data["f_number_err"])
 
     # Input f-numbers
-    input_f_num = np.array(
+    input_f_num, input_f_num_err =  load_frd_calibration_data(calibration_folder)
+    # Convert to numpy arrays
+    input_f_num = np.array(input_f_num)
+    input_f_num_err = np.array(input_f_num_err)
+
+    """input_f_num = np.array(
         [3.637, 4.089, 4.571, 5.103, 6.095])  # These are from the setup_F#_EE_98_ph10_0000 file, 5.5.25
-    input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])
+    input_f_num_err = np.array([0.010, 0.009, 0.010, 0.007, 0.030])"""
     # Change order of input f-numbers
     input_f_num = np.flip(input_f_num)
     input_f_num_err = np.flip(input_f_num_err)

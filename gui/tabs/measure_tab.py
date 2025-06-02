@@ -65,8 +65,24 @@ class MeasureTab:
         measurement_type_layout.addWidget(self.exposure_time_label_mt_exit)
         measurement_type_layout.addWidget(self.exposure_time_input_mt_exit)
 
-
         layout.addWidget(measurement_type_widget)
+
+
+        # Number of measurements chooser
+        self.number_of_measurements_label = QLabel("Number of Measurements:")
+        self.number_of_measurements_input = QLineEdit()
+        self.number_of_measurements_input.setValidator(QRegularExpressionValidator(QRegularExpression(r"^\d+$")))
+        self.number_of_measurements_input.setFixedWidth(100)
+        self.number_of_measurements_input.setText("11")
+        number_of_measurements_widget = QWidget()
+        number_of_measurements_layout = QHBoxLayout(number_of_measurements_widget)
+        number_of_measurements_layout.addWidget(self.number_of_measurements_label)
+        number_of_measurements_layout.addWidget(self.number_of_measurements_input)
+        number_of_measurements_layout.addStretch()
+        layout.addWidget(number_of_measurements_widget)
+        # Initially hidden
+        self.number_of_measurements_label.hide()
+        self.number_of_measurements_input.hide()
 
         self.checklist_label = QLabel("Checklist:")
         self.checklist_label.setStyleSheet("font-weight: bold;")
@@ -155,8 +171,11 @@ class MeasureTab:
         exposure_time_exit = self.exposure_time_input_mt_exit.text()
         exposure_time_entrance = self.exposure_time_input_mt_entrance.text()
         exp_times = {"exit": exposure_time_exit, "entrance": exposure_time_entrance}
+        number_of_measurements = int(self.number_of_measurements_input.text())
 
-        analysis.sg_analysis.capture_images_and_reduce(working_dir, fiber_diameter, progress_signal=self.main.progress_signal, exposure_times=exp_times)
+        analysis.sg_analysis.capture_images_and_reduce(working_dir, fiber_diameter,
+            progress_signal=self.main.progress_signal, exposure_times=exp_times,
+            number_of_positions=number_of_measurements)
 
     def measure_frd(self, working_dir, fiber_diameter, fiber_shape):
         self.main_init.log_data(f"FRD measurement started with working dir: {working_dir}.")  # Log FRD start
@@ -212,6 +231,9 @@ class MeasureTab:
             self.exposure_time_label_mt_entrance.show()
             self.exposure_time_input_mt_entrance.show()
 
+            self.number_of_measurements_label.show()
+            self.number_of_measurements_input.show()
+
         elif measurement_type == "FRD":
             self.check1.setText("Fiber in place: Output at large camera")
             self.check2.setText("Spot on Fiber")
@@ -226,6 +248,9 @@ class MeasureTab:
             self.exposure_time_input_mt_exit.hide()
             self.exposure_time_label_mt_entrance.hide()
             self.exposure_time_input_mt_entrance.hide()
+
+            self.number_of_measurements_label.hide()
+            self.number_of_measurements_input.hide()
 
         elif measurement_type == "Throughput":
             self.check1.setText("Fiber in place: Output on Photodetector")
@@ -243,5 +268,8 @@ class MeasureTab:
             self.exposure_time_input_mt_exit.hide()
             self.exposure_time_label_mt_entrance.hide()
             self.exposure_time_input_mt_entrance.hide()
+
+            self.number_of_measurements_label.hide()
+            self.number_of_measurements_input.hide()
 
         self.update_measurement_button_state()

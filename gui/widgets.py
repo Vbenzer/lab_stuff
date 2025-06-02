@@ -51,7 +51,7 @@ class FiberDataWindow(QDialog):
         self.fiber_shape_combo.setFixedWidth(300)
         self.fiber_shape_combo.currentIndexChanged.connect(self.update_fiber_shape_inputs)
 
-        self.numerical_aperature_label = QLabel("Numerical Aperature:")
+        self.numerical_aperature_label = QLabel("Numerical Aperture:")
         self.numerical_aperature_input = QLineEdit()
         self.numerical_aperature_input.setFixedWidth(300)
 
@@ -132,6 +132,11 @@ class FiberDataWindow(QDialog):
         file_path = os.path.join(folder, "fiber_data.json")
         self.update_from_load_token = True
         if os.path.exists(file_path):
+            # Reset fiber dimension and shape
+            self.fiber_dimension = ""
+            self.fiber_shape = ""
+            fiber_dimension = None
+            fiber_shape = None
             with open(file_path, "r") as file:
                 data = json.load(file)
                 fiber_dimension = data.get("fiber_dimension", "")
