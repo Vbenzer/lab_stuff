@@ -26,8 +26,6 @@ Additions: (Sorted by priority)
     - must check system measurements: Circles fits are bad (this is done)
     - c_100 frds are influenced by background light
 
-- Have a look at modal noise
-
 - For sg: Check if motor precision for displacement of fiber face is acceptable to use as base for entrance fiber position values
     - For this there would have to be one calibration image so maybe not feasible...
     - But perhaps useful for better precision of the sg input image
@@ -43,6 +41,8 @@ Additions: (Sorted by priority)
 - Add to gui:
     - qol stuff:
         - add general way to choose frd calibration data
+        - add buttons to set motor positions for measurements (0,5,9.9)
+        - add functionality to change number of positions for sg measurements
         - make sure that analysis dependencies are enforced (visually also with indentations)
 
 

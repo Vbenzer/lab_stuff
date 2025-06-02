@@ -120,6 +120,33 @@ class GeneralTab(HelperFunctions):
         self.scale_label.hide()
         self.scale_combo.hide()
 
+        # Motor drive buttons as three separate buttons
+        self.motor_drive_label = QLabel("Drive to Position:")
+        self.motor_drive_button_0 = QPushButton("0")
+        self.motor_drive_button_0.setFixedWidth(30)
+        self.motor_drive_button_5 = QPushButton("5")
+        self.motor_drive_button_5.setFixedWidth(30)
+        self.motor_drive_button_9_9 = QPushButton("9.9")
+        self.motor_drive_button_9_9.setFixedWidth(30)
+
+        motor_drive_buttons_layout = QHBoxLayout()
+        motor_drive_buttons_layout.addWidget(self.motor_drive_label)
+        motor_drive_buttons_layout.addWidget(self.motor_drive_button_0)
+        motor_drive_buttons_layout.addWidget(self.motor_drive_button_5)
+        motor_drive_buttons_layout.addWidget(self.motor_drive_button_9_9)
+        layout.addLayout(motor_drive_buttons_layout)
+
+        # Connect buttons to handler
+        self.motor_drive_button_0.clicked.connect(lambda: self.handle_motor_drive_button(0))
+        self.motor_drive_button_5.clicked.connect(lambda: self.handle_motor_drive_button(5))
+        self.motor_drive_button_9_9.clicked.connect(lambda: self.handle_motor_drive_button(9.9))
+
+        # Initially hidden
+        self.motor_drive_label.hide()
+        self.motor_drive_button_0.hide()
+        self.motor_drive_button_5.hide()
+        self.motor_drive_button_9_9.hide()
+
         # Add a spacer item to push the button to the bottom
         layout.addStretch()
 
@@ -140,6 +167,16 @@ class GeneralTab(HelperFunctions):
         self.general_function_combo.currentIndexChanged.connect(self.update_general_tab_buttons)
         #self.main_init.folder_name_input.textChanged.connect(self.update_general_tab_buttons)
         self.update_general_tab_buttons()
+
+    def handle_motor_drive_combo(self):
+        def run_motor_move():
+            position = float(self.motor_drive_combo.currentText())
+            from core.hardware import motor_control as smc
+            smc.open_connection()
+            smc.move_motor_to_position(position, progress_signal=self.main.progress_signal)
+            smc.close_connection()
+
+        threading.Thread(target=run_motor_move).start()
 
     def run_general_function(self):
         selected_function = self.general_function_combo.currentText()
@@ -311,6 +348,10 @@ class GeneralTab(HelperFunctions):
         self.main_init.folder_name_label.setText("Folder Name:")
         self.main_init.show_message("")
         self.run_button_gt.setDisabled(True)
+        self.motor_drive_label.hide()
+        self.motor_drive_button_0.hide()
+        self.motor_drive_button_5.hide()
+        self.motor_drive_button_9_9.hide()
 
         # Handle specific functions
         if selected_function == "Measure System F-ratio":
@@ -333,6 +374,10 @@ class GeneralTab(HelperFunctions):
         elif selected_function == "Motor Controller: Move to Position":
             self.number_input_label.show()
             self.number_input.show()
+            self.motor_drive_label.show()
+            self.motor_drive_button_0.show()
+            self.motor_drive_button_5.show()
+            self.motor_drive_button_9_9.show()
 
         elif selected_function == "FF with each Filter":
             self.main_init.folder_name_label.show()
