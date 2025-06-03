@@ -180,6 +180,7 @@ def move_motor_to_position(position: float, progress_signal=None):
     print(f"New position: {position_new}")
     if progress_signal:
         progress_signal.emit(f"New position: {position_new}")
+    return position_new
 
 def close_connection():
     """

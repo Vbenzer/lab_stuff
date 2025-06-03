@@ -67,6 +67,10 @@ class FiberDataWindow(QDialog):
         self.manufacturer_combo.addItems(["Thorlabs", "Option 2", "Option 3", "Option 4"])  # Add your predefined options here
         self.manufacturer_combo.setFixedWidth(300)
 
+        self.manufacturer_code_label = QLabel("Manufacturer Code:")
+        self.manufacturer_code_input = QLineEdit()
+        self.manufacturer_code_input.setFixedWidth(300)
+
         self.save_button = QPushButton("Save and close")
         self.save_button.clicked.connect(self.check_inputs_and_save)
 
@@ -88,6 +92,8 @@ class FiberDataWindow(QDialog):
         self.layout.addWidget(self.coating_type_combo)
         self.layout.addWidget(self.manufacturer_label)
         self.layout.addWidget(self.manufacturer_combo)
+        self.layout.addWidget(self.manufacturer_code_label)
+        self.layout.addWidget(self.manufacturer_code_input)
 
         self.layout.addWidget(self.save_button)
 
@@ -98,6 +104,7 @@ class FiberDataWindow(QDialog):
         self.numerical_aperature = ""
         self.coating_type = ""
         self.manufacturer = ""
+        self.manufacturer_code = ""
 
         self.update_from_load_token = False
 
@@ -109,6 +116,7 @@ class FiberDataWindow(QDialog):
         self.numerical_aperature_input.setText(self.numerical_aperature)
         self.coating_type_combo.setCurrentText(self.coating_type)
         self.manufacturer_combo.setCurrentText(self.manufacturer)
+        self.manufacturer_code_input.setText(self.manufacturer_code)
         self.update_fiber_shape_inputs()
         if self.fiber_shape == "rectangular":
             self.fiber_width_input.setText(str(self.fiber_dimension[0]))
@@ -126,7 +134,7 @@ class FiberDataWindow(QDialog):
             # noinspection PyTypeChecker
             json.dump({"fiber_name": os.path.basename(folder), "fiber_dimension": self.fiber_dimension, "fiber_shape": self.fiber_shape,
                        "fiber_length": self.fiber_length, "numerical_aperature": self.numerical_aperature, "coating_type": self.coating_type,
-                          "manufacturer": self.manufacturer}, file)
+                          "manufacturer": self.manufacturer, "manufacturer_code": self.manufacturer_code}, file)
 
     def load_fiber_data(self, folder):
         file_path = os.path.join(folder, "fiber_data.json")
@@ -145,6 +153,7 @@ class FiberDataWindow(QDialog):
                 numerical_aperature = data.get("numerical_aperature", "")
                 coating_type = data.get("coating_type", "")
                 manufacturer = data.get("manufacturer", "")
+                manufacturer_code = data.get("manufacturer_code", "")
 
                 self.fiber_shape = fiber_shape if fiber_shape else ""
                 self.fiber_dimension = fiber_dimension if fiber_dimension else ""
@@ -152,6 +161,7 @@ class FiberDataWindow(QDialog):
                 self.numerical_aperature = numerical_aperature if numerical_aperature else ""
                 self.coating_type = coating_type if coating_type else ""
                 self.manufacturer = manufacturer if manufacturer else ""
+                self.manufacturer_code = manufacturer_code if manufacturer_code else ""
         else:
             self.show_message("No fiber data file found.")
 
@@ -173,6 +183,7 @@ class FiberDataWindow(QDialog):
         self.numerical_aperature_input.setText(self.numerical_aperature)
         self.coating_type_combo.setCurrentText(self.coating_type)
         self.manufacturer_combo.setCurrentText(self.manufacturer)
+        self.manufacturer_code_input.setText(self.manufacturer_code)
 
     def check_folder_exists(self, folder=None):
         if folder is None:
@@ -211,6 +222,7 @@ class FiberDataWindow(QDialog):
             self.numerical_aperature = self.numerical_aperature_input.text()
             self.coating_type = self.coating_type_combo.currentText()
             self.manufacturer = self.manufacturer_combo.currentText()
+            self.manufacturer_code = self.manufacturer_code_input.text()
 
             self.emit_fiber_data_changed()
 

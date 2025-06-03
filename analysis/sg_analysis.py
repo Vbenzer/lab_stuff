@@ -710,6 +710,48 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
         json.dump(parameters, f, indent=4)
 
 
+def get_precise_entrance_positions(main_folder: str, progress_signal=None):
+    from scipy.interpolate import interp1d
+    from scipy.stats import linregress
+
+    parameter_file = os.path.join(main_folder, "scrambling_gain_parameters.json")
+    positions_file = os.path.join(main_folder, "positions.json")
+
+    if not os.path.exists(parameter_file):
+        raise FileNotFoundError(f"Parameter file {parameter_file} not found. Please run get_sg_params first.")
+    if not os.path.exists(positions_file):
+        raise FileNotFoundError(f"Positions file {positions_file} not found. Please run get_positions first.")
+
+    # Load entrance center-of-mask positions (in pixel space)
+    with open(parameter_file, 'r') as f:
+        parameters = json.load(f)
+    entrance_comk = np.array(parameters["entrance_comk"])
+    comk_y = entrance_comk[:, 1]
+
+    # Load motor positions (in mm or similar)
+    with open(positions_file, 'r') as f:
+        positions = np.array(json.load(f))
+
+    if len(comk_y) != len(positions):
+        raise ValueError(f"Length mismatch: {len(comk_y)} comks vs {len(positions)} positions")
+
+    # Normalize both to better fit
+    comk_y_centered = comk_y - np.mean(comk_y)
+    positions_centered = positions - np.mean(positions)
+
+    # Fit a regression model: comk_y -> motor_position
+    slope, intercept, *_ = linregress(comk_y_centered, positions_centered)
+
+    # Compute refined, subpixel-accurate positions
+    refined_positions = slope * comk_y_centered + intercept + np.mean(positions)
+
+    if progress_signal:
+        progress_signal.emit("Calculated precise entrance positions.")
+
+    return refined_positions
+
+
+
 def check_mask_flux_single(image:np.ndarray, mask:np.ndarray, plot:bool=False, print_text:bool=True):
     """
     Check the flux of the mask in the image.
@@ -792,7 +834,9 @@ def grow_mask(image:np.ndarray, position:(tuple[int,int],list), radius:[int, tup
             return margin
 
 
-def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None, number_of_positions:int=11, exposure_times:dict[str, str]=None):
+
+def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None,
+                              number_of_positions:int=11, exposure_times:dict[str, str]=None):
     """
     Capture images and reduce them for the scrambling gain calculation
     Args:
@@ -852,8 +896,6 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         tcc.take_image("exit_cam", exit_dark_image_folder + f"/exit_cam_dark{i:03d}.png",
                        exposure_time=exposure_times["exit"])
 
-
-
     # Move to filter "0" for light
     mtf.move("Open")
 
@@ -875,11 +917,15 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
         pos_left = 5 - fiber_diameter / 1000 * 0.8 / 2  # Leftmost position in mm
 
     # Take images
+    position_list = []  # List to save positions
     for i in range(number_of_positions):
         print(i, pos_left + i * step_size)
 
         # Move the motor to the next position
-        smc.move_motor_to_position(pos_left + i * step_size)
+        position = smc.move_motor_to_position(pos_left + i * step_size)
+
+        # Save position to list
+        position_list.append(position)
 
         # Take images
         tcc.take_image("entrance_cam", entrance_light_folder + f"/entrance_cam_image{i:03d}.png",
@@ -892,6 +938,15 @@ def capture_images_and_reduce(main_image_folder:str, fiber_diameter:[int, tuple[
 
         time.sleep(1)  # Probably not necessary
     print("All images taken!")
+
+    # Save the positions to json file
+    positions_file = os.path.join(main_image_folder, "positions.json")
+    with open(positions_file, 'w') as f:
+        json.dump(position_list, f, indent=4)
+
+    # Send progress signal
+    if progress_signal:
+        progress_signal.emit("Positions saved to json.")
 
     # Reset the motor to the initial position
     smc.move_motor_to_position(5)

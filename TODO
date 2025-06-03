@@ -5,6 +5,10 @@ Bugs: (Sorted by priority)
     - minor bugs:
         - Gui layout doesnt stay still... but only in lab
 
+TODOs from report:
+    - FRD with all filters
+    - Nicer report
+
 - implement check that counts are in linear regime ~35k counts
 
 - input beam profile doesnt look great with pinholes
@@ -40,7 +44,6 @@ Additions: (Sorted by priority)
 
 - Add to gui:
     - qol stuff:
-        - add general way to choose frd calibration data
         - make sure that analysis dependencies are enforced (visually also with indentations)
 
 
