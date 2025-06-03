@@ -441,6 +441,12 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
     Returns:
     scrambling_gain: List of scrambling gains for each pair of entrance and exit images.
     """
+
+    # Detect if positions.json file exists
+    positions_file = os.path.join(main_folder, "positions.json")
+    if not os.path.exists(positions_file):
+        raise FileNotFoundError(f"Positions file {positions_file} not found. Please run new measurement first.")
+
     # Define the image folders
     entrance_image_folder_reduced = os.path.join(main_folder, "entrance/reduced")
     exit_image_folder_reduced = os.path.join(main_folder, "exit/reduced")
@@ -712,8 +718,6 @@ def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress
 
 def get_precise_entrance_positions(main_folder: str, progress_signal=None):
     from scipy.interpolate import interp1d
-    from scipy.stats import linregress
-
     parameter_file = os.path.join(main_folder, "scrambling_gain_parameters.json")
     positions_file = os.path.join(main_folder, "positions.json")
 
@@ -722,33 +726,31 @@ def get_precise_entrance_positions(main_folder: str, progress_signal=None):
     if not os.path.exists(positions_file):
         raise FileNotFoundError(f"Positions file {positions_file} not found. Please run get_positions first.")
 
-    # Load entrance center-of-mask positions (in pixel space)
+    # Load comk values
     with open(parameter_file, 'r') as f:
         parameters = json.load(f)
     entrance_comk = np.array(parameters["entrance_comk"])
     comk_y = entrance_comk[:, 1]
 
-    # Load motor positions (in mm or similar)
+    # Load and clean motor positions: from "1=4.98400" to float
     with open(positions_file, 'r') as f:
-        positions = np.array(json.load(f))
+        raw_positions = json.load(f)
+    positions = np.array([float(p.split('=')[1]) for p in raw_positions])
 
     if len(comk_y) != len(positions):
         raise ValueError(f"Length mismatch: {len(comk_y)} comks vs {len(positions)} positions")
 
-    # Normalize both to better fit
-    comk_y_centered = comk_y - np.mean(comk_y)
-    positions_centered = positions - np.mean(positions)
+    # Create interpolation: motor position -> comk_y
+    # This gives a smooth fit of comk_y across motor positions
+    interp = interp1d(positions, comk_y, kind='cubic', fill_value="extrapolate")
 
-    # Fit a regression model: comk_y -> motor_position
-    slope, intercept, *_ = linregress(comk_y_centered, positions_centered)
-
-    # Compute refined, subpixel-accurate positions
-    refined_positions = slope * comk_y_centered + intercept + np.mean(positions)
+    # Evaluate the interpolation at each motor position (now with higher precision)
+    refined_comk_y = interp(positions)
 
     if progress_signal:
         progress_signal.emit("Calculated precise entrance positions.")
 
-    return refined_positions
+    return refined_comk_y
 
 
 
@@ -1040,6 +1042,14 @@ def sg_new(main_folder:str, progress_signal=None):
         progress_signal: Progress signal to update the progress.
 
     """
+    positions_file = os.path.join(main_folder, "positions.json")
+
+    # Load motor positions (in mm or similar)
+    with open(positions_file, 'r') as f:
+        raw_positions = json.load(f)
+
+    positions = np.array([float(item.split('=')[1]) for item in raw_positions])
+
     # Read parameters from json file
     if progress_signal:
         progress_signal.emit("Loading parameters form json")
@@ -1088,11 +1098,17 @@ def sg_new(main_folder:str, progress_signal=None):
         gauge_distance_entrance[i] = np.sqrt(gauge_points_entrance[i][0] ** 2 + gauge_points_entrance[i][1] ** 2)
         gauge_distance_exit[i] = np.sqrt(gauge_points_exit[i][0] ** 2 + gauge_points_exit[i][1] ** 2)
 
+    # Calculate the motor positions relative to the reference position
+    gauge_distance_entrance_motor = np.zeros(len(entrance_coms))
+    print("Motor positions", positions)
+    for i in range(len(entrance_coms)):
+        gauge_distance_entrance_motor[i] = positions[i] - positions[reference_index]
+
     # Check for bad measurements
     distance_avg = np.mean(gauge_distance_exit)
     is_bad = []
     for i in range(len(gauge_distance_exit)):
-        if gauge_distance_exit[i] > distance_avg * 2.5:
+        if gauge_distance_exit[i] > distance_avg * 2.0:
             flag = True
             is_bad.append(flag)
         else:
@@ -1105,9 +1121,19 @@ def sg_new(main_folder:str, progress_signal=None):
     gauge_distance_exit = np.delete(gauge_distance_exit, np.where(is_bad))
     gauge_points_entrance = np.delete(gauge_points_entrance, np.where(is_bad), axis=0)
     gauge_points_exit = np.delete(gauge_points_exit, np.where(is_bad), axis=0)
+    gauge_distance_entrance_motor = np.delete(gauge_distance_entrance_motor, np.where(is_bad))
 
     # Move the reference index to new position after removing bad measurements
     reference_index = np.argmin(gauge_distance_entrance)
+
+    # Convert everything to micrometers
+    gauge_points_entrance = gauge_points_entrance * 0.5169363821005045
+    gauge_points_exit = gauge_points_exit * 0.439453125
+    gauge_distance_entrance = gauge_distance_entrance * 0.5169363821005045
+    gauge_distance_exit = gauge_distance_exit * 0.439453125
+    print("Gauged motor positions pre conversion", gauge_distance_entrance_motor)
+    gauge_distance_entrance_motor = gauge_distance_entrance_motor * 1e3  # Convert to micrometers from mm
+    print("Gauged motor positions post conversion", gauge_distance_entrance_motor)
 
     # Calculate the scrambling gain
     scrambling_gain = np.zeros(len(gauge_distance_entrance))
@@ -1115,10 +1141,10 @@ def sg_new(main_folder:str, progress_signal=None):
         if i == reference_index:
             continue
 
-        scrambling_gain[i] = gauge_distance_entrance[i] / gauge_distance_exit[i]
+        scrambling_gain[i] = gauge_distance_entrance_motor[i] / gauge_distance_exit[i]
 
     # Calculate sg_min
-    sg_min = np.max(gauge_distance_entrance)/np.max(gauge_distance_exit)
+    sg_min = np.max(gauge_distance_entrance_motor)/np.max(gauge_distance_exit)
     print(f"Scrambling gain min: {sg_min}")
 
     if progress_signal:
@@ -1133,59 +1159,63 @@ def sg_new(main_folder:str, progress_signal=None):
     scrambling_gain = np.delete(scrambling_gain, reference_index)
     print(scrambling_gain)
 
+    """
     # Plot the results
     plt.scatter(gauge_points_entrance[:, 1], gauge_points_entrance[:, 0], label='Entrance Gauged Points')
     plt.scatter(0, 0, label='Reference Point', color='r')
-    plt.xlabel('X-distance [px]')
-    plt.ylabel('Y-distance [px]')
+    plt.xlabel('X-distance [μm]')
+    plt.ylabel('Y-distance [μm]')
     plt.title('Entrance Gauged Points')
     plt.legend()
     plt.savefig(os.path.join(main_folder, "plots/entrance_gauged_points.png"))
-    plt.close()
+    plt.close()"""
 
     plt.scatter(gauge_points_exit[:, 1], gauge_points_exit[:, 0], label='Exit Gauged Points')
     plt.scatter(0, 0, label='Reference Point', color='r')
-    plt.xlabel('X-distance [px]')
-    plt.ylabel('Y-distance [px]')
+    plt.xlabel('X-distance [μm]')
+    plt.ylabel('Y-distance [μm]')
     plt.title('Exit Gauged Points')
     plt.legend()
     plt.savefig(os.path.join(main_folder, "plots/exit_gauged_points.png"))
     plt.close()
 
+    """
     plt.scatter(gauge_distance_entrance, gauge_distance_exit, label='Gauged Distances')
     plt.scatter(gauge_distance_entrance[reference_index], gauge_distance_exit[reference_index], label='Reference Point', color='r')
-    plt.xlabel('Entrance COM distance [px]')
-    plt.ylabel('Exit COM distance [px]')
+    plt.xlabel('Entrance COM distance [μm]')
+    plt.ylabel('Exit COM distance [μm]')
     plt.title('Gauged Distances')
     plt.legend()
     plt.savefig(os.path.join(main_folder, "plots/gauged_distances.png"))
     plt.close()
+    """
 
     # Linear function for plot visuals
     def func(x, a, b):
         return a * x + b
 
-    # Convert into micrometers
-    gauge_points_entrance = gauge_points_entrance * 0.5169363821005045
-    gauge_points_exit = gauge_points_exit * 0.439453125
-
     # Plot from "plot_sg_cool_like" function
     plt.figure(figsize=(10, 5), dpi=100)
-    plt.scatter(gauge_points_entrance[:, 1], gauge_points_exit[:, 1], label='X movement')
-    plt.scatter(gauge_points_entrance[:, 1], gauge_points_exit[:, 0], label='Y movement')
-    plt.scatter(gauge_points_entrance[:, 1], gauge_distance_exit, label='Total movement')
-    plt.plot(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], 5e-4, 0), 'g--', label='SG 2000', alpha=1, linewidth=0.5)
-    plt.plot(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], -5e-4, 0), 'g--', alpha=1, linewidth=0.5)
-    plt.fill_between(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], 5e-4, 0), func(gauge_points_entrance[:,1], -5e-4, 0),
+    plt.scatter(gauge_distance_entrance_motor, gauge_points_exit[:, 1], label='X movement')
+    plt.scatter(gauge_distance_entrance_motor, gauge_points_exit[:, 0], label='Y movement')
+    plt.scatter(gauge_distance_entrance_motor, gauge_distance_exit, label='Total movement')
+    plt.plot(gauge_distance_entrance_motor, func(gauge_distance_entrance_motor, 5e-4, 0), 'g--', label='SG 2000', alpha=1, linewidth=0.5)
+    plt.plot(gauge_distance_entrance_motor, func(gauge_distance_entrance_motor, -5e-4, 0), 'g--', alpha=1, linewidth=0.5)
+    plt.fill_between(gauge_distance_entrance_motor, func(gauge_distance_entrance_motor, 5e-4, 0), func(gauge_distance_entrance_motor, -5e-4, 0),
                      color='g', alpha=0.3, hatch="//", zorder=2)
-    plt.plot(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], 2e-3, 0), 'r--', label='SG 500', alpha=1, linewidth=0.5)
-    plt.plot(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], -2e-3, 0), 'r--', alpha=1, linewidth=0.5)
-    plt.fill_between(gauge_points_entrance[:, 1], func(gauge_points_entrance[:,1], 2e-3, 0), func(gauge_points_entrance[:,1], -2e-3, 0),
+    plt.plot(gauge_distance_entrance_motor, func(gauge_distance_entrance_motor, 2e-3, 0), 'r--', label='SG 500', alpha=1, linewidth=0.5)
+    plt.plot(gauge_distance_entrance_motor, func(gauge_distance_entrance_motor, -2e-3, 0), 'r--', alpha=1, linewidth=0.5)
+    plt.fill_between(gauge_distance_entrance_motor, func(gauge_distance_entrance_motor, 2e-3, 0), func(gauge_distance_entrance_motor, -2e-3, 0),
                      color='r', alpha=0.2, hatch="/", zorder=1)
     plt.legend()
     plt.ylim(-0.08, 0.08)
-    plt.ylabel('Exit COM distance [mu]')
-    plt.xlabel('Entrance Spot displacement [mu]')
+    plt.ylabel('Exit COM distance [μm]')
+    plt.xlabel('Entrance Spot displacement [μm]')
     plt.title('Scrambling Gain')
     plt.savefig(os.path.join(main_folder, "plots/scrambling_gain_plot.png"))
     plt.close()
+
+if __name__ == "__main__":
+    # Example usage
+    main_folder = "/run/user/1002/gvfs/smb-share:server=srv4.local,share=labshare/raw_data/fibers/Measurements/O_40_0000_0003_test/SG"
+    print(get_precise_entrance_positions(main_folder))
