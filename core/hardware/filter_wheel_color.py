@@ -1,3 +1,7 @@
+"""Module filter_wheel_color.py.
+
+Auto-generated docstring for better readability.
+"""
 import sys
 import elliptec
 from time import sleep

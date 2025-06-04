@@ -1,3 +1,7 @@
+"""Module collimation_test_obs.py.
+
+Auto-generated docstring for better readability.
+"""
 import core.data_processing
 import image_analysation_obs
 import image_reduction_obs

@@ -1,3 +1,7 @@
+"""Module power_meter_control.py.
+
+Auto-generated docstring for better readability.
+"""
 import pyvisa
 import json
 import datetime

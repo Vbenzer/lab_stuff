@@ -1,3 +1,7 @@
+"""Module thorlabs_cam_control.py.
+
+Auto-generated docstring for better readability.
+"""
 import cv2
 import time
 from astropy.io import fits

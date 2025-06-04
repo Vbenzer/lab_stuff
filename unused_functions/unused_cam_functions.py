@@ -1,3 +1,7 @@
+"""Module unused_cam_functions.py.
+
+Auto-generated docstring for better readability.
+"""
 def take_image_old(cam_name: str, save_file_name: str, wait: bool = False, exposure_time=None, info: bool = False,
                save_fits: bool = False, progress_signal=None):
     cam = instrumental.instrument(cam_name, reopen_policy="new")

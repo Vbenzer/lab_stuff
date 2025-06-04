@@ -1,3 +1,7 @@
+"""Module unused_sg_functions.py.
+
+Auto-generated docstring for better readability.
+"""
 import time
 
 #from cProfile import label

@@ -1,3 +1,7 @@
+"""Module PyQT_Gui.py.
+
+Auto-generated docstring for better readability.
+"""
 #!/usr/bin/env python3
 import sys
 import os

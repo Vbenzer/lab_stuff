@@ -1,3 +1,7 @@
+"""Module general_analysis.py.
+
+Auto-generated docstring for better readability.
+"""
 import os
 
 import numpy as np

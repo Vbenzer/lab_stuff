@@ -1,3 +1,7 @@
+"""Module find_f_number_obs.py.
+
+Auto-generated docstring for better readability.
+"""
 import numpy as np
 
 from analysis.frd_analysis import calculate_f_number

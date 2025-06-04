@@ -1,3 +1,7 @@
+"""Module motor_control.py.
+
+Auto-generated docstring for better readability.
+"""
 import serial
 import time
 

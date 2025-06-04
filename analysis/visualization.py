@@ -1,3 +1,7 @@
+"""Module visualization.py.
+
+Auto-generated docstring for better readability.
+"""
 import json
 import os
 

@@ -1,3 +1,7 @@
+"""Module general_tab.py.
+
+Auto-generated docstring for better readability.
+"""
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QVBoxLayout
                              )

@@ -1,3 +1,7 @@
+"""Module helpers.py.
+
+Auto-generated docstring for better readability.
+"""
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
                              QSizePolicy, QDialog, QVBoxLayout, QMessageBox
