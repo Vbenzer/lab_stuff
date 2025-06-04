@@ -1,3 +1,7 @@
+"""Module analyse_main_obs.py.
+
+Auto-generated docstring for better readability.
+"""
 import core.file_management
 import os
 import time

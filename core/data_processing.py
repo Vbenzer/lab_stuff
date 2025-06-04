@@ -1,3 +1,7 @@
+"""Module data_processing.py.
+
+Auto-generated docstring for better readability.
+"""
 import json
 import os
 from tkinter.constants import RAISED

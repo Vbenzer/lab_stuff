@@ -1,3 +1,7 @@
+"""Module widgets.py.
+
+Auto-generated docstring for better readability.
+"""
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QComboBox, QTabWidget, QFileDialog, QCheckBox, QTextEdit, QSpacerItem,
                              QSizePolicy, QDialog, QVBoxLayout, QMessageBox
@@ -195,12 +199,28 @@ class FiberDataWindow(QDialog):
             self.show_message("")
             return False
 
-    def check_inputs_and_save(self):
+    def _get_fiber_dimension(self):
+        """Return the fiber dimension from the dialog inputs."""
         if self.fiber_diameter_input.text() != "":
-            self.fiber_dimension = self.fiber_diameter_input.text()
-        elif self.fiber_width_input.text() != "" and self.fiber_height_input.text() != "":
-            self.fiber_dimension = (self.fiber_width_input.text(), self.fiber_height_input.text())
-        else:
+            return self.fiber_diameter_input.text()
+        if self.fiber_width_input.text() != "" and self.fiber_height_input.text() != "":
+            return (self.fiber_width_input.text(), self.fiber_height_input.text())
+        return None
+
+    def _collect_fiber_info(self):
+        """Collect user provided fiber information from the input fields."""
+        self.fiber_shape = self.fiber_shape_combo.currentText()
+        self.fiber_length = self.fiber_length_input.text()
+        self.fiber_name = self.fiber_name_input.text()
+        self.numerical_aperature = self.numerical_aperature_input.text()
+        self.coating_type = self.coating_type_combo.currentText()
+        self.manufacturer = self.manufacturer_combo.currentText()
+        self.manufacturer_code = self.manufacturer_code_input.text()
+
+    def check_inputs_and_save(self):
+        """Validate input fields and save the fiber configuration."""
+        self.fiber_dimension = self._get_fiber_dimension()
+        if self.fiber_dimension is None:
             self.show_message("Please enter fiber diameter or height and width.")
             return
 
@@ -216,13 +236,7 @@ class FiberDataWindow(QDialog):
                 if reply == QMessageBox.StandardButton.No:
                     return
             self.update_from_load_token = False
-            self.fiber_shape = self.fiber_shape_combo.currentText()
-            self.fiber_length = self.fiber_length_input.text()
-            self.fiber_name = self.fiber_name_input.text()
-            self.numerical_aperature = self.numerical_aperature_input.text()
-            self.coating_type = self.coating_type_combo.currentText()
-            self.manufacturer = self.manufacturer_combo.currentText()
-            self.manufacturer_code = self.manufacturer_code_input.text()
+            self._collect_fiber_info()
 
             self.emit_fiber_data_changed()
 

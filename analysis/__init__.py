@@ -1,3 +1,7 @@
+"""Module __init__.py.
+
+Auto-generated docstring for better readability.
+"""
 # Python
 
 from .throughput_analysis import (

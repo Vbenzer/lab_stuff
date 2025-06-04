@@ -1,3 +1,7 @@
+"""Module main_window.py.
+
+Auto-generated docstring for better readability.
+"""
 import socket
 import threading
 

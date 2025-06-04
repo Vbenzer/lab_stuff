@@ -1,3 +1,7 @@
+"""Module image_analysation_obs.py.
+
+Auto-generated docstring for better readability.
+"""
 from core.data_processing import fits_to_arr, measure_fiber_dimensions
 
 # Usage

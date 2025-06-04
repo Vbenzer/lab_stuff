@@ -1,3 +1,7 @@
+"""Module modal_noise.py.
+
+Auto-generated docstring for better readability.
+"""
 import numpy as np
 
 

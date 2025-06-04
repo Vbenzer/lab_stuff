@@ -1,3 +1,7 @@
+"""Module qhyccd_control_old.py.
+
+Auto-generated docstring for better readability.
+"""
 import cv2
 import numpy as np
 import ctypes

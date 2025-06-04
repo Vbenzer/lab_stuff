@@ -1,3 +1,7 @@
+"""Module filter_wheel_fratio.py.
+
+Auto-generated docstring for better readability.
+"""
 import serial
 import time
 

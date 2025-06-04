@@ -1,3 +1,7 @@
+"""Module sg_analysis.py.
+
+Auto-generated docstring for better readability.
+"""
 import json
 import os
 

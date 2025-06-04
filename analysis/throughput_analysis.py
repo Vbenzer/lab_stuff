@@ -1,3 +1,7 @@
+"""Module throughput_analysis.py.
+
+Auto-generated docstring for better readability.
+"""
 import numpy as np
 import os
 import json

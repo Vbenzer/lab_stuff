@@ -1,3 +1,7 @@
+"""Module qhyccd_cam_control_live.py.
+
+Auto-generated docstring for better readability.
+"""
 import cv2
 import numpy as np
 import ctypes

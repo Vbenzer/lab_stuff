@@ -1,3 +1,7 @@
+"""Module fiber_frd_measurements_obs.py.
+
+Auto-generated docstring for better readability.
+"""
 from analysis.general_analysis import measure_fiber_size
 
 

@@ -1,3 +1,7 @@
+"""Module file_management.py.
+
+Auto-generated docstring for better readability.
+"""
 import os
 import shutil
 import subprocess

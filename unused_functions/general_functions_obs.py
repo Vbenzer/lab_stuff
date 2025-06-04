@@ -1,3 +1,7 @@
+"""Module general_functions_obs.py.
+
+Auto-generated docstring for better readability.
+"""
 from analysis.general_analysis import overplot_original_and_data
 
 if __name__ == "__main__":
