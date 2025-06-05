@@ -1,6 +1,8 @@
-"""Module qhyccd_control.py.
+"""Utilities for controlling a QHYCCD camera.
 
-Auto-generated docstring for better readability.
+This module wraps the vendor provided DLL to offer a minimal Python
+interface for capturing single images. Only a subset of the available
+functionality is implemented as required by the project.
 """
 import cv2
 import numpy as np
@@ -8,6 +10,7 @@ import ctypes
 from ctypes import *
 from enum import Enum
 import time
+import os
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -42,12 +45,23 @@ def convert_to_us(time_str):
         raise ValueError("Unsupported time unit")
 
 class Camera:
-    def __init__(self, exp_time):
+    """Simple wrapper around the QHYCCD camera API."""
+
+    def __init__(self, exp_time: int) -> None:
+        """Initialize the camera and configure basic settings.
+
+        Parameters
+        ----------
+        exp_time : int
+            Exposure time in microseconds used for initial configuration.
+        """
+
         # Based on https://github.com/JiangXL/qhyccd-python
         self.qhyccddll = cdll.LoadLibrary('.\\qhyccd.dll')
 
         qhyccddll = self.qhyccddll
 
+        # ---- Configure function prototypes ----
         # get camera id
         qhyccddll.GetQHYCCDId.argtypes = [ctypes.c_uint32, ctypes.c_char_p]
         # get handle via camera id
@@ -110,10 +124,17 @@ class Camera:
         qhyccddll.StopQHYCCDLive.argtypes = [ctypes.c_void_p]
 
         # convert image data
-        qhyccddll.Bits16ToBits8.argtypes = [ctypes.c_void_p,
-                                              ctypes.POINTER(ctypes.c_uint8), ctypes.POINTER(ctypes.c_uint8),
-                                              ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint16, ctypes.c_uint16]
+        qhyccddll.Bits16ToBits8.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_uint8),
+            ctypes.POINTER(ctypes.c_uint8),
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_uint16,
+            ctypes.c_uint16,
+        ]
 
+        # Enum of supported control parameters
         class CONTROL_ID(Enum):
             CONTROL_BRIGHTNESS = 0
             CONTROL_CONTRAST = 1
@@ -150,6 +171,7 @@ class Camera:
 
         self.CONTROL_ID = CONTROL_ID
 
+        # ---- Establish connection with the first available camera ----
         camhandle = 0
 
         ret = qhyccddll.InitQHYCCDResource()
@@ -245,7 +267,17 @@ class Camera:
         self.imgdata_raw8 = (ctypes.c_uint8 * length)()
         #print(imgdata_raw8, imgdata)
 
-    def change_exposure_time(self, exp_time, progress_signal=None):
+    def change_exposure_time(self, exp_time: int, progress_signal=None) -> None:
+        """Change the exposure time of the camera.
+
+        Parameters
+        ----------
+        exp_time : int
+            New exposure time in microseconds.
+        progress_signal : optional
+            Qt signal used to report progress in the GUI.
+        """
+
         print(f"Changing exposure time to {exp_time} us")
         if progress_signal:
             progress_signal.emit(f"Changing exposure time to {exp_time} us")
@@ -253,49 +285,98 @@ class Camera:
         ret = self.qhyccddll.SetQHYCCDParam(self.camhandle, self.CONTROL_ID.CONTROL_EXPOSURE.value, exp_time)
         print("SetQHYCCDParam() ret =", ret)
 
-    def close(self):
+    def close(self) -> None:
+        """Close the camera and release resources."""
         ret = self.qhyccddll.CloseQHYCCD(self.camhandle)
         ret = self.qhyccddll.ReleaseQHYCCDResource()
         cv2.destroyAllWindows()
 
-    def take_frame(self, working_dir: str, image_name: str, show: bool = False, save: bool = True,
-                   progress_signal=None):
-        self.qhyccddll.ExpQHYCCDSingleFrame(self.camhandle)
-        ret = self.qhyccddll.GetQHYCCDSingleFrame(self.camhandle, byref(self.w), byref(self.h), byref(self.b), byref(self.c), self.imgdata)     # This takes long if not live, longer if live...
-        #print("GetQHYCCDSingleFrame() ret =", ret, "w =", w.value, "h =", h.value, "b =", b.value, "c =", c.value, "count =", count,)
-        if ret != 0:
-            print("Failed to capture image.")
-            if progress_signal:
-                progress_signal.emit("Failed to capture image.")
-            exit()
-        #qhyccddll.Bits16ToBits8(camhandle, imgdata, imgdata_raw8, w.value, h.value, 0, 65535)
-        img = np.frombuffer(self.imgdata, dtype=np.uint16).reshape((self.h.value, self.w.value))
+    def _capture_frame(self) -> np.ndarray:
+        """Capture a single frame from the camera."""
 
-        # Print max pixel value
-        print("Max pixel value:", np.max(img), "Mean pixel value: ", np.mean(img))
+        self.qhyccddll.ExpQHYCCDSingleFrame(self.camhandle)
+        ret = self.qhyccddll.GetQHYCCDSingleFrame(
+            self.camhandle,
+            byref(self.w),
+            byref(self.h),
+            byref(self.b),
+            byref(self.c),
+            self.imgdata,
+        )
+        if ret != 0:
+            raise RuntimeError("Failed to capture image")
+
+        return np.frombuffer(self.imgdata, dtype=np.uint16).reshape(
+            (self.h.value, self.w.value)
+        )
+
+    def _report_statistics(self, img: np.ndarray, progress_signal=None) -> None:
+        """Print and optionally emit basic image statistics."""
+        max_pixel = np.max(img)
+        mean_pixel = np.mean(img)
+        print("Max pixel value:", max_pixel, "Mean pixel value:", mean_pixel)
         if progress_signal:
-            progress_signal.emit(f"Max pixel value: {np.max(img)}")
-            progress_signal.emit(f"Mean pixel value: {np.mean(img)}")
+            progress_signal.emit(f"Max pixel value: {max_pixel}")
+            progress_signal.emit(f"Mean pixel value: {mean_pixel}")
+
+    def _display_frame(self, img: np.ndarray) -> None:
+        """Show the captured frame using OpenCV."""
+        show_img = img / np.max(img) * 255
+        cv2.namedWindow("Show", 0)
+        cv2.resizeWindow("Show", self.w.value // 10, self.h.value // 10)
+        cv2.imshow("Show", show_img.astype(np.uint8))
+        cv2.waitKey(0)
+
+    def _save_frame(self, img: np.ndarray, path: str) -> None:
+        """Save the frame as a FITS file to ``path``."""
+        import astropy.io.fits as fits
+
+        if not path.endswith(".fits"):
+            path += ".fits"
+        fits.writeto(path, img, overwrite=True)
+
+    def take_frame(
+        self,
+        working_dir: str,
+        image_name: str,
+        show: bool = False,
+        save: bool = True,
+        progress_signal=None,
+    ) -> np.ndarray:
+        """Capture a frame and optionally display or save it."""
+
+        img = self._capture_frame()
+        self._report_statistics(img, progress_signal)
 
         if show:
-            show_img = img / np.max(img) * 255
-            cv2.namedWindow("Show", 0)
-            cv2.resizeWindow("Show", self.w.value//10, self.h.value//10)  # Set the window size to 800x600
-            cv2.imshow("Show", show_img.astype(np.uint8))
-            cv2.waitKey(0)
+            self._display_frame(img)
 
         if save:
-            # Save image as fits
-            import os
-            import astropy.io.fits as fits
-            if not image_name.endswith(".fits"):
-                image_name += ".fits"
-            fits.writeto(os.path.join(working_dir, image_name), img, overwrite=True)
+            self._save_frame(img, os.path.join(working_dir, image_name))
 
-    def take_single_frame(self, working_dir: str, image_name: str, show: bool = False, progress_signal=None):
-        self.take_frame(working_dir, image_name, show=show, progress_signal=progress_signal)
+        return img
 
-    def take_multiple_frames(self, working_dir:str, image_name:str, num_frames:int):
+    def take_single_frame(
+        self,
+        working_dir: str,
+        image_name: str,
+        show: bool = False,
+        progress_signal=None,
+    ) -> np.ndarray:
+        """Convenience wrapper for :meth:`take_frame`."""
+
+        return self.take_frame(
+            working_dir,
+            image_name,
+            show=show,
+            progress_signal=progress_signal,
+        )
+
+    def take_multiple_frames(
+        self, working_dir: str, image_name: str, num_frames: int
+    ) -> None:
+        """Capture ``num_frames`` sequential images."""
+
         for i in range(num_frames):
             self.take_frame(working_dir, f"{image_name}_{i}")
 
