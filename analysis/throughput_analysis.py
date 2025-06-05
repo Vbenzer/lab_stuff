@@ -76,17 +76,54 @@ def _sanitize_measurements(data: Dict[str, dict], min_points: int = 20) -> None:
             values["channel_1"] = [0]
             values["channel_2"] = [1]
 
-def measure_single_filter(main_folder, filter_name, number_of_measurements):
-    """
-    Measure the transmission of a single filter.
-    Args:
-        main_folder: Path to the main folder.
-        filter_name: Name of the filter.
-        number_of_measurements: Number of data points to take.
+
+def _compute_throughput(data: Dict[str, dict], calibration: List[float],
+                        filters: List[str]) -> Dict[str, float]:
+    """Return throughput per filter.
+
+    Parameters
+    ----------
+    data:
+        Cleaned measurement data as returned by
+        :func:`_load_measurement_files`.
+    calibration:
+        List of calibration quotients.  Must have the same length as
+        ``filters``.
+    filters:
+        Names of the filters corresponding to ``data`` and ``calibration``.
+
+    Returns
+    -------
+    Dict[str, float]
+        Mapping ``filter -> throughput`` in percent.
     """
 
+    throughput: Dict[str, float] = {}
+    for fname, cal_q in zip(filters, calibration):
+        ch1 = np.mean(data[fname]["channel_1"])
+        ch2 = np.mean(data[fname]["channel_2"])
+        throughput[fname] = ch1 / (cal_q * ch2)
+
+    return throughput
+
+def measure_single_filter(main_folder: str, filter_name: str,
+                          number_of_measurements: int) -> None:
+    """Record power meter readings for ``filter_name``.
+
+    Parameters
+    ----------
+    main_folder:
+        Directory where the resulting ``*.json`` file will be stored.
+    filter_name:
+        Name of the filter wheel position.
+    number_of_measurements:
+        Amount of samples to record.
+    """
+
+    # Delegate the actual acquisition to the hardware layer.  The power meter
+    # readings are written directly into ``main_folder`` using the filter name
+    # as file name.
     from core.hardware import power_meter_control as pmc
-    # Make the measurement
     pmc.make_measurement(main_folder, number_of_measurements, filter_name + ".json")
 
 def measure_all_filters(main_folder, number_of_measurements=100, progress_signal=None, calibration:str=None, base_directory:str=None):
@@ -102,10 +139,11 @@ def measure_all_filters(main_folder, number_of_measurements=100, progress_signal
     import datetime
 
     if calibration:
+        # For calibration runs store the data in a dedicated folder with
+        # timestamp so repeated calibrations do not overwrite previous ones.
         date = datetime.datetime.now().strftime("%Y-%m-%d")
         main_folder = base_directory + r"/Calibration/" + date + "_" + calibration + "/"
         os.makedirs(main_folder, exist_ok=False)
-
     else:
         os.makedirs(main_folder, exist_ok=False)
 
@@ -157,7 +195,7 @@ def calculate_throughput(main_folder, calibration_folder):
         main_folder: Path to the main folder.
 
     """
-    # Obtain the calibration factors used to scale the measurements
+    # Determine the calibration factors used to scale the measurements
     calibration_quotient_list = calc_cal_quotient(calibration_folder)
 
     # Persist calibration data for later inspection
@@ -167,18 +205,12 @@ def calculate_throughput(main_folder, calibration_folder):
 
     filter_list = ["400", "450", "500", "600", "700", "800"]
 
-    # Load all filter measurement files
+    # Load and clean measurement files
     data = _load_measurement_files(main_folder, filter_list)
-
-    # Clean up measurement lists (remove infinities/zeros)
     _sanitize_measurements(data)
 
-    # Calculate the throughput for each filter
-    throughput = {}
-    for filter_name, calibration_quotient in zip(filter_list, calibration_quotient_list):
-        avg_ch1 = np.mean(data[filter_name]["channel_1"])
-        avg_ch2 = np.mean(data[filter_name]["channel_2"])
-        throughput[filter_name] = avg_ch1 / (calibration_quotient * avg_ch2)
+    # Compute throughput dictionary
+    throughput = _compute_throughput(data, calibration_quotient_list, filter_list)
 
     # Write throughput to json
     throughput_file = os.path.join(main_folder, "throughput.json")
