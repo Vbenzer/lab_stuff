@@ -3,6 +3,7 @@
 Auto-generated docstring for better readability.
 """
 import os
+import threading
 
 import numpy as np
 from astropy.io import fits
@@ -58,8 +59,83 @@ def init_filter_wheel():
     fw = qhycfw3_filter_wheel_control.FilterWheel('COM5')
 
 
-def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], exposure_times:dict[str, int]=None,
-                         progress_signal=None, driving_width:float=None, number_of_positions:int=11):
+def _initialize_devices(exit_cam_exp: int, progress_signal=None) -> None:
+    """Initialize camera and filter wheel in parallel."""
+    if progress_signal:
+        progress_signal.emit("Initializing filter wheel and cameras")
+
+    fw_thread = threading.Thread(target=init_filter_wheel)
+    cam_thread = threading.Thread(target=init_camera, args=(exit_cam_exp,))
+
+    fw_thread.start()
+    cam_thread.start()
+    fw_thread.join()
+    cam_thread.join()
+
+
+def _create_capture_folders(project_folder: str) -> dict[str, str]:
+    """Create and return all subfolders used during capture."""
+    entrance_folder = os.path.join(project_folder, "entrance")
+    exit_folder = os.path.join(project_folder, "exit")
+    os.makedirs(entrance_folder, exist_ok=True)
+    os.makedirs(exit_folder, exist_ok=True)
+
+    folders = {
+        "entrance_light": os.path.join(entrance_folder, "light"),
+        "exit_light": os.path.join(exit_folder, "light"),
+        "entrance_dark": os.path.join(entrance_folder, "dark"),
+        "exit_dark": os.path.join(exit_folder, "dark"),
+        "entrance_reduced": os.path.join(entrance_folder, "reduced"),
+        "exit_reduced": os.path.join(exit_folder, "reduced"),
+    }
+
+    for folder in folders.values():
+        os.makedirs(folder, exist_ok=True)
+
+    return folders
+
+
+def _capture_position(index: int, position: float, exposure_times: dict[str, int],
+                      folders: dict[str, str], progress_signal=None) -> None:
+    """Capture dark and light frames for a single motor position."""
+    from core.hardware import motor_control as smc
+    from core.hardware import filter_wheel_color as mtf
+
+    if progress_signal:
+        progress_signal.emit(f"Moving Motor to position {position}")
+    smc.move_motor_to_position(position)
+
+    if progress_signal:
+        progress_signal.emit("Closing Shutter")
+    mtf.move("Closed")
+    if progress_signal:
+        progress_signal.emit("Taking darks")
+
+    tcc.take_image(
+        "entrance_cam",
+        os.path.join(folders["entrance_dark"], f"entrance_cam_dark{index:03d}.fits"),
+        exposure_time=exposure_times["entrance_cam"],
+        save_fits=True,
+    )
+    cam.take_single_frame(folders["exit_dark"], f"exit_cam_dark{index:03d}.fits")
+
+    if progress_signal:
+        progress_signal.emit("Opening Shutter")
+    mtf.move("Open")
+    if progress_signal:
+        progress_signal.emit("Taking images")
+
+    tcc.take_image(
+        "entrance_cam",
+        os.path.join(folders["entrance_light"], f"entrance_cam_image{index:03d}.fits"),
+        exposure_time=exposure_times["entrance_cam"],
+        save_fits=True,
+    )
+    cam.take_single_frame(folders["exit_light"], f"exit_cam_image{index:03d}.fits")
+
+
+def nf_ff_capture(project_folder: str, fiber_diameter: [int, tuple[int, int]], exposure_times: dict[str, int] | None = None,
+                  progress_signal=None, driving_width: float | None = None, number_of_positions: int = 11) -> None:
     """
     Takes far field and near field images with the entrance and exit cameras. The images are taken at different
     positions of the input spot.
@@ -76,108 +152,38 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
     Returns:
 
     """
-    from core.hardware import motor_control as smc
-    from core.hardware import filter_wheel_color as mtf
-    import threading
-
     if exposure_times is None:
         raise ValueError("Exposure times must be provided.")
 
-    # Create and check project folder
     os.makedirs(project_folder, exist_ok=True)
 
-    if progress_signal:
-        progress_signal.emit("Initializing filter wheel and cameras")
-
-    # Connect filter wheel and cameras in thread
-    fw_thread = threading.Thread(target=init_filter_wheel)
-    cam_thread = threading.Thread(target=init_camera, args=([exposure_times["exit_cam"]]))
-
-    fw_thread.start()
-    cam_thread.start()
-
-    # Make sure everything is ready
-    fw_thread.join()
-    cam_thread.join()
+    _initialize_devices(exposure_times["exit_cam"], progress_signal)
 
     if progress_signal:
         progress_signal.emit("Moving to initial position (f/3.5)")
 
-    # Set filter wheel to f/3.5
     fw.move_to_filter("3.5")
 
-    # Define folders
-    entrance_folder = os.path.join(project_folder, "entrance")
-    exit_folder = os.path.join(project_folder, "exit")
-    os.makedirs(entrance_folder, exist_ok=True)
-    os.makedirs(exit_folder, exist_ok=True)
-
-    entrance_folder_light = os.path.join(entrance_folder, "light")
-    exit_folder_light = os.path.join(exit_folder, "light")
-    os.makedirs(entrance_folder_light, exist_ok=True)
-    os.makedirs(exit_folder_light, exist_ok=True)
-
-    entrance_folder_dark = os.path.join(entrance_folder, "dark")
-    exit_folder_dark = os.path.join(exit_folder, "dark")
-    os.makedirs(entrance_folder_dark, exist_ok=True)
-    os.makedirs(exit_folder_dark, exist_ok=True)
-
-    entrance_folder_reduced = os.path.join(entrance_folder, "reduced")
-    exit_folder_reduced = os.path.join(exit_folder, "reduced")
-    os.makedirs(entrance_folder_reduced, exist_ok=True)
-    os.makedirs(exit_folder_reduced, exist_ok=True)
+    folders = _create_capture_folders(project_folder)
 
     if driving_width is not None:
         fiber_diameter = driving_width
 
-    # Calculate the step size and leftmost position. Also handle rectangular case
     if isinstance(fiber_diameter, (tuple, list)):
         max_size = max(fiber_diameter)
-        step_size = max_size / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
-        pos_left = 5 - max_size / 1000 * 0.8 / 2  # Leftmost position in mm
     else:
-        step_size = fiber_diameter / 1000 * 0.8 / (number_of_positions - 1)  # Step size in mm
-        pos_left = 5 - fiber_diameter / 1000 * 0.8 / 2  # Leftmost position in mm
+        max_size = fiber_diameter
+    step_size = max_size / 1000 * 0.8 / (number_of_positions - 1)
+    pos_left = 5 - max_size / 1000 * 0.8 / 2
 
-    # Take images
     for i in range(number_of_positions):
         if progress_signal:
             progress_signal.emit(f"Starting image process {i + 1} of {number_of_positions}")
 
-        print("Taking image:", i, ", at position:", pos_left + i * step_size)
+        current_pos = pos_left + i * step_size
+        print("Taking image:", i, ", at position:", current_pos)
 
-        if progress_signal:
-            progress_signal.emit(f"Moving Motor to position {pos_left + i * step_size}")
-
-        # Move the motor to the next position
-        smc.move_motor_to_position(pos_left + i * step_size)
-
-        # Take darks
-        if progress_signal:
-            progress_signal.emit(f"Closing Shutter")
-
-        mtf.move("Closed")
-
-        if progress_signal:
-            progress_signal.emit(f"Taking darks")
-
-        tcc.take_image("entrance_cam", entrance_folder_dark + f"/entrance_cam_dark{i:03d}.fits",
-                       exposure_time=exposure_times["entrance_cam"], save_fits=True)
-        cam.take_single_frame(exit_folder_dark, f"exit_cam_dark{i:03d}.fits")
-
-
-        # Take images
-        if progress_signal:
-            progress_signal.emit(f"Opening Shutter")
-
-        mtf.move("Open")
-
-        if progress_signal:
-            progress_signal.emit(f"Taking images")
-
-        tcc.take_image("entrance_cam", entrance_folder_light + f"/entrance_cam_image{i:03d}.fits",
-                       exposure_time=exposure_times["entrance_cam"], save_fits=True)
-        cam.take_single_frame(exit_folder_light, f"exit_cam_image{i:03d}.fits")
+        _capture_position(i, current_pos, exposure_times, folders, progress_signal)
 
         if progress_signal:
             progress_signal.emit(f"Image process {i + 1} of {number_of_positions} done")
@@ -185,6 +191,7 @@ def nf_ff_capture(project_folder:str, fiber_diameter:[int, tuple[int,int]], expo
     if progress_signal:
         progress_signal.emit("Resetting motor position to 5mm")
 
+    from core.hardware import motor_control as smc
     smc.move_motor_to_position(5)
     print("All images taken!")
 
