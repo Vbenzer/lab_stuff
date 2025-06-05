@@ -1,10 +1,17 @@
-"""Module throughput_analysis.py.
+"""Utility functions for analysing filter throughput.
 
-Auto-generated docstring for better readability.
+The routines in this module are used to measure the transmission
+of different colour filters and to compute the throughput relative
+to calibration data.  The functions were originally written as part
+of a measurement GUI and therefore rely on measurement files stored
+in ``JSON`` format.  Only a very small subset of error handling is
+performed here as the data is assumed to be well formed.
 """
-import numpy as np
-import os
 import json
+import os
+from typing import Dict, List
+
+import numpy as np
 
 
 def main(main_folder, calibration_folder):
@@ -19,6 +26,55 @@ def main(main_folder, calibration_folder):
 
     # Plot the throughput
     plot_throughput(main_folder, save=True)
+
+
+def _load_measurement_files(main_folder: str, filter_list: List[str]) -> Dict[str, dict]:
+    """Return measurement data for each filter.
+
+    Parameters
+    ----------
+    main_folder : str
+        Directory containing ``*.json`` measurement files.
+    filter_list : List[str]
+        Names of the filters that should be loaded.
+
+    Returns
+    -------
+    Dict[str, dict]
+        Mapping of filter name to loaded JSON content.
+    """
+
+    data: Dict[str, dict] = {}
+    for filter_name in filter_list:
+        file_name = os.path.join(main_folder, f"{filter_name}.json")
+        with open(file_name, "r") as f:
+            data[filter_name] = json.load(f)
+    return data
+
+
+def _sanitize_measurements(data: Dict[str, dict], min_points: int = 20) -> None:
+    """Clean measurement data in-place.
+
+    Removes ``inf`` and zero entries from the measurement lists and ensures a
+    minimum number of data points is available.  If too few values remain the
+    channel is replaced with ``[0]`` and ``[1]`` to signal an invalid
+    measurement.
+
+    Parameters
+    ----------
+    data : Dict[str, dict]
+        Dictionary returned by :func:`_load_measurement_files`.
+    min_points : int, optional
+        Minimum number of valid measurements required.
+    """
+
+    for values in data.values():
+        values["channel_1"] = [x for x in values["channel_1"] if x not in (np.inf, 0.0)]
+        values["channel_2"] = [x for x in values["channel_2"] if x not in (np.inf, 0.0)]
+
+        if len(values["channel_1"]) < min_points or len(values["channel_2"]) < min_points:
+            values["channel_1"] = [0]
+            values["channel_2"] = [1]
 
 def measure_single_filter(main_folder, filter_name, number_of_measurements):
     """
@@ -101,48 +157,49 @@ def calculate_throughput(main_folder, calibration_folder):
         main_folder: Path to the main folder.
 
     """
-    # Get calibration quotient
+    # Obtain the calibration factors used to scale the measurements
     calibration_quotient_list = calc_cal_quotient(calibration_folder)
 
-    # Save calibration quotient list to json
+    # Persist calibration data for later inspection
     cal_qou_file = os.path.join(main_folder, "calibration_quotient.json")
-    with open(cal_qou_file, 'w') as f:
+    with open(cal_qou_file, "w") as f:
         json.dump(calibration_quotient_list, f, indent=4)
 
-    # Load the data
     filter_list = ["400", "450", "500", "600", "700", "800"]
-    data = {}
 
-    for filter_name in filter_list:
-        file_name = os.path.join(main_folder, filter_name + ".json")
-        with open(file_name, 'r') as f:
-            data[filter_name] = json.load(f)
+    # Load all filter measurement files
+    data = _load_measurement_files(main_folder, filter_list)
 
-    print(data)
+    # Clean up measurement lists (remove infinities/zeros)
+    _sanitize_measurements(data)
 
-    # Filter out infinities and zeros
-    for filter_name in filter_list:
-        data[filter_name]["channel_1"] = [x for x in data[filter_name]["channel_1"] if x != np.inf and x != 0.0]
-        data[filter_name]["channel_2"] = [x for x in data[filter_name]["channel_2"] if x != np.inf and x != 0.0]
-    #data = data[np.isfinite(data) & (data != 0)]
-        if len(data[filter_name]["channel_1"]) < 20 or len(data[filter_name]["channel_2"]) < 20:
-            data[filter_name]["channel_1"] = [0]
-            data[filter_name]["channel_2"] = [1]
-            print("Warning: Data amount small, setting to 0")
-    print(data)
-    print(calibration_quotient_list)
-
-    # Calculate the throughput
+    # Calculate the throughput for each filter
     throughput = {}
     for filter_name, calibration_quotient in zip(filter_list, calibration_quotient_list):
-        throughput[filter_name] = np.mean(data[filter_name]["channel_1"]) / (calibration_quotient * np.mean(data[filter_name]["channel_2"]))
+        avg_ch1 = np.mean(data[filter_name]["channel_1"])
+        avg_ch2 = np.mean(data[filter_name]["channel_2"])
+        throughput[filter_name] = avg_ch1 / (calibration_quotient * avg_ch2)
 
     # Write throughput to json
     throughput_file = os.path.join(main_folder, "throughput.json")
     with open(throughput_file, 'w') as f:
         json.dump(throughput, f, indent=4)
 
-def calc_cal_quotient_folder(calibration_folder:str): # deprecated
+def calc_cal_quotient_folder(calibration_folder: str) -> None:  # deprecated
+    """Create ``calibration_quotient.json`` from all files in ``calibration_folder``.
+
+    The function iterates over all JSON files in ``calibration_folder`` and
+    computes the calibration quotient for each using
+    :func:`calc_cal_quotient`.  The resulting list is written back to the same
+    folder for later use.  This helper remains for backwards compatibility and
+    might be removed in the future.
+
+    Parameters
+    ----------
+    calibration_folder : str
+        Folder containing the calibration measurements.
+    """
+
     calibration_file_list = os.listdir(calibration_folder)
 
     cal_qou_list = []
@@ -151,19 +208,26 @@ def calc_cal_quotient_folder(calibration_folder:str): # deprecated
         calibration_quotient = calc_cal_quotient(os.path.join(calibration_folder, file))
         cal_qou_list.append(calibration_quotient)
 
-    # Write calibration quotient to json
+    # Write calibration quotient list back to disk
     cal_qou_file = os.path.join(calibration_folder, "calibration_quotient.json")
-    with open(cal_qou_file, 'w') as f:
+    with open(cal_qou_file, "w") as f:
         json.dump(cal_qou_list, f, indent=4)
 
-def calc_cal_quotient(calibration_folder:str):
-    """
-    Calculate the calibration quotient
-    Args:
-        calibration_folder: Path to the calibration folder.
+def calc_cal_quotient(calibration_folder: str) -> List[float]:
+    """Return calibration quotients for all JSON files in *calibration_folder*.
 
-    Returns: List of calibration quotients for all filters.
+    The calibration quotient is defined as the ratio between the mean of
+    ``channel_1`` and ``channel_2`` values stored in each calibration file.
 
+    Parameters
+    ----------
+    calibration_folder : str
+        Path to the folder containing the calibration measurement files.
+
+    Returns
+    -------
+    List[float]
+        One quotient for every file found in the folder.
     """
     # Load the calibration data
     data_list = []
@@ -193,10 +257,12 @@ def calc_cal_quotient(calibration_folder:str):
     return calibration_quotient_list
 
 def create_test_data(main_folder):
-    """
-    Create test data for the throughput analysis.
-    Args:
-        main_folder: Path to the main folder.
+    """Generate random measurement files for manual testing.
+
+    Parameters
+    ----------
+    main_folder : str
+        Directory where the JSON files will be created.
     """
     import numpy as np
     import os
