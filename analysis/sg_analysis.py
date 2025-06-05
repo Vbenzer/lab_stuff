@@ -98,8 +98,117 @@ def make_shape(shape:str, radius:[int, tuple[int, int]]):
         return mask
 
 
-def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, radius_threshold:int=5,
-                plot_all:bool=False, best_params=None):
+def _prepare_mask(image: np.ndarray, plot_all: bool = False) -> np.ndarray:
+    """Return a cleaned binary mask of ``image`` edges."""
+    edges = feature.canny(image, sigma=2, low_threshold=1, high_threshold=15)
+    erode = morphology.binary_erosion(edges)
+    dilate = morphology.binary_dilation(edges)
+    mask = np.logical_and(dilate, ~erode)
+    erode = morphology.binary_erosion(mask)
+    dilate = morphology.binary_dilation(mask)
+    mask = np.logical_and(dilate, ~erode)
+    filled_mask = ndi.binary_fill_holes(mask)
+
+    if plot_all:
+        plt.figure(figsize=(12.80, 10.24))
+        plt.imshow(edges)
+        plt.title("Edges")
+        plt.show()
+
+        plt.figure(figsize=(12.80, 10.24))
+        plt.imshow(filled_mask)
+        plt.title("Filled Mask")
+        plt.show()
+
+    return filled_mask.astype(np.uint8)
+
+
+def _search_template(
+    uint8_mask: np.ndarray,
+    shape: str,
+    radius: int | tuple,
+    num_rotations: int,
+    stop_value: int,
+    radius_threshold: int,
+    best_params,
+) -> tuple[np.ndarray | None, float, tuple[int, int] | None, int | tuple]:
+    """Return best template match for ``uint8_mask``."""
+    best_match = None
+    best_score = -np.inf
+    best_angle = 0
+    best_location = None
+    best_radius = radius
+
+    if best_params is not None:
+        radius = best_params[0]
+        angle = best_params[1]
+        r = [radius[0], radius[1]] if shape == "rectangular" else radius
+        full_shape = make_shape(shape, r)
+        erode = morphology.binary_erosion(full_shape)
+        dilate = morphology.binary_dilation(full_shape)
+        template = np.logical_and(dilate, ~erode)
+        rotated_template = transform.rotate(template, angle, resize=False)
+        rotated_template = (rotated_template * 255).astype(np.uint8)
+        result = cv2.matchTemplate(uint8_mask, rotated_template, cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, max_loc = cv2.minMaxLoc(result)
+        best_match = rotated_template
+        best_angle = angle
+        best_location = max_loc
+        best_radius = r
+    else:
+        for i in range(-radius_threshold, radius_threshold):
+            r = [radius[0] + i, radius[1] + i] if shape == "rectangular" else radius + i
+            full_shape = make_shape(shape, r)
+            erode = morphology.binary_erosion(full_shape)
+            dilate = morphology.binary_dilation(full_shape)
+            template = np.logical_and(dilate, ~erode)
+            for angle in np.linspace(0, stop_value, num_rotations, endpoint=False):
+                rotated_template = transform.rotate(template, angle, resize=False)
+                rotated_template = (rotated_template * 255).astype(np.uint8)
+                result = cv2.matchTemplate(uint8_mask, rotated_template, cv2.TM_CCOEFF_NORMED)
+                _, max_val, _, max_loc = cv2.minMaxLoc(result)
+                if max_val > best_score:
+                    best_score = max_val
+                    best_match = rotated_template
+                    best_angle = angle
+                    best_location = max_loc
+                    best_radius = r
+
+    return best_match, best_angle, best_location, best_radius
+
+
+def _plot_best_result(
+    image: np.ndarray,
+    best_match: np.ndarray,
+    best_angle: float,
+    com_position: tuple[float, float],
+    shape: str,
+    radius: int | tuple,
+) -> None:
+    """Visualize best template match."""
+    plot_best = make_shape(shape, radius)
+    plot_best = transform.rotate(plot_best, best_angle, resize=False)
+    pad_x_0 = com_position[1] - plot_best.shape[1] // 2
+    pad_x_1 = image.shape[0] - (com_position[1] + plot_best.shape[1] // 2)
+    pad_y_0 = com_position[0] - plot_best.shape[0] // 2
+    pad_y_1 = image.shape[1] - (com_position[0] + plot_best.shape[0] // 2)
+    plot_best = np.pad(plot_best, ((int(pad_x_0), int(pad_x_1)), (int(pad_y_0), int(pad_y_1))), mode="constant")
+    plot_best_outline = measure.find_contours(plot_best, 0.5)[0]
+
+    plt.figure(figsize=(12.80, 10.24))
+    plt.imshow(best_match, cmap="gray")
+    plt.title("Best Match")
+    plt.show()
+
+    plt.figure(figsize=(12.80, 10.24))
+    plt.imshow(image, cmap="gray")
+    plt.plot(plot_best_outline[:, 1], plot_best_outline[:, 0], "r", linewidth=0.5)
+    plt.title("Best Match")
+    plt.show()
+
+
+def match_shape(image: np.ndarray, radius: int, shape: str, num_rotations: int = 50, radius_threshold: int = 5,
+                plot_all: bool = False, best_params=None):
     """
     Match the given shape to the image using template matching.
     Args:
@@ -116,49 +225,10 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
         com_position: The center of mass of the best match.
         best_radius: The radius of the best match.
     """
-    best_match = None
-    best_score = -np.inf
-    best_angle = 0
-    best_location = None
-    best_radius = radius
-
     print("Matching shape")
 
-    # Detect edges using Canny edge detector
-    edges = feature.canny(image, sigma=2, low_threshold=1, high_threshold=15)
+    filled_mask = _prepare_mask(image, plot_all)
 
-    # Ensure outline is closed (2 iterations of dilation and erosion)
-    erode = morphology.binary_erosion(edges)
-    dilate = morphology.binary_dilation(edges)
-    mask_1 = np.logical_and(dilate, ~erode)
-
-    erode = morphology.binary_erosion(mask_1)
-    dilate = morphology.binary_dilation(mask_1)
-    mask_2 = np.logical_and(dilate, ~erode)
-
-    # Plots to check mask
-    if plot_all:
-        plt.figure(figsize=(12.80, 10.24))
-        plt.imshow(edges)
-        plt.title("Edges")
-        plt.show()
-
-        plt.figure(figsize=(12.80, 10.24))
-        plt.imshow(mask_2)
-        plt.title("Mask after 2nd iteration of dilation and erosion")
-        plt.show()
-
-    # Fill in the holes in the edges
-    filled_mask = ndi.binary_fill_holes(mask_2)
-
-    if plot_all:
-        plt.figure(figsize=(12.80, 10.24))
-        # Plot the filled mask
-        plt.imshow(filled_mask)
-        plt.title("Filled Mask")
-        plt.show()
-
-    # Set the stop value for the rotation depending on the shape
     if shape == "circular":
         stop_value = 0
         num_rotations = 1
@@ -171,125 +241,24 @@ def match_shape(image:np.ndarray, radius:int, shape:str, num_rotations:int=50, r
     else:
         raise ValueError("Invalid shape. Must be either 'circle', 'rectangle' or 'octagon")
 
-    # Convert bool to uint8
     uint8_mask = filled_mask.astype(np.uint8)
-    #uint8_mask = image
 
-    """if image.dtype != np.uint8:
-        edges = (edges * 255).astype(np.uint8)"""
-
-    if best_params is not None:
-        radius = best_params[0]
-        angle = best_params[1]
-
-        if shape == "rectangular":
-            r = [radius[0], radius[1]]
-        else:
-            r = radius
-
-        # Create the shape
-        full_shape = make_shape(shape, r)
-
-        # Convert the full_shape to just the outline of the shape
-        erode = morphology.binary_erosion(full_shape)
-        dilate = morphology.binary_dilation(full_shape)
-
-        # Create the template
-        template = np.logical_and(dilate, ~erode)
-
-        # Rotate the template
-        rotated_template = transform.rotate(template, angle, resize=False)
-        rotated_template = (rotated_template * 255).astype(np.uint8)
-
-        # Perform template matching
-        result = cv2.matchTemplate(uint8_mask, rotated_template, cv2.TM_CCOEFF_NORMED)
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-
-        best_match = rotated_template
-        best_angle = angle
-        best_location = max_loc
-        best_radius = r
-
-    else:
-        for i in range( -radius_threshold, radius_threshold): # Iterate over different radii
-            if shape == "rectangular":
-                r = [radius[0] + i, radius[1] + i]
-            else:
-                r = radius + i
-
-            # Create the shape
-            full_shape = make_shape(shape,r)
-
-            # Convert the full_shape to just the outline of the shape
-            erode = morphology.binary_erosion(full_shape)
-            dilate = morphology.binary_dilation(full_shape)
-
-            # Create the template
-            template = np.logical_and(dilate, ~erode)
-
-            #print("Template shape:", template.shape)
-
-            for angle in np.linspace(0, stop_value, num_rotations, endpoint=False): # Iterate over different rotations
-                print("Angle:", angle)
-                # Rotate the template
-                rotated_template = transform.rotate(template, angle, resize=False)
-                rotated_template = (rotated_template * 255).astype(np.uint8)
-
-                #print("Rotated template shape:", rotated_template.shape)
-
-                # Perform template matching
-                result = cv2.matchTemplate(uint8_mask, rotated_template, cv2.TM_CCOEFF_NORMED)
-                min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-
-                if max_val > best_score:
-                    # Update the best match
-                    best_score = max_val
-                    best_match = rotated_template
-                    best_angle = angle
-                    best_location = max_loc
-                    best_radius = r
+    best_match, best_angle, best_location, best_radius = _search_template(
+        uint8_mask, shape, radius, num_rotations, stop_value, radius_threshold, best_params
+    )
 
     if best_match is not None:
-        # Calculate the center of mass of the best match
-        com_position = best_location[0] + best_match.shape[1] / 2, best_location[1] + best_match.shape[0] / 2
+        com_position = (
+            best_location[0] + best_match.shape[1] / 2,
+            best_location[1] + best_match.shape[0] / 2,
+        )
 
         if plot_all:
-
-            radius = best_radius
-
-            plot_best = make_shape(shape, radius)
-
-            # Rotate the best match
-            plot_best = transform.rotate(plot_best, best_angle, resize=False)
-
-
-            # Pad the best match to fit the image while getting it on position
-            pad_x_0 = com_position[1] - plot_best.shape[1] // 2
-            pad_x_1 = image.shape[0] - (com_position[1] + plot_best.shape[1] // 2)
-            pad_y_0 = com_position[0] - plot_best.shape[0] // 2
-            pad_y_1 = image.shape[1] - (com_position[0] + plot_best.shape[0] // 2)
-
-            # Plot best match
-            plt.figure(figsize=(12.80, 10.24))
-            plt.imshow(best_match, cmap='gray')
-            plt.title("Best Match")
-            plt.show()
-
-            # Pad the best match to fit the image while getting it on position
-            plot_best = np.pad(plot_best, ((int(pad_x_0), int(pad_x_1)), (int(pad_y_0), int(pad_y_1)),), mode='constant')
-            plot_best_outline = measure.find_contours(plot_best, 0.5)[0]
-
-            plt.figure(figsize=(12.80, 10.24))
-            plt.imshow(image, cmap='gray')
-            plt.plot(plot_best_outline[:, 1], plot_best_outline[:, 0], 'r', linewidth=0.5)
-            plt.title("Best Match")
-            plt.show()
+            _plot_best_result(image, best_match, best_angle, com_position, shape, best_radius)
 
         return best_angle, com_position, best_radius
-
     else:
         print("No match found")
-
 
 def build_mask(image:np.ndarray, radius:[int, tuple[int,int]], shape:str, mask_margin:int, position:tuple[int,int],
                angle:int, plot_mask:bool=False, save_mask:str="-1"):
