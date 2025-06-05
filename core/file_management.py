@@ -9,40 +9,54 @@ import time
 import h5py
 import numpy as np
 
-def create_new_hdf5(file_path:str):
-    # Create a new HDF5 file
-    h5py.File(file_path, 'a')
+def create_new_hdf5(file_path: str) -> None:
+    """Create an empty HDF5 file.
+
+    Parameters
+    ----------
+    file_path : str
+        Location where the file should be created.
+    """
+
+    h5py.File(file_path, "a")
     print("File created at:", file_path)
 
 
-def create_hdf5_group(folder_path:str, group_name:str):
-    with h5py.File(folder_path,"w") as f:
+def create_hdf5_group(folder_path: str, group_name: str) -> None:
+    """Create ``group_name`` within the HDF5 file at ``folder_path``."""
+
+    with h5py.File(folder_path, "w") as f:
         f.create_group(group_name)
     print("Created new group:", group_name, "at:", folder_path)
 
 
-def add_data_to_hdf(path:str, data, dataset_name:str):
+def add_data_to_hdf(path: str, data, dataset_name: str):
+    """Append ``data`` to ``dataset_name`` in the HDF5 file at ``path``."""
+
     with h5py.File(path, "a") as f:
         dset = f.create_dataset(dataset_name, data)
     print("Wrote data to:", dataset_name)
     return dset
 
 
-def add_plot_to_hdf(file_path:str, plot_path:str, plot_name:str):
+def add_plot_to_hdf(file_path: str, plot_path: str, plot_name: str) -> None:
+    """Store an image from ``plot_path`` as ``plot_name`` in ``file_path``."""
+
     with h5py.File(file_path, "w") as f:
         with open(plot_path, "rb") as img:
             f.create_dataset(plot_name, data=np.frombuffer(img.read(), dtype="uint8"))
     print("Plot:", plot_name, "saved to:", file_path)
 
 
-def save_measurement_hdf5(filename, measurement_name, f_number, f_number_err):
-    with h5py.File(filename, 'a') as file:
-        # Create a group for each measurement ID
-        measurement_group = file.create_group(measurement_name)
+def save_measurement_hdf5(
+    filename: str, measurement_name: str, f_number, f_number_err
+) -> None:
+    """Persist measurement values in an HDF5 file."""
 
-        # Save the two arrays under the measurement group
-        measurement_group.create_dataset('f_number', data=f_number)
-        measurement_group.create_dataset('f_number_err', data=f_number_err)
+    with h5py.File(filename, "a") as file:
+        measurement_group = file.create_group(measurement_name)
+        measurement_group.create_dataset("f_number", data=f_number)
+        measurement_group.create_dataset("f_number_err", data=f_number_err)
 
 def move_files_and_folders(source_folder:str, destination_folder:str):
     """
@@ -106,18 +120,9 @@ def clear_folder(folder_path):
             shutil.rmtree(item_path)
             print(f"Deleted folder: {item_path}")
 
+def _copy_items(source_folder: str, destination_folder: str) -> None:
+    """Recursively copy items from ``source_folder`` to ``destination_folder``."""
 
-def synchronize_directories(source_folder: str, destination_folder: str):
-    """
-    Synchronize the files and folders between the source and destination folders.
-    Args:
-        source_folder: Path of the source folder.
-        destination_folder: Path of the destination folder.
-    """
-    # Ensure the destination folder exists
-    os.makedirs(destination_folder, exist_ok=True)
-
-    # Copy files and folders from source to destination
     for item in os.listdir(source_folder):
         source_path = os.path.join(source_folder, item)
         destination_path = os.path.join(destination_folder, item)
@@ -131,9 +136,12 @@ def synchronize_directories(source_folder: str, destination_folder: str):
                 print(f"Copying folder: {item}")
                 shutil.copytree(source_path, destination_path)
             else:
-                synchronize_directories(source_path, destination_path)
+                _copy_items(source_path, destination_path)
 
-    # Remove files and folders from destination that are not in source
+
+def _remove_extra_items(source_folder: str, destination_folder: str) -> None:
+    """Remove items from ``destination_folder`` that do not exist in ``source_folder``."""
+
     for item in os.listdir(destination_folder):
         source_path = os.path.join(source_folder, item)
         destination_path = os.path.join(destination_folder, item)
@@ -145,6 +153,14 @@ def synchronize_directories(source_folder: str, destination_folder: str):
             elif os.path.isdir(destination_path):
                 print(f"Deleting folder: {item}")
                 shutil.rmtree(destination_path)
+
+
+def synchronize_directories(source_folder: str, destination_folder: str) -> None:
+    """Synchronize contents of ``destination_folder`` with ``source_folder``."""
+
+    os.makedirs(destination_folder, exist_ok=True)
+    _copy_items(source_folder, destination_folder)
+    _remove_extra_items(source_folder, destination_folder)
 
 def run_batch_file(batch_file_path:str):
     """
