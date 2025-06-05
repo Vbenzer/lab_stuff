@@ -300,28 +300,44 @@ class GeneralTab(HelperFunctions):
             return
 
         selected_function = self.general_function_combo.currentText()
-        self.main_init.log_data(f"General tab buttons updated for function: {selected_function}.")  # Log button update
-
-        # Spacer management
-        spacer_height = (
-            162 if selected_function in ["Adjust Tip/Tilt", "Motor Controller: Reference",
-                                         "Motor Controller: Move to Position", "Measure Eccentricity",
-                                         "Change Color Filter",
-                                         "Change System F-ratio"
-                                         ]
-            else 82 if selected_function in ["Make Throughput Calibration",
-                                             "FF with each Filter", "Measure Fiber Size",
-                                             ]
-            else 0 if selected_function in ["Measure System F-ratio", "Near-Field, Far-Field Comparison"]
-            else 200
+        self.main_init.log_data(
+            f"General tab buttons updated for function: {selected_function}."
         )
 
-        if hasattr(self.main, 'placeholder_spacer'):
+        spacer_height = self._calculate_spacer_height(selected_function)
+        if hasattr(self.main, "placeholder_spacer"):
             self.main.layout.removeItem(self.main.placeholder_spacer)
             del self.main.placeholder_spacer
         self.main.insert_spacer(spacer_height)
 
-        # Hide all elements by default
+        self._hide_all_general_elements()
+        self._show_elements_for_function(selected_function)
+        self._update_run_button_state(selected_function)
+
+    def _calculate_spacer_height(self, selected_function: str) -> int:
+        if selected_function in [
+            "Adjust Tip/Tilt",
+            "Motor Controller: Reference",
+            "Motor Controller: Move to Position",
+            "Measure Eccentricity",
+            "Change Color Filter",
+            "Change System F-ratio",
+        ]:
+            return 162
+        if selected_function in [
+            "Make Throughput Calibration",
+            "FF with each Filter",
+            "Measure Fiber Size",
+        ]:
+            return 82
+        if selected_function in [
+            "Measure System F-ratio",
+            "Near-Field, Far-Field Comparison",
+        ]:
+            return 0
+        return 200
+
+    def _hide_all_general_elements(self) -> None:
         self.main_init.create_datasheet_button.hide()
         self.main_init.open_fiber_data_button.hide()
         self.main_init.recent_folders_combo.hide()
@@ -349,15 +365,15 @@ class GeneralTab(HelperFunctions):
         self.number_pos_input_label.hide()
         self.scale_label.hide()
         self.scale_combo.hide()
-        self.main_init.folder_name_label.setText("Folder Name:")
-        self.main_init.show_message("")
-        self.run_button_gt.setDisabled(True)
         self.motor_drive_label.hide()
         self.motor_drive_button_0.hide()
         self.motor_drive_button_5.hide()
         self.motor_drive_button_9_9.hide()
+        self.run_button_gt.setDisabled(True)
+        self.main_init.folder_name_label.setText("Folder Name:")
+        self.main_init.show_message("")
 
-        # Handle specific functions
+    def _show_elements_for_function(self, selected_function: str) -> None:
         if selected_function == "Measure System F-ratio":
             print("Setting focus policy to StrongFocus for folder name input.")
             self.main_init.folder_name_input.show()
@@ -371,10 +387,8 @@ class GeneralTab(HelperFunctions):
             self.main_init.recent_folders_combo.show()
             self.main_init.recent_folders_label.show()
             self.main_init.choose_folder_button.show()
-
         elif selected_function in ["Adjust Tip/Tilt", "Measure Eccentricity"]:
             self.stop_button.show()
-
         elif selected_function == "Motor Controller: Move to Position":
             self.number_input_label.show()
             self.number_input.show()
@@ -382,25 +396,21 @@ class GeneralTab(HelperFunctions):
             self.motor_drive_button_0.show()
             self.motor_drive_button_5.show()
             self.motor_drive_button_9_9.show()
-
         elif selected_function == "FF with each Filter":
             self.main_init.folder_name_label.show()
             self.main_init.folder_name_input.show()
             self.main_init.working_dir_label.show()
             self.main_init.working_dir_display.show()
             self.main_init.comments_button.show()
-
         elif selected_function == "Change Color Filter":
             self.filter_input_label.show()
             self.filter_input_combo.show()
-
         elif selected_function == "Change System F-ratio":
             if not self.main.filter_wheel_initiated:
                 threading.Thread(target=self.main.initialize_filter_wheel).start()
             self.fratio_input_label.show()
             self.fratio_input_combo.show()
             self.fratio_input_combo.setDisabled(not self.main.filter_wheel_ready)
-
         elif selected_function == "Measure Fiber Size":
             self.main_init.folder_name_input.setText("Fiber_Size_Measurement")
             self.main_init.folder_name_label.show()
@@ -410,7 +420,6 @@ class GeneralTab(HelperFunctions):
             self.main_init.comments_button.show()
             self.exposure_time_label_gt.show()
             self.exposure_time_input_gt.show()
-
         elif selected_function == "Near-Field, Far-Field Comparison":
             self.main_init.folder_name_input.setText(self.main.folder_name)
             self.main_init.folder_name_input.show()
@@ -433,13 +442,16 @@ class GeneralTab(HelperFunctions):
             self.scale_label.show()
             self.scale_combo.show()
             if not self.main.fiber_dimension:
-                self.main_init.show_message("Please enter fiber dimension before running the function.")
+                self.main_init.show_message(
+                    "Please enter fiber dimension before running the function."
+                )
                 return
 
-            if type(self.main.fiber_dimension) == "str":
-                fiber_dimension =  float(self.main.fiber_dimension)
-            else:
-                fiber_dimension = float(self.main.fiber_dimension)
+            fiber_dimension = (
+                float(self.main.fiber_dimension)
+                if isinstance(self.main.fiber_dimension, str)
+                else float(self.main.fiber_dimension)
+            )
 
             if isinstance(fiber_dimension, (list, tuple)):
                 fiber_radius = max(fiber_dimension[0], fiber_dimension[1])
@@ -447,7 +459,6 @@ class GeneralTab(HelperFunctions):
                 fiber_radius = fiber_dimension
 
             self.driving_width_input.setText(str(fiber_radius))
-
         elif selected_function == "Make Throughput Calibration":
             self.main_init.folder_name_input.show()
             self.main_init.folder_name_label.show()
@@ -456,10 +467,17 @@ class GeneralTab(HelperFunctions):
             self.main_init.comments_button.show()
             self.main_init.folder_name_label.setText("Calibration Name:")
 
-        # Run button state
-        if selected_function in ["Measure System F-ratio", "Near-Field, Far-Field Comparison", "FF with each Filter",
-                                 "Make Throughput Calibration", "Measure Fiber Size"]:
-            self.run_button_gt.setDisabled(self.main_init.folder_name_input.text() == "")
+    def _update_run_button_state(self, selected_function: str) -> None:
+        if selected_function in [
+            "Measure System F-ratio",
+            "Near-Field, Far-Field Comparison",
+            "FF with each Filter",
+            "Make Throughput Calibration",
+            "Measure Fiber Size",
+        ]:
+            self.run_button_gt.setDisabled(
+                self.main_init.folder_name_input.text() == ""
+            )
         elif selected_function in ["Change System F-ratio"] and not self.main.filter_wheel_ready:
             self.run_button_gt.setDisabled(True)
         else:
