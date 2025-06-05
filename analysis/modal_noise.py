@@ -1,6 +1,8 @@
-"""Module modal_noise.py.
+"""Utilities to analyse modal noise via Fourier transforms.
 
-Auto-generated docstring for better readability.
+This module provides helper functions to load images, compute their
+Fourier transform and visualise the resulting power spectra.  It is
+mainly intended for quick explorations of fiber images.
 """
 import numpy as np
 
@@ -53,147 +55,161 @@ def create_test_image(plot:bool=False):
     return image
 
 
-def pipeline(image, cut_image_par:bool=False, save:bool=False ,debug:bool=False):
+def _load_image(image: str | np.ndarray, save: bool) -> tuple[np.ndarray, str | None]:
+    """Load ``image`` from disk if necessary.
+
+    Parameters
+    ----------
+    image:
+        Either a path to an image or an array.
+    save:
+        If ``True`` plots will be written next to the image and a base
+        directory is returned.
+
+    Returns
+    -------
+    numpy.ndarray
+        The loaded image as array.
+    str | None
+        The directory where plots should be stored or ``None`` when
+        ``save`` is ``False``.
+    """
+
     from core.data_processing import png_to_numpy
-    from matplotlib import pyplot as plt
-    from core.data_processing import cut_image
     import os
 
+    basepath = None
     if isinstance(image, str):
-        image_path = image
-        basepath = os.path.abspath(os.path.join(os.path.dirname(image_path), "..", "..")) + "/results"
-        os.makedirs(basepath, exist_ok=True)
-        if image_path.endswith('.png'):
-            # Load the png image and convert it to a numpy array
-            image = png_to_numpy(image_path)
-        elif image_path.endswith('.gif'):
+        if save:
+            basepath = os.path.abspath(os.path.join(os.path.dirname(image), "..", "..")) + "/results"
+            os.makedirs(basepath, exist_ok=True)
+
+        if image.endswith(".png"):
+            image = png_to_numpy(image)
+        elif image.endswith(".gif"):
             from PIL import Image
-            image = Image.open(image_path)
-            image = np.array(image)  # Convert to grayscale
+            image = np.array(Image.open(image))
         else:
             raise ValueError("Unsupported image format. Please provide a .png or .gif file.")
     else:
         if save:
             raise ValueError("If 'image' is not a string, 'save' must be False.")
 
+    return image, basepath
+
+
+def _plot_image(img: np.ndarray, title: str, save_path: str | None = None) -> None:
+    """Display ``img`` and optionally write it to ``save_path``."""
+    from matplotlib import pyplot as plt
+
+    plt.imshow(img, cmap="gray")
+    plt.title(title)
+    plt.colorbar()
+    if save_path:
+        plt.savefig(save_path)
+        plt.close()
+    else:
+        plt.show()
+
+
+def _radial_average(power_spectrum: np.ndarray, freq_x: np.ndarray, freq_y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Compute the radial average of ``power_spectrum``."""
+    u, v = np.meshgrid(freq_x, freq_y)
+    r = np.sqrt(u ** 2 + v ** 2)
+    r_flat = r.ravel()
+    p_flat = power_spectrum.ravel()
+    r_max = r_flat.max()
+    nbins = min(power_spectrum.shape)
+    bin_edges = np.linspace(0, r_max, nbins + 1)
+    sum_p, _ = np.histogram(r_flat, bins=bin_edges, weights=p_flat)
+    counts, _ = np.histogram(r_flat, bins=bin_edges)
+    radial_prof = sum_p / np.maximum(counts, 1)
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    return bin_centers, radial_prof
+
+
+def pipeline(image, cut_image_par: bool = False, save: bool = False, debug: bool = False) -> np.ndarray:
+    """Run the modal noise analysis pipeline on ``image``.
+
+    Parameters
+    ----------
+    image:
+        Path to an image or an image array.
+    cut_image_par:
+        If ``True`` the image is cropped using :func:`core.data_processing.cut_image`.
+    save:
+        Save the generated plots next to the input image.
+    debug:
+        Print additional debug output.
+
+    Returns
+    -------
+    numpy.ndarray
+        The computed power spectrum.
+    """
+
+    from core.data_processing import cut_image
+    from matplotlib import pyplot as plt
+    import os
+
+    img_array, basepath = _load_image(image, save)
+
     if cut_image_par:
-        cut_image = cut_image(image)
-    else:
-        cut_image = image
+        img_array = cut_image(img_array)
 
-    # Show cut image
-    plt.imshow(cut_image, cmap='gray')
-    plt.title("Cut Image")
-    plt.colorbar()
-    if save:
-        plt.savefig(basepath + "/cut_image.png")
-        plt.close()
-    else:
-        plt.show()
+    _plot_image(img_array, "Cut Image", os.path.join(basepath, "cut_image.png") if save else None)
 
-    transformed_image = fast_fourier_transform(cut_image)
+    transformed = fast_fourier_transform(img_array)
+    _plot_image(np.log1p(np.abs(transformed)), "Fourier Transform Magnitude",
+                os.path.join(basepath, "fourier_trans_2d.png") if save else None)
 
-    plt.imshow(np.log1p(np.abs(transformed_image)), cmap='gray')
-    plt.title("Fourier Transform Magnitude")
-    plt.colorbar()
-    if save:
-        plt.savefig(basepath + "/fourier_trans_2d.png")
-        plt.close()
-    else:
-        plt.show()
+    power_spectrum = np.abs(transformed) ** 2
 
-    power_spectrum = np.abs(transformed_image) ** 2
-
-    # Use the pixel size to calculate frequency axes
-    pixel_size = 5.2e-6  # Pixel size in meters
-    frequency_x = np.fft.fftfreq(cut_image.shape[1], d=pixel_size)
-    frequency_y = np.fft.fftfreq(cut_image.shape[0], d=pixel_size)
-    frequency_x = np.fft.fftshift(frequency_x)
-    frequency_y = np.fft.fftshift(frequency_y)
+    pixel_size = 5.2e-6  # pixel size in meters
+    frequency_x = np.fft.fftshift(np.fft.fftfreq(img_array.shape[1], d=pixel_size))
+    frequency_y = np.fft.fftshift(np.fft.fftfreq(img_array.shape[0], d=pixel_size))
 
     if debug:
         print("Frequency X:", frequency_x)
         print("Frequency Y:", frequency_y)
 
-    # Define the target values: 0 and increments of ±10000
-    targets = np.arange(0, round(max(abs(frequency_x)), -5), 10000)  # Positive direction
-    targets = np.concatenate((-targets[::-1], targets[1:]))  # Add negative direction
+    targets = np.arange(0, round(max(abs(frequency_x)), -5), 10000)
+    targets = np.concatenate((-targets[::-1], targets[1:]))
+    indices_x = [np.argmin(np.abs(frequency_x - t)) for t in targets]
+    indices_y = [np.argmin(np.abs(frequency_y - t)) for t in targets]
 
-    # Find the indices of the closest values
-    indices_x = [np.argmin(np.abs(frequency_x - target)) for target in targets]
-    indices_y = [np.argmin(np.abs(frequency_y - target)) for target in targets]
-
-    # Print the results
-    if debug:
-        for target, index in zip(targets, indices_x):
-            print(f"Target: {target}, Closest Value: {frequency_x[index]}, Index: {index}")
-
-        for target, index in zip(targets, indices_y):
-            print(f"Target: {target}, Closest Value: {frequency_y[index]}, Index: {index}")
-
-    # Plot the power spectrum with frequency axes
     plt.figure(figsize=(8, 8))
-    plt.imshow(np.log1p(power_spectrum), cmap='jet')
+    plt.imshow(np.log1p(power_spectrum), cmap="jet")
     plt.title("Power Spectrum")
     plt.colorbar()
     plt.grid(True)
     plt.xlabel("Frequency X (1/mm)")
     plt.ylabel("Frequency Y (1/mm)")
-
-    plt.xticks(ticks=[i for i in indices_x], labels=[int(targets[i]/1000) for i in range(len(targets))], rotation=45)
-    plt.yticks(ticks=[i for i in indices_y], labels=[int(targets[i]/1000) for i in range(len(targets))])
+    plt.xticks(ticks=indices_x, labels=[int(t/1000) for t in targets], rotation=45)
+    plt.yticks(ticks=indices_y, labels=[int(t/1000) for t in targets])
     if save:
-        plt.savefig(basepath + "/fourier_trans_2d_physical_units.png")
+        plt.savefig(os.path.join(basepath, "fourier_trans_2d_physical_units.png"))
         plt.close()
     else:
         plt.show()
 
-    # Radial average of the power spectrum
-    u, v = np.meshgrid(frequency_x, frequency_y)
-    r = np.sqrt(u**2 + v**2)
-
-    r_flat = r.ravel()
-    P_flat = np.abs(transformed_image) ** 2
-    P_flat = P_flat.ravel()
-
-    # choose your radial bins
-    r_max = r_flat.max()
-    nbins = min(transformed_image.shape)
-    bin_edges = np.linspace(0, r_max, nbins + 1)
-
-    # histogram: sum of power in each bin
-    sum_P, _ = np.histogram(r_flat, bins=bin_edges, weights=P_flat)
-
-    # histogram: count of pixels in each bin
-    counts, _ = np.histogram(r_flat, bins=bin_edges)
-
-    # avoid division by zero
-    radial_prof = sum_P / np.maximum(counts, 1)
-
-    # bin centers
-    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-
-
-
-
-    print("Maximum frequency:", min(np.max(frequency_x), np.max(frequency_y)))
-    mask = (bin_centers <= min(np.max(frequency_x), np.max(frequency_y)))
-
-
-
+    bin_centers, radial_prof = _radial_average(power_spectrum, frequency_x, frequency_y)
+    mask = bin_centers <= min(frequency_x.max(), frequency_y.max())
 
     plt.plot(bin_centers[mask], radial_prof[mask])
     plt.xlabel("Spatial frequency (cycles/µm)")
-    plt.ylabel("Radial‐averaged power")
-    plt.yscale('log')
+    plt.ylabel("Radial-averaged power")
+    plt.yscale("log")
     plt.title("1D Power Spectrum")
     if save:
-        plt.savefig(basepath + "/fourier_plot.png")
+        plt.savefig(os.path.join(basepath, "fourier_plot.png"))
         plt.close()
     else:
         plt.show()
 
     return power_spectrum
+
+
 
 
 
