@@ -1,11 +1,14 @@
-"""Module file_management.py.
+"""Utility helpers for managing measurement files and directories.
 
-Auto-generated docstring for better readability.
+This module bundles small convenience functions used across the
+analysis scripts.  They deal with creation of HDF5 containers, storing
+plots, copying directory structures and running batch files.
 """
 import os
 import shutil
 import subprocess
-import time
+from typing import Callable
+
 import h5py
 import numpy as np
 
@@ -58,48 +61,63 @@ def save_measurement_hdf5(
         measurement_group.create_dataset("f_number", data=f_number)
         measurement_group.create_dataset("f_number_err", data=f_number_err)
 
-def move_files_and_folders(source_folder:str, destination_folder:str):
-    """
-    Move all files and subfolders from the source folder to the destination folder.
-    Args:
-        source_folder: Path of the source folder.
-        destination_folder: Path of the destination folder.
 
+def _transfer_items(
+    source_folder: str,
+    destination_folder: str,
+    file_func: Callable[[str, str], None],
+    folder_func: Callable[[str, str], None],
+    verb: str,
+) -> None:
+    """Helper used by ``move_files_and_folders`` and ``copy_files_and_folders``.
+
+    Parameters
+    ----------
+    source_folder:
+        Directory from which to read items.
+    destination_folder:
+        Directory where items will be placed.
+    file_func:
+        Function used to process files (e.g. ``shutil.move``).
+    folder_func:
+        Function used to process folders (e.g. ``shutil.copytree``).
+    verb:
+        Action description used for console output.
     """
+
     for item in os.listdir(source_folder):
         source_path = os.path.join(source_folder, item)
         destination_path = os.path.join(destination_folder, item)
 
         if os.path.isfile(source_path):
-            # Move file
-            print(f"Moving file: {item}")
-            shutil.move(source_path, destination_path)
+            print(f"{verb} file: {item}")
+            file_func(source_path, destination_path)
         elif os.path.isdir(source_path):
-            # Move folder
-            print(f"Moving folder: {item}")
-            shutil.move(source_path, destination_path)
+            print(f"{verb} folder: {item}")
+            folder_func(source_path, destination_path)
+
+def move_files_and_folders(source_folder: str, destination_folder: str) -> None:
+    """Move all items from ``source_folder`` to ``destination_folder``."""
+
+    _transfer_items(
+        source_folder,
+        destination_folder,
+        shutil.move,
+        shutil.move,
+        "Moving",
+    )
 
 
-def copy_files_and_folders(source_folder:str, destination_folder:str):
-    """
-    Copy all files and subfolders from the source folder to the destination folder.
-    Args:
-        source_folder: Path of the source folder.
-        destination_folder: Path of the destination folder.
+def copy_files_and_folders(source_folder: str, destination_folder: str) -> None:
+    """Copy all items from ``source_folder`` to ``destination_folder``."""
 
-    """
-    for item in os.listdir(source_folder):
-        source_path = os.path.join(source_folder, item)
-        destination_path = os.path.join(destination_folder, item)
-
-        if os.path.isfile(source_path):
-            # Copy file
-            print(f"Copying file: {item}")
-            shutil.copy(source_path, destination_path)
-        elif os.path.isdir(source_path):
-            # Copy folder
-            print(f"Copying folder: {item}")
-            shutil.copytree(source_path, destination_path)
+    _transfer_items(
+        source_folder,
+        destination_folder,
+        shutil.copy2,
+        shutil.copytree,
+        "Copying",
+    )
 
 
 def clear_folder(folder_path):
@@ -123,6 +141,10 @@ def clear_folder(folder_path):
 def _copy_items(source_folder: str, destination_folder: str) -> None:
     """Recursively copy items from ``source_folder`` to ``destination_folder``."""
 
+    # Iterate over each file or directory in the source folder and copy it to
+    # the destination.  Existing files are overwritten, while existing folders
+    # are merged recursively.
+
     for item in os.listdir(source_folder):
         source_path = os.path.join(source_folder, item)
         destination_path = os.path.join(destination_folder, item)
@@ -142,6 +164,10 @@ def _copy_items(source_folder: str, destination_folder: str) -> None:
 def _remove_extra_items(source_folder: str, destination_folder: str) -> None:
     """Remove items from ``destination_folder`` that do not exist in ``source_folder``."""
 
+    # Walk destination folder and delete files or folders that have no
+    # counterpart in the source.  This keeps ``destination_folder``
+    # synchronized with ``source_folder`` when copying.
+
     for item in os.listdir(destination_folder):
         source_path = os.path.join(source_folder, item)
         destination_path = os.path.join(destination_folder, item)
@@ -158,16 +184,16 @@ def _remove_extra_items(source_folder: str, destination_folder: str) -> None:
 def synchronize_directories(source_folder: str, destination_folder: str) -> None:
     """Synchronize contents of ``destination_folder`` with ``source_folder``."""
 
+    # Ensure destination exists before starting the synchronization. All new
+    # or changed files are copied, and obsolete files are removed so that both
+    # directories mirror each other.
+
     os.makedirs(destination_folder, exist_ok=True)
     _copy_items(source_folder, destination_folder)
     _remove_extra_items(source_folder, destination_folder)
 
-def run_batch_file(batch_file_path:str):
-    """
-    Runs a batch file using subprocess
-    Args:
-        batch_file_path: Path of the file.
-    """
+def run_batch_file(batch_file_path: str) -> None:
+    """Execute ``batch_file_path`` using ``subprocess.run``."""
     try:
         # Use subprocess to run the batch file
         result = subprocess.run(batch_file_path, shell=True, check=True, text=True)
@@ -175,13 +201,19 @@ def run_batch_file(batch_file_path:str):
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while running the batch file: {e}")
 
-def load_frd_calibration_data(folder_path:str):
-    """
-    Load FRD calibration data from a specified folder.
-    Args:
-        folder_path: Path of the folder containing the calibration data.
-    Returns:
-        A dictionary with calibration data.
+def load_frd_calibration_data(folder_path: str):
+    """Load FRD calibration data located in ``folder_path``.
+
+    Parameters
+    ----------
+    folder_path : str
+        Path to the folder containing ``f_number.json``.
+
+    Returns
+    -------
+    tuple[list | None, list | None]
+        ``f_number`` and ``f_number_err`` arrays if the file was found,
+        otherwise ``(None, None)``.
     """
     import json
     calibration_data = {}
