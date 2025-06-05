@@ -649,8 +649,105 @@ def plot_circle_movement(image_folder:str, fiber_px_radius:int): # Todo: This fu
     plt.xlabel('Time')
     plt.ylabel('Shift [μm]')
     plt.title('Center of Mass Movement')
+
     plt.legend()
     plt.show()
+
+
+def _pixel_radii(fiber_diameter, fiber_shape):
+    """Calculate entrance and exit pixel radii for a fiber."""
+    if fiber_shape == "rectangular":
+        r_in = (
+            int(fiber_diameter[0] / 0.5169363821005045 / 2),
+            int(fiber_diameter[1] / 0.5169363821005045 / 2),
+        )
+        r_out = (
+            int(fiber_diameter[0] / 0.439453125 / 2),
+            int(fiber_diameter[1] / 0.439453125 / 2),
+        )
+    else:
+        r_in = int(fiber_diameter / 0.5169363821005045 / 2)
+        r_out = int(fiber_diameter / 0.439453125 / 2)
+    return r_in, r_out
+
+
+def _process_entrance_images(image_folder, mask_folder, fiber_shape, pixel_radius,
+                             progress_signal=None, plot_mask=False,
+                             save_mask=True, plot_all=False):
+    """Process entrance images and return COM, COMK and radius arrays."""
+    files = sorted(f for f in os.listdir(image_folder) if f.endswith("reduced.png"))
+    coms, comks, radii = [], [], []
+    best_params = None
+
+    for image_file in files:
+        img_path = os.path.join(image_folder, image_file)
+        if progress_signal:
+            progress_signal.emit(f"Processing entrance image {image_file}")
+        image = io.imread(img_path)
+        coms.append(com_of_spot(image, threshold=10, plot=False))
+        mask_path = os.path.join(mask_folder, image_file.replace(".png", "_mask.png"))
+
+        if fiber_shape == "circular":
+            cy, cx, r = detect_circle(image, pixel_radius)
+            mask = create_circular_mask(image, (cy, cx), r, plot_mask=plot_mask)
+            io.imsave(mask_path, mask.astype(np.uint8) * 255)
+            comks.append([cy, cx])
+            radii.append(r)
+            continue
+
+        save_path = img_path.replace(".png", "_mask.png") if save_mask else -1
+        angle, position, r = match_shape(image, pixel_radius, fiber_shape,
+                                        plot_all=plot_all, best_params=best_params)
+        best_params = [r, angle]
+        mask, comk = build_mask(image, r, fiber_shape, 1, position, angle,
+                                plot_mask=plot_mask, save_mask=save_path)
+        io.imsave(mask_path, mask.astype(np.uint8) * 255)
+        comks.append(comk)
+        radii.append(r)
+
+    return np.array(coms), np.array(comks), np.array(radii)
+
+
+def _process_exit_images(image_folder, mask_folder, fiber_shape, pixel_radius,
+                         progress_signal=None, plot_mask=False,
+                         save_mask=True, plot_all=False):
+    """Process exit images and return COMK, COM and radius arrays."""
+    files = sorted(f for f in os.listdir(image_folder) if f.endswith("reduced.png"))
+    comks, coms, radii, max_flux = [], [], [], []
+    mask = None
+
+    for image_file in files:
+        img_path = os.path.join(image_folder, image_file)
+        if progress_signal:
+            progress_signal.emit(f"Processing exit image {image_file}")
+        image = io.imread(img_path)
+        mask_path = os.path.join(mask_folder, image_file.replace(".png", "_mask.png"))
+
+        if mask is None:
+            if fiber_shape == "circular":
+                cy, cx, r = detect_circle(image, pixel_radius)
+                comk = [cy, cx]
+                margin = grow_mask(image, comk, r, "circular")
+                mask = create_circular_mask(image, (cy, cx), r + margin, plot_mask=plot_mask)
+            else:
+                save_path = img_path.replace(".png", "_mask.png") if save_mask else -1
+                angle, position, r = match_shape(image, pixel_radius, fiber_shape, plot_all=plot_all)
+                margin = grow_mask(image, position, r, fiber_shape, angle=angle)
+                mask, comk = build_mask(image, r, fiber_shape, margin, position, angle,
+                                        plot_mask=plot_mask, save_mask=save_path)
+                r = pixel_radius
+            io.imsave(mask_path, mask.astype(np.uint8) * 255)
+        else:
+            comk = comks[-1]
+            r = radii[-1]
+
+        comks.append(comk)
+        radii.append(r)
+        max_flux.append(int(check_mask_flux_single(image, mask, plot=False)))
+        image[~mask.astype(bool)] = 0
+        coms.append(com_of_spot(image))
+
+    return np.array(comks), np.array(coms), np.array(radii), max_flux
 
 def get_sg_params(main_folder:str, fiber_diameter:int, fiber_shape:str, progress_signal=None,
                               save_mask:bool=True, plot_mask:bool=False, plot_all:bool=False):
