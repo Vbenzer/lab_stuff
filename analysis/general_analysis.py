@@ -17,7 +17,24 @@ import core.hardware.cameras.qhyccd_control as qhy_ccd_take_image
 from core.hardware.cameras import thorlabs_cam_control as tcc
 
 
-def measure_fiber_size(project_folder: str, exposure_times: dict[str, str] = None, progress_signal=None):
+def measure_fiber_size(
+    project_folder: str,
+    exposure_times: dict[str, str] | None = None,
+    progress_signal=None,
+) -> None:
+    """Estimate the fiber dimensions using an exit camera image.
+
+    Parameters
+    ----------
+    project_folder:
+        Location where the temporary FITS file is written.
+    exposure_times:
+        Mapping ``{"exit_cam": str}`` describing the exposure time.  A
+        ``ValueError`` is raised when ``None``.
+    progress_signal:
+        Optional Qt signal used by the GUI to report progress.
+    """
+
     if exposure_times is None:
         raise ValueError("Exposure times must be provided.")
 
@@ -45,18 +62,24 @@ def measure_fiber_size(project_folder: str, exposure_times: dict[str, str] = Non
     print(fiber_data[0]["dimensions_mu"])
 
 
+# Device instances used across capture functions.  They are created in
+# :func:`_initialize_devices` and reused throughout the module.
 fw = None
 cam = None
 
 
-def init_camera(exp_time:int):
+def init_camera(exp_time: int) -> None:
+    """Initialise the QHYCCD camera used for exit images."""
+
     global cam
     cam = qhy_ccd_take_image.Camera(exp_time=exp_time)
 
 
-def init_filter_wheel():
+def init_filter_wheel() -> None:
+    """Initialise the filter wheel controlling the input f-ratio."""
+
     global fw
-    fw = qhycfw3_filter_wheel_control.FilterWheel('COM5')
+    fw = qhycfw3_filter_wheel_control.FilterWheel("COM5")
 
 
 def _initialize_devices(exit_cam_exp: int, progress_signal=None) -> None:
@@ -196,6 +219,102 @@ def nf_ff_capture(project_folder: str, fiber_diameter: [int, tuple[int, int]], e
     print("All images taken!")
 
 
+def _reduce_raw_images(
+    entrance_light: str,
+    entrance_dark: str,
+    exit_light: str,
+    exit_dark: str,
+    entrance_out: str,
+    exit_out: str,
+    progress_signal=None,
+) -> None:
+    """Reduce all raw images found in the provided folders."""
+
+    entrance_light_images = sorted(os.listdir(entrance_light))
+    exit_light_images = sorted(os.listdir(exit_light))
+    entrance_dark_images = sorted(os.listdir(entrance_dark))
+    exit_dark_images = sorted(os.listdir(exit_dark))
+
+    for i in range(len(entrance_light_images)):
+        if progress_signal:
+            progress_signal.emit(
+                f"Reducing images {i + 1} of {len(entrance_light_images)}"
+            )
+
+        with fits.open(os.path.join(entrance_light, entrance_light_images[i])) as hd:
+            entrance_light_data = hd[0].data.astype(np.float32)
+        with fits.open(os.path.join(entrance_dark, entrance_dark_images[i])) as hd:
+            entrance_dark_data = hd[0].data.astype(np.float32)
+
+        out_path = os.path.join(entrance_out, f"entrance_cam_reduced{i:03d}.fits")
+        core.data_processing.reduce_image_with_dark(
+            entrance_light_data, entrance_dark_data, out_path, save=True
+        )
+
+        with fits.open(os.path.join(exit_light, exit_light_images[i])) as hd:
+            exit_light_data = hd[0].data.astype(np.float32)
+        with fits.open(os.path.join(exit_dark, exit_dark_images[i])) as hd:
+            exit_dark_data = hd[0].data.astype(np.float32)
+
+        out_path = os.path.join(exit_out, f"exit_cam_reduced{i:03d}.fits")
+        core.data_processing.reduce_image_with_dark(
+            exit_light_data, exit_dark_data, out_path, save=True
+        )
+
+
+def _cut_images(
+    entrance_reduced: str,
+    exit_reduced: str,
+    entrance_cut: str,
+    exit_cut: str,
+    fiber_radius: int | tuple[int, int],
+    output_scale: str,
+    progress_signal=None,
+) -> None:
+    """Cut reduced images to a manageable size."""
+
+    entrance_reduced_images = sorted(os.listdir(entrance_reduced))
+    exit_reduced_images = sorted(os.listdir(exit_reduced))
+
+    for i in range(len(entrance_reduced_images)):
+        if progress_signal:
+            progress_signal.emit(
+                f"Cutting images {i + 1} of {len(entrance_reduced_images)}"
+            )
+
+        from analysis.sg_analysis import cut_image_around_comk
+
+        with fits.open(os.path.join(entrance_reduced, entrance_reduced_images[i])) as hd:
+            entrance_data = hd[0].data.astype(np.float32)
+
+        com = core.data_processing.locate_focus(entrance_data)
+        cut_img = cut_image_around_comk(entrance_data, com, fiber_radius, margin=50)
+        cut_img = (cut_img - np.min(cut_img)) / (np.max(cut_img) - np.min(cut_img)) * 255
+        io.imsave(
+            os.path.join(entrance_cut, f"entrance_cam_cut{i:03d}.png"),
+            cut_img.astype(np.uint8),
+        )
+
+        with fits.open(os.path.join(exit_reduced, exit_reduced_images[i])) as hd:
+            exit_data = hd[0].data.astype(np.float32)
+
+        trimmed = core.data_processing.cut_image(exit_data, margin=500)
+        trimmed = (trimmed - np.min(trimmed)) / (np.max(trimmed) - np.min(trimmed)) * 255
+        trimmed = transform.resize(
+            trimmed,
+            (trimmed.shape[0] // 10, trimmed.shape[1] // 10),
+            anti_aliasing=True,
+        )
+
+        if output_scale == "log":
+            trimmed = np.log1p(trimmed) / np.log1p(np.max(trimmed)) * 255
+
+        io.imsave(
+            os.path.join(exit_cut, f"exit_cam_cut{i:03d}.png"),
+            trimmed.astype(np.uint8),
+        )
+
+
 def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], progress_signal=None, output_scale:str="lin"):
     """
     Processes the images taken with the entrance and exit cameras. The images are reduced and cut to size.
@@ -229,99 +348,36 @@ def nf_ff_process(project_folder:str, fiber_diameter:[int, tuple[int,int]], prog
     os.makedirs(entrance_folder_cut, exist_ok=True)
     os.makedirs(exit_folder_cut, exist_ok=True)
 
-    # Get the list of light and dark images
-    entrance_light_images = sorted(os.listdir(entrance_folder_light))
-    exit_light_images = sorted(os.listdir(exit_folder_light))
+    # Reduce raw images and create cleaned FITS files
+    _reduce_raw_images(
+        entrance_folder_light,
+        entrance_folder_dark,
+        exit_folder_light,
+        exit_folder_dark,
+        entrance_folder_reduced,
+        exit_folder_reduced,
+        progress_signal,
+    )
 
-    entrance_dark_images = sorted(os.listdir(entrance_folder_dark))
-    exit_dark_images = sorted(os.listdir(exit_folder_dark))
-
-    # Reduce the images
-    for i in range(len(entrance_light_images)):
-        print("Reducing image", i)
-
-        if progress_signal:
-            progress_signal.emit(f"Reducing images {i + 1} of {len(entrance_light_images)}")
-
-        output_file_path_entrance = os.path.join(entrance_folder_reduced, f"entrance_cam_reduced{i:03d}.fits")
-        # Load the entrance light and dark images
-        with fits.open(os.path.join(entrance_folder_light, entrance_light_images[i])) as hdul:
-            entrance_light_data = hdul[0].data.astype(np.float32)
-
-        with fits.open(os.path.join(entrance_folder_dark, entrance_dark_images[i])) as hdul:
-            entrance_dark_data = hdul[0].data.astype(np.float32)
-
-        core.data_processing.reduce_image_with_dark(entrance_light_data, entrance_dark_data, output_file_path_entrance, save=True)
-
-        # Load the exit light and dark images
-        with fits.open(os.path.join(exit_folder_light, exit_light_images[i])) as hdul:
-            exit_light_data = hdul[0].data.astype(np.float32)
-
-        with fits.open(os.path.join(exit_folder_dark, exit_dark_images[i])) as hdul:
-            exit_dark_data = hdul[0].data.astype(np.float32)
-
-        output_file_path_exit = os.path.join(exit_folder_reduced, f"exit_cam_reduced{i:03d}.fits")
-        core.data_processing.reduce_image_with_dark(exit_light_data, exit_dark_data, output_file_path_exit, save=True)
-    print("All images reduced!")
-
-    if progress_signal:
-        progress_signal.emit("Image reduction done")
-
-    # Get list of reduced images
-    entrance_reduced_images = sorted(os.listdir(entrance_folder_reduced))
-    exit_reduced_images = sorted(os.listdir(exit_folder_reduced))
-
-    # Calculate the radius of the fiber in pixels, also handle rectangular case
     if isinstance(fiber_diameter, (tuple, list)):
         fiber_input_radius = (
-        int(fiber_diameter[0] / 0.5169363821005045 / 2), int(fiber_diameter[1] / 0.5169363821005045 / 2))
+            int(fiber_diameter[0] / 0.5169363821005045 / 2),
+            int(fiber_diameter[1] / 0.5169363821005045 / 2),
+        )
     else:
         fiber_input_radius = int(fiber_diameter / 0.5169363821005045 / 2)
 
-    # Cut the images to size
-    for i in range(len(entrance_light_images)):
-        print("Cutting image", i)
-
-        if progress_signal:
-            progress_signal.emit(f"Cutting images {i + 1} of {len(entrance_light_images)}")
-
-        # Cut entrance images
-        from analysis.sg_analysis import cut_image_around_comk
-
-        # Load the reduced entrance images
-        with fits.open(os.path.join(entrance_folder_reduced, entrance_reduced_images[i])) as hdul:
-            entrance_reduced_data = hdul[0].data.astype(np.float32)
-
-        com = core.data_processing.locate_focus(entrance_reduced_data)
-        cut_image = cut_image_around_comk(entrance_reduced_data, com, fiber_input_radius, margin=50)
-        # Save the cut image as png
-        cut_image = (cut_image - np.min(cut_image)) / (np.max(cut_image) - np.min(cut_image)) * 255
-        io.imsave(os.path.join(entrance_folder_cut, f"entrance_cam_cut{i:03d}.png"), cut_image.astype(np.uint8))
-
-        # Cut exit images
-        # Load the reduced exit images
-        with fits.open(os.path.join(exit_folder_reduced, exit_reduced_images[i])) as hdul:
-            exit_reduced_data = hdul[0].data.astype(np.float32)
-        trimmed_data = core.data_processing.cut_image(exit_reduced_data, margin=500)
-
-        # Raise values so that minimum is 0
-        trimmed_data = (trimmed_data - np.min(trimmed_data)) / (np.max(trimmed_data) - np.min(trimmed_data)) * 255
-        # Resize the image to 1/10
-        trimmed_data = transform.resize(trimmed_data, (trimmed_data.shape[0] // 10, trimmed_data.shape[1] // 10),
-                                        anti_aliasing=True)
-        if output_scale == "lin":
-            scaled_data = trimmed_data
-        elif output_scale == "log":
-            # Scale the data to 0-255 using logarithmic scaling
-            scaled_data = (np.log1p(trimmed_data) / np.log1p(np.max(trimmed_data)) * 255)
-        else:
-            print("Output scale must be either 'lin' or 'log'")
-            scaled_data = trimmed_data
-
-        io.imsave(os.path.join(exit_folder_cut, f"exit_cam_cut{i:03d}.png"), scaled_data.astype(np.uint8))
+    _cut_images(
+        entrance_folder_reduced,
+        exit_folder_reduced,
+        entrance_folder_cut,
+        exit_folder_cut,
+        fiber_input_radius,
+        output_scale,
+        progress_signal,
+    )
 
     print("All images reduced and cut!")
-
     if progress_signal:
         progress_signal.emit("Image cutting done")
 
